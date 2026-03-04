@@ -126,6 +126,11 @@
   align-items: flex-start;
 }
 
+.messageOwn {
+  background: rgba(138, 230, 255, 0.09);
+  border-color: rgba(138, 230, 255, 0.24);
+}
+
 .avatarLink {
   display: inline-flex;
   align-items: center;

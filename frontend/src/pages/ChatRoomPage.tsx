@@ -31,6 +31,10 @@ type Props = {
 };
 
 const RATE_LIMIT_COOLDOWN_MS = 10_000;
+const isOwnMessage = (
+  message: Message,
+  currentUsername: string | null | undefined,
+) => Boolean(currentUsername && message.username === currentUsername);
 const sameAvatarCrop = (
   left: Message["avatarCrop"],
   right: Message["avatarCrop"],
@@ -523,7 +527,19 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 </div>
               ) : (
                 <article
-                  className={styles.message}
+                  className={[
+                    styles.message,
+                    isOwnMessage(item.message, user?.username)
+                      ? styles.messageOwn
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  data-own-message={
+                    isOwnMessage(item.message, user?.username)
+                      ? "true"
+                      : "false"
+                  }
                   key={`${item.message.id}-${item.message.createdAt}`}
                 >
                   <button

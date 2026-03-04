@@ -198,5 +198,29 @@ describe('ChatRoomPage', () => {
     const { container } = render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />)
     expect(container.querySelector('[data-size="small"][data-online="true"]')).toBeNull()
   })
+
+  it('highlights own messages', () => {
+    chatRoomMock.messages = [
+      {
+        id: 3,
+        username: 'demo',
+        content: 'mine',
+        profilePic: null,
+        createdAt: '2026-02-13T12:00:00.000Z',
+      },
+      {
+        id: 4,
+        username: 'alice',
+        content: 'other',
+        profilePic: null,
+        createdAt: '2026-02-13T12:01:00.000Z',
+      },
+    ]
+
+    const { container } = render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />)
+
+    expect(container.querySelector('article[data-own-message="true"]')).not.toBeNull()
+    expect(container.querySelector('article[data-own-message="false"]')).not.toBeNull()
+  })
 })
 
