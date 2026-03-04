@@ -3,6 +3,15 @@ import { z } from 'zod'
 import type { DirectChatListItem } from '../../entities/room/types'
 import { parseJson, safeDecode } from '../core/codec'
 
+const avatarCropSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  })
+  .passthrough()
+
 const unreadSchema = z
   .object({
     dialogs: z.number().optional(),
@@ -18,6 +27,7 @@ const itemSchema = z
       .object({
         username: z.string().min(1),
         profileImage: z.string().nullable().optional(),
+        avatarCrop: avatarCropSchema.nullable().optional(),
       })
       .passthrough(),
     lastMessage: z.string().optional(),
@@ -90,6 +100,7 @@ const normalizeItem = (value: z.infer<typeof itemSchema>): DirectChatListItem =>
   peer: {
     username: value.peer.username,
     profileImage: value.peer.profileImage ?? null,
+    avatarCrop: value.peer.avatarCrop ?? null,
   },
   lastMessage: value.lastMessage ?? '',
   lastMessageAt: value.lastMessageAt ?? new Date().toISOString(),

@@ -21,7 +21,11 @@ describe('direct inbox WS DTO decoder', () => {
         type: 'direct_inbox_item',
         item: {
           slug: 'dm_1',
-          peer: { username: 'alice', profileImage: null },
+          peer: {
+            username: 'alice',
+            profileImage: null,
+            avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+          },
           lastMessage: 'hey',
           lastMessageAt: '2026-02-18T00:00:00Z',
         },
@@ -31,6 +35,7 @@ describe('direct inbox WS DTO decoder', () => {
     expect(decoded.type).toBe('direct_inbox_item')
     if (decoded.type === 'direct_inbox_item') {
       expect(decoded.item?.peer.username).toBe('alice')
+      expect(decoded.item?.peer.avatarCrop).toEqual({ x: 0.1, y: 0.2, width: 0.3, height: 0.4 })
     }
   })
 

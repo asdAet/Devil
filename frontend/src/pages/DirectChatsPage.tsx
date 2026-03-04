@@ -96,6 +96,7 @@ export function DirectChatsList({
                 <Avatar
                   username={item.peer.username}
                   profileImage={item.peer.profileImage}
+                  avatarCrop={item.peer.avatarCrop}
                   size="tiny"
                   online={isPeerOnline}
                 />

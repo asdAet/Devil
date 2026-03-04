@@ -3,10 +3,20 @@ import { z } from 'zod'
 import type { OnlineUser } from '../../shared/api/users'
 import { parseJson, safeDecode } from '../core/codec'
 
+const avatarCropSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  })
+  .passthrough()
+
 const onlineUserSchema = z
   .object({
     username: z.string().min(1),
     profileImage: z.string().nullable().optional(),
+    avatarCrop: avatarCropSchema.nullable().optional(),
   })
   .passthrough()
 
@@ -59,10 +69,11 @@ export const decodePresenceWsEvent = (raw: string): PresenceWsEvent => {
 
   return {
     type: 'state',
-    online: state.online
+        online: state.online
       ? state.online.map((entry) => ({
           username: entry.username,
           profileImage: entry.profileImage ?? null,
+          avatarCrop: entry.avatarCrop ?? null,
         }))
       : null,
     guests: toGuests(state.guests),

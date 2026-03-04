@@ -15,6 +15,7 @@ describe('chat HTTP DTO decoders', () => {
           username: 'alice',
           content: 'hi',
           profilePic: null,
+          avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
           createdAt: '2026-02-18T00:00:00Z',
         },
       ],
@@ -22,6 +23,7 @@ describe('chat HTTP DTO decoders', () => {
     })
 
     expect(decoded.messages).toHaveLength(1)
+    expect(decoded.messages[0]?.avatarCrop).toEqual({ x: 0.1, y: 0.2, width: 0.3, height: 0.4 })
     expect(decoded.pagination?.limit).toBe(50)
   })
 
@@ -29,10 +31,16 @@ describe('chat HTTP DTO decoders', () => {
     const decoded = decodeDirectStartResponse({
       slug: 'dm_123',
       kind: 'direct',
-      peer: { username: 'bob', profileImage: null, lastSeen: null },
+      peer: {
+        username: 'bob',
+        profileImage: null,
+        avatarCrop: { x: 0.11, y: 0.22, width: 0.33, height: 0.44 },
+        lastSeen: null,
+      },
     })
 
     expect(decoded.peer.username).toBe('bob')
+    expect(decoded.peer.avatarCrop).toEqual({ x: 0.11, y: 0.22, width: 0.33, height: 0.44 })
   })
 
   it('decodes direct chats response', () => {

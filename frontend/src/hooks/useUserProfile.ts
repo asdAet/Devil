@@ -55,9 +55,10 @@ export const useUserProfile = (username: string) => {
         setState({
           username,
           user: {
-            username: user.username,
+            ...user,
             email: user.email || '',
             profileImage: user.profileImage || null,
+            avatarCrop: user.avatarCrop ?? null,
             bio: user.bio || '',
             lastSeen: user.lastSeen || null,
             registeredAt: user.registeredAt || null,

@@ -18,7 +18,7 @@ from chat_app_django.http_utils import parse_request_payload
 from .access import READ_ROLES, ensure_can_read_or_404
 from .constants import PUBLIC_ROOM_NAME, PUBLIC_ROOM_SLUG
 from .models import ChatRole, Message, Room
-from .utils import build_profile_url_from_request
+from .utils import build_profile_url_from_request, serialize_avatar_crop
 
 User = get_user_model()
 
@@ -49,6 +49,7 @@ def _serialize_peer(request, user):
     return {
         "username": user.username,
         "profileImage": profile_pic,
+        "avatarCrop": serialize_avatar_crop(profile),
         "lastSeen": last_seen.isoformat() if last_seen else None,
     }
 
@@ -489,6 +490,7 @@ def room_messages(request, room_slug):
                 profile_source = message.profile_pic
 
             profile_pic = _build_profile_pic_url(request, profile_source)
+            avatar_crop = serialize_avatar_crop(getattr(user, "profile", None)) if user else None
 
             serialized.append(
                 {
@@ -496,6 +498,7 @@ def room_messages(request, room_slug):
                     "username": username,
                     "content": message.message_content,
                     "profilePic": profile_pic,
+                    "avatarCrop": avatar_crop,
                     "createdAt": message.date_added.isoformat(),
                 }
             )

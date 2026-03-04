@@ -3,11 +3,21 @@
 import type { UserProfile } from '../../entities/user/types'
 import { decodeOrThrow, safeDecode } from '../core/codec'
 
+const avatarCropSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  })
+  .passthrough()
+
 const rawUserProfileSchema = z
   .object({
     username: z.string().min(1),
     email: z.string().optional(),
     profileImage: z.string().nullable().optional(),
+    avatarCrop: avatarCropSchema.nullable().optional(),
     bio: z.string().optional(),
     lastSeen: z.string().nullable().optional(),
     registeredAt: z.string().nullable().optional(),
@@ -72,6 +82,7 @@ const updateProfileRequestSchema = z
     username: z.string().trim().min(1),
     email: z.string(),
     image: maybeFileSchema.optional(),
+    avatarCrop: avatarCropSchema.nullable().optional(),
     bio: z.string().optional(),
   })
   .strict()
@@ -80,6 +91,7 @@ const mapUserProfile = (dto: z.infer<typeof rawUserProfileSchema>): UserProfile 
   username: dto.username,
   email: dto.email ?? '',
   profileImage: dto.profileImage ?? null,
+  avatarCrop: dto.avatarCrop ?? null,
   bio: dto.bio ?? '',
   lastSeen: dto.lastSeen ?? null,
   registeredAt: dto.registeredAt ?? null,

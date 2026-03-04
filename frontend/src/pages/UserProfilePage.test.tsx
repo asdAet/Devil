@@ -10,6 +10,7 @@ const profileMock = vi.hoisted(() => ({
     username: 'alice',
     email: '',
     profileImage: null,
+    avatarCrop: null,
     bio: '',
     lastSeen: null as string | null,
     registeredAt: null,
@@ -40,6 +41,7 @@ const makeUser = (username: string) =>
     username,
     email: `${username}@example.com`,
     profileImage: null,
+    avatarCrop: null,
     bio: '',
     lastSeen: null as string | null,
     registeredAt: null,
@@ -51,6 +53,7 @@ describe('UserProfilePage', () => {
       username: 'alice',
       email: '',
       profileImage: null,
+      avatarCrop: null,
       bio: '',
       lastSeen: null as string | null,
       registeredAt: null,
@@ -111,6 +114,7 @@ describe('UserProfilePage', () => {
       username: 'alice',
       email: '',
       profileImage: null,
+      avatarCrop: null,
       bio: '',
       lastSeen: '2026-02-13T10:00:00.000Z',
       registeredAt: null,
@@ -128,5 +132,37 @@ describe('UserProfilePage', () => {
 
     expect(container.querySelector('[data-online="true"]')).toBeNull()
   })
-})
 
+  it('shows original image in fullscreen preview even when avatarCrop exists', () => {
+    profileMock.user = {
+      username: 'alice',
+      email: '',
+      profileImage: 'https://cdn.example.com/alice.jpg',
+      avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+      bio: '',
+      lastSeen: null,
+      registeredAt: null,
+    }
+
+    const { container } = render(
+      <UserProfilePage
+        user={makeUser('bob')}
+        currentUser={makeUser('bob')}
+        username="alice"
+        onNavigate={vi.fn()}
+        onLogout={vi.fn()}
+      />,
+    )
+
+    const openPreviewButton = screen.getByRole('button', { name: 'Открыть аватар' })
+    fireEvent.click(openPreviewButton)
+
+    const dialog = screen.getByRole('dialog', { name: 'Аватар alice' })
+    const lightboxImage = dialog.querySelector('img')
+    expect(lightboxImage?.getAttribute('src')).toBe('https://cdn.example.com/alice.jpg')
+    expect(lightboxImage?.style.width).toBe('')
+
+    const circleImage = container.querySelector('[data-online] img')
+    expect(circleImage).not.toBeNull()
+  })
+})

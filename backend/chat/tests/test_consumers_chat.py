@@ -238,6 +238,19 @@ class ChatConsumerTests(TransactionTestCase):
 
     def test_message_persisted(self):
         """Проверяет сценарий `test_message_persisted`."""
+        self.member.profile.avatar_crop_x = 0.1
+        self.member.profile.avatar_crop_y = 0.2
+        self.member.profile.avatar_crop_width = 0.3
+        self.member.profile.avatar_crop_height = 0.4
+        self.member.profile.save(
+            update_fields=[
+                'avatar_crop_x',
+                'avatar_crop_y',
+                'avatar_crop_width',
+                'avatar_crop_height',
+            ]
+        )
+
         async def run():
             """Проверяет сценарий `run`."""
             communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
@@ -246,6 +259,10 @@ class ChatConsumerTests(TransactionTestCase):
             event = json.loads(await communicator.receive_from(timeout=2))
             self.assertEqual(event.get('message'), 'hello')
             self.assertEqual(event.get('username'), self.member.username)
+            self.assertEqual(
+                event.get('avatar_crop'),
+                {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
+            )
             await communicator.disconnect()
 
         async_to_sync(run)()
@@ -254,6 +271,19 @@ class ChatConsumerTests(TransactionTestCase):
 
     def test_direct_message_notifies_participants_in_inbox_channel(self):
         """Проверяет сценарий `test_direct_message_notifies_participants_in_inbox_channel`."""
+        self.owner.profile.avatar_crop_x = 0.1
+        self.owner.profile.avatar_crop_y = 0.2
+        self.owner.profile.avatar_crop_width = 0.3
+        self.owner.profile.avatar_crop_height = 0.4
+        self.owner.profile.save(
+            update_fields=[
+                'avatar_crop_x',
+                'avatar_crop_y',
+                'avatar_crop_width',
+                'avatar_crop_height',
+            ]
+        )
+
         async def run():
             """Проверяет сценарий `run`."""
             inbox_member, connected, _ = await self._connect('/ws/direct/inbox/', user=self.member)
@@ -270,6 +300,10 @@ class ChatConsumerTests(TransactionTestCase):
             self.assertEqual(inbox_payload.get('type'), 'direct_inbox_item')
             self.assertEqual(inbox_payload['item']['slug'], self.direct_room.slug)
             self.assertEqual(inbox_payload['item']['peer']['username'], self.owner.username)
+            self.assertEqual(
+                inbox_payload['item']['peer']['avatarCrop'],
+                {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
+            )
             self.assertTrue(inbox_payload['unread']['isUnread'])
             self.assertEqual(inbox_payload['unread']['dialogs'], 1)
             self.assertEqual(inbox_payload['unread']['counts'].get(self.direct_room.slug), 1)

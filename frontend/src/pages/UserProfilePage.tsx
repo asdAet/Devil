@@ -12,7 +12,7 @@ import type { UserProfile } from '../entities/user/types'
 import { useUserProfile } from '../hooks/useUserProfile'
 import { usePresence } from '../shared/presence'
 import { avatarFallback, formatLastSeen, formatRegistrationDate } from '../shared/lib/format'
-import { Button, Card, Panel } from '../shared/ui'
+import { AvatarMedia, Button, Card, Panel } from '../shared/ui'
 import styles from '../styles/pages/UserProfilePage.module.css'
 
 type Props = {
@@ -282,7 +282,12 @@ export function UserProfilePage({
           onKeyDown={handleAvatarKeyDown}
         >
           {profileUser.profileImage ? (
-            <img src={profileUser.profileImage} alt={profileUser.username} />
+            <AvatarMedia
+              src={profileUser.profileImage}
+              alt={profileUser.username}
+              avatarCrop={profileUser.avatarCrop}
+              loading="eager"
+            />
           ) : (
             <span>{avatarFallback(profileUser.username)}</span>
           )}

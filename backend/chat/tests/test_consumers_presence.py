@@ -46,6 +46,19 @@ class PresenceConsumerTests(TransactionTestCase):
         async_to_sync(run)()
 
     def test_authenticated_receives_online_list(self):
+        self.user.profile.avatar_crop_x = 0.1
+        self.user.profile.avatar_crop_y = 0.2
+        self.user.profile.avatar_crop_width = 0.3
+        self.user.profile.avatar_crop_height = 0.4
+        self.user.profile.save(
+            update_fields=[
+                'avatar_crop_x',
+                'avatar_crop_y',
+                'avatar_crop_width',
+                'avatar_crop_height',
+            ]
+        )
+
         async def run():
             communicator, connected, _ = await self._connect(user=self.user)
             self.assertTrue(connected)
@@ -53,6 +66,11 @@ class PresenceConsumerTests(TransactionTestCase):
             self.assertIn('online', payload)
             usernames = [entry['username'] for entry in payload['online']]
             self.assertIn(self.user.username, usernames)
+            current = next(entry for entry in payload['online'] if entry['username'] == self.user.username)
+            self.assertEqual(
+                current.get('avatarCrop'),
+                {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
+            )
             await communicator.disconnect()
 
         async_to_sync(run)()

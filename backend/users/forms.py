@@ -91,6 +91,57 @@ class ProfileUpdateForm(forms.ModelForm):
         bio = self.cleaned_data.get("bio") or ""
         return strip_tags(bio).strip()
 
+    def clean(self):
+        """Валидирует набор crop-параметров аватарки и подготавливает обновление модели."""
+        cleaned = super().clean()
+        crop_field_map = {
+            "avatarCropX": "avatar_crop_x",
+            "avatarCropY": "avatar_crop_y",
+            "avatarCropWidth": "avatar_crop_width",
+            "avatarCropHeight": "avatar_crop_height",
+        }
+
+        raw_values = {}
+        for request_field in crop_field_map:
+            raw = self.data.get(request_field) if hasattr(self, "data") else None
+            raw_values[request_field] = str(raw).strip() if raw is not None else ""
+
+        provided = [field for field, value in raw_values.items() if value != ""]
+        if provided and len(provided) != len(crop_field_map):
+            raise forms.ValidationError({"image": ["Укажите все параметры обрезки аватарки."]})
+
+        crop_update = None
+        if len(provided) == len(crop_field_map):
+            parsed = {}
+            try:
+                for request_field, model_field in crop_field_map.items():
+                    parsed[model_field] = float(raw_values[request_field])
+            except (TypeError, ValueError):
+                raise forms.ValidationError({"image": ["Некорректные параметры обрезки аватарки."]})
+
+            x = parsed["avatar_crop_x"]
+            y = parsed["avatar_crop_y"]
+            width = parsed["avatar_crop_width"]
+            height = parsed["avatar_crop_height"]
+
+            if not (0 <= x < 1 and 0 <= y < 1 and 0 < width <= 1 and 0 < height <= 1):
+                raise forms.ValidationError({"image": ["Параметры обрезки аватарки выходят за допустимые границы."]})
+
+            if (x + width) > 1.000001 or (y + height) > 1.000001:
+                raise forms.ValidationError({"image": ["Параметры обрезки аватарки выходят за границы изображения."]})
+
+            crop_update = parsed
+        elif cleaned.get("image"):
+            crop_update = {
+                "avatar_crop_x": None,
+                "avatar_crop_y": None,
+                "avatar_crop_width": None,
+                "avatar_crop_height": None,
+            }
+
+        self._avatar_crop_update = crop_update
+        return cleaned
+
     def clean_image(self):
         """Проверяет формат и размеры аватара до сохранения."""
         image = self.cleaned_data.get("image")
@@ -122,3 +173,17 @@ class ProfileUpdateForm(forms.ModelForm):
                 image.seek(0)
 
         return image
+
+    def save(self, commit=True):
+        """Сохраняет профиль и при необходимости обновляет crop-метаданные аватарки."""
+        instance = super().save(commit=False)
+        crop_update = getattr(self, "_avatar_crop_update", None)
+        if crop_update is not None:
+            for field, value in crop_update.items():
+                setattr(instance, field, value)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance

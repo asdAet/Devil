@@ -6,14 +6,26 @@ describe('presence WS DTO decoder', () => {
   it('decodes state event', () => {
     const decoded = decodePresenceWsEvent(
       JSON.stringify({
-        online: [{ username: 'alice', profileImage: null }],
+        online: [
+          {
+            username: 'alice',
+            profileImage: null,
+            avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+          },
+        ],
         guests: '2',
       }),
     )
 
     expect(decoded).toEqual({
       type: 'state',
-      online: [{ username: 'alice', profileImage: null }],
+      online: [
+        {
+          username: 'alice',
+          profileImage: null,
+          avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+        },
+      ],
       guests: 2,
     })
   })

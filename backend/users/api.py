@@ -21,6 +21,7 @@ from chat.utils import (
     build_profile_url_from_request,
     is_valid_media_signature,
     normalize_media_path,
+    serialize_avatar_crop,
 )
 from chat_app_django.http_utils import error_response, parse_request_payload
 from chat_app_django.ip_utils import get_client_ip_from_request
@@ -43,6 +44,7 @@ def _serialize_user(request, user):
         "username": user.username,
         "email": user.email,
         "profileImage": profile_image,
+        "avatarCrop": serialize_avatar_crop(profile),
         "bio": getattr(profile, "bio", "") or "",
         "lastSeen": profile.last_seen.isoformat() if getattr(profile, "last_seen", None) else None,
         "registeredAt": user.date_joined.isoformat() if getattr(user, "date_joined", None) else None,
@@ -314,6 +316,7 @@ def public_profile_view(request, username: str):
                 "username": user.username,
                 "email": "",
                 "profileImage": profile_image,
+                "avatarCrop": serialize_avatar_crop(profile),
                 "bio": getattr(profile, "bio", "") or "",
                 "lastSeen": profile.last_seen.isoformat() if getattr(profile, "last_seen", None) else None,
                 "registeredAt": user.date_joined.isoformat() if getattr(user, "date_joined", None) else None,

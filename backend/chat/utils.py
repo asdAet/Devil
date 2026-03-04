@@ -23,6 +23,34 @@ INTERNAL_HOSTNAMES = {
 }
 
 
+def serialize_avatar_crop(profile) -> dict[str, float] | None:
+    """Сериализует crop-метаданные аватарки профиля в единый API-формат."""
+    if not profile:
+        return None
+
+    field_names = (
+        "avatar_crop_x",
+        "avatar_crop_y",
+        "avatar_crop_width",
+        "avatar_crop_height",
+    )
+    raw_values = [getattr(profile, field, None) for field in field_names]
+    if any(value is None for value in raw_values):
+        return None
+
+    try:
+        x, y, width, height = [float(value) for value in raw_values]
+    except (TypeError, ValueError):
+        return None
+
+    return {
+        "x": x,
+        "y": y,
+        "width": width,
+        "height": height,
+    }
+
+
 def _decode_header(value: bytes | None) -> str | None:
     """Декодирует HTTP-заголовок, учитывая UTF-8 и fallback на latin-1."""
     if not value:

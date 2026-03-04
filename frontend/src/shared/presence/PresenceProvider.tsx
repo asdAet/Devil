@@ -67,9 +67,12 @@ export function PresenceProvider({ user, children, ready = true }: ProviderProps
       if (decoded.online) {
         if (user) {
           const nextImage = user.profileImage || null
+          const nextCrop = user.avatarCrop ?? null
           setOnlineUsers(
             decoded.online.map((entry) =>
-              entry.username === user.username ? { ...entry, profileImage: nextImage } : entry,
+              entry.username === user.username
+                ? { ...entry, profileImage: nextImage, avatarCrop: nextCrop }
+                : entry,
             ),
           )
         } else {
@@ -106,8 +109,11 @@ export function PresenceProvider({ user, children, ready = true }: ProviderProps
     if (!user) return []
 
     const nextImage = user.profileImage || null
+    const nextCrop = user.avatarCrop ?? null
     return onlineUsers.map((entry) =>
-      entry.username === user.username ? { ...entry, profileImage: nextImage } : entry,
+      entry.username === user.username
+        ? { ...entry, profileImage: nextImage, avatarCrop: nextCrop }
+        : entry,
     )
   }, [onlineUsers, user])
 

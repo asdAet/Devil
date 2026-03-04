@@ -78,6 +78,8 @@ class ProfileApiTests(TestCase):
         self.assertEqual(payload['email'], self.user.email)
         self.assertIn('bio', payload)
         self.assertIn('lastSeen', payload)
+        self.assertIn('avatarCrop', payload)
+        self.assertIsNone(payload['avatarCrop'])
 
     def test_profile_update_allows_same_username(self):
         """Проверяет сценарий `test_profile_update_allows_same_username`."""
@@ -196,6 +198,42 @@ class ProfileApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()['user']
         self._assert_signed_profile_image(payload['profileImage'])
+        self.assertIsNone(payload['avatarCrop'])
+
+    def test_profile_update_image_upload_persists_avatar_crop(self):
+        """Сохраняет crop-метаданные вместе с новой аватаркой."""
+        self.client.force_login(self.user)
+        csrf = self._csrf()
+        response = self.client.post(
+            '/api/auth/profile/',
+            data={
+                'username': self.user.username,
+                'email': self.user.email,
+                'bio': 'has cropped image',
+                'image': self._image_upload(),
+                'avatarCropX': '0.1',
+                'avatarCropY': '0.2',
+                'avatarCropWidth': '0.3',
+                'avatarCropHeight': '0.4',
+            },
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.profile.avatar_crop_x, 0.1)
+        self.assertEqual(self.user.profile.avatar_crop_y, 0.2)
+        self.assertEqual(self.user.profile.avatar_crop_width, 0.3)
+        self.assertEqual(self.user.profile.avatar_crop_height, 0.4)
+        self.assertEqual(
+            response.json()['user']['avatarCrop'],
+            {
+                'x': 0.1,
+                'y': 0.2,
+                'width': 0.3,
+                'height': 0.4,
+            },
+        )
 
     def test_profile_update_rejects_oversized_image(self):
         """Отклоняет загрузку аватара, если сторона больше безопасного лимита."""
@@ -254,3 +292,4 @@ class ProfileApiTests(TestCase):
         self.assertEqual(payload['username'], self.user.username)
         self.assertEqual(payload['email'], '')
         self.assertIn('lastSeen', payload)
+        self.assertIn('avatarCrop', payload)

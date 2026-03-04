@@ -22,6 +22,12 @@ export async function updateProfile(
   if (dto.image) {
     form.append('image', dto.image)
   }
+  if (dto.avatarCrop) {
+    form.append('avatarCropX', String(dto.avatarCrop.x))
+    form.append('avatarCropY', String(dto.avatarCrop.y))
+    form.append('avatarCropWidth', String(dto.avatarCrop.width))
+    form.append('avatarCropHeight', String(dto.avatarCrop.height))
+  }
   if (dto.bio !== undefined) {
     form.append('bio', dto.bio)
   }

@@ -72,6 +72,7 @@ export function TopBar({ user, onNavigate }: Props) {
             <Avatar
               username={user.username}
               profileImage={user.profileImage}
+              avatarCrop={user.avatarCrop}
               size="tiny"
               online={isCurrentUserOnline}
               className={styles.avatar}

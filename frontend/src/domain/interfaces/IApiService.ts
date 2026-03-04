@@ -6,11 +6,13 @@ import type {
   RoomPeer,
 } from "../../entities/room/types";
 import type { UserProfile } from "../../entities/user/types";
+import type { AvatarCrop } from "../../shared/api/users";
 
 export type UpdateProfileInput = {
   username: string;
   email: string;
   image?: File | null;
+  avatarCrop?: AvatarCrop | null;
   bio?: string;
 };
 

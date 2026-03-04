@@ -15,6 +15,7 @@ describe('auth DTO decoders', () => {
         username: 'alice',
         email: 'alice@example.com',
         profileImage: null,
+        avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
         bio: 'bio',
         lastSeen: null,
         registeredAt: null,
@@ -23,6 +24,7 @@ describe('auth DTO decoders', () => {
 
     expect(decoded.authenticated).toBe(true)
     expect(decoded.user?.username).toBe('alice')
+    expect(decoded.user?.avatarCrop).toEqual({ x: 0.1, y: 0.2, width: 0.3, height: 0.4 })
   })
 
   it('decodes profile envelope with defaults', () => {
@@ -36,6 +38,7 @@ describe('auth DTO decoders', () => {
       username: 'bob',
       email: '',
       profileImage: null,
+      avatarCrop: null,
       bio: '',
       lastSeen: null,
       registeredAt: null,

@@ -43,7 +43,7 @@ from .direct_inbox import (
     user_group_name,
 )
 from .models import ChatRole, Message, Room
-from .utils import build_profile_url
+from .utils import build_profile_url, serialize_avatar_crop
 
 User = get_user_model()
 
@@ -161,7 +161,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         username = user.username
         room_slug = self.room.slug
 
-        profile_name = await self._get_profile_image_name(user)
+        profile_name, avatar_crop = await self._get_profile_avatar_state(user)
         profile_url = build_profile_url(self.scope, profile_name)
 
         saved_message = await self.save_message(message, user, username, profile_name, room_slug)
@@ -174,6 +174,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "message": message,
                 "username": username,
                 "profile_pic": profile_url,
+                "avatar_crop": avatar_crop,
                 "room": room_slug,
             },
         )
@@ -203,6 +204,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "message": event["message"],
                     "username": event["username"],
                     "profile_pic": event["profile_pic"],
+                    "avatar_crop": event.get("avatar_crop"),
                     "room": event["room"],
                 }
             )
@@ -273,6 +275,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return ""
 
     @sync_to_async
+    def _get_profile_avatar_state(self, user):
+        """Возвращает имя файла аватарки и crop-метаданные пользователя."""
+        try:
+            profile = user.profile
+            image = getattr(profile, "image", None)
+            name = getattr(image, "name", "") or ""
+            return name, serialize_avatar_crop(profile)
+        except (AttributeError, ObjectDoesNotExist):
+            return "", None
+
+    @sync_to_async
     def _rate_limited(self, user) -> bool:
         """Checks chat message rate limit for the current user."""
         limit = int(getattr(settings, "CHAT_MESSAGE_RATE_LIMIT", 20))
@@ -329,10 +342,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for participant in participants:
             peer = next((candidate for candidate in participants if candidate.id != participant.id), None)
             peer_image_name = ""
+            peer_avatar_crop = None
             if peer:
                 peer_profile = getattr(peer, "profile", None)
                 peer_image = getattr(peer_profile, "image", None) if peer_profile else None
                 peer_image_name = getattr(peer_image, "name", "") or ""
+                peer_avatar_crop = serialize_avatar_crop(peer_profile)
 
             if participant.id == sender_id or is_room_active(participant.id, room.slug):
                 unread_state = mark_read(participant.id, room.slug, self.direct_inbox_unread_ttl)
@@ -352,6 +367,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "peer": {
                         "username": peer.username if peer else "",
                         "profileImage": build_profile_url(self.scope, peer_image_name) if peer_image_name else None,
+                        "avatarCrop": peer_avatar_crop,
                     },
                     "lastMessage": message,
                     "lastMessageAt": created_at,
@@ -715,12 +731,15 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         data = cache.get(self.cache_key, {})
         current = data.get(user.username, {})
         count = current.get("count", 0) + 1
-        image_name = getattr(getattr(user, "profile", None), "image", None)
+        profile = getattr(user, "profile", None)
+        image_name = getattr(profile, "image", None)
         image_name = image_name.name if image_name else ""
         image_url = build_profile_url(self.scope, image_name) if image_name else None
+        avatar_crop = serialize_avatar_crop(profile)
         data[user.username] = {
             "count": count,
             "profileImage": image_url,
+            "avatarCrop": avatar_crop,
             "last_seen": time.time(),
             "grace_until": 0,
         }
@@ -774,7 +793,11 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         if cleaned != data:
             cache.set(self.cache_key, cleaned, timeout=self.cache_timeout_seconds)
         return [
-            {"username": username, "profileImage": info.get("profileImage")}
+            {
+                "username": username,
+                "profileImage": info.get("profileImage"),
+                "avatarCrop": info.get("avatarCrop"),
+            }
             for username, info in cleaned.items()
         ]
 
@@ -848,21 +871,24 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         """Выполняет логику `_touch_user` с параметрами из сигнатуры."""
         data = cache.get(self.cache_key, {})
         current = data.get(user.username)
-        image_name = getattr(getattr(user, "profile", None), "image", None)
+        profile = getattr(user, "profile", None)
+        image_name = getattr(profile, "image", None)
         image_name = image_name.name if image_name else ""
         image_url = build_profile_url(self.scope, image_name) if image_name else None
+        avatar_crop = serialize_avatar_crop(profile)
         if not current:
             data[user.username] = {
                 "count": 1,
                 "profileImage": image_url,
+                "avatarCrop": avatar_crop,
                 "last_seen": time.time(),
                 "grace_until": 0,
             }
         else:
             current["last_seen"] = time.time()
             current["grace_until"] = 0
-            if image_url:
-                current["profileImage"] = image_url
+            current["profileImage"] = image_url
+            current["avatarCrop"] = avatar_crop
             data[user.username] = current
         cache.set(self.cache_key, data, timeout=self.cache_timeout_seconds)
 

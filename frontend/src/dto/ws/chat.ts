@@ -2,6 +2,15 @@ import { z } from 'zod'
 
 import { parseJson, safeDecode } from '../core/codec'
 
+const avatarCropSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  })
+  .passthrough()
+
 const rateLimitedSchema = z
   .object({
     error: z.literal('rate_limited'),
@@ -19,6 +28,7 @@ const messageSchema = z
     message: z.string(),
     username: z.string().min(1),
     profile_pic: z.string().nullable().optional(),
+    avatar_crop: avatarCropSchema.nullable().optional(),
     room: z.string().optional(),
   })
   .passthrough()
@@ -36,6 +46,12 @@ export type ChatWsEvent =
         content: string
         username: string
         profilePic: string | null
+        avatarCrop: {
+          x: number
+          y: number
+          width: number
+          height: number
+        } | null
         room: string | null
       }
     }
@@ -86,6 +102,7 @@ export const decodeChatWsEvent = (raw: string): ChatWsEvent => {
         content: message.message,
         username: message.username,
         profilePic: message.profile_pic ?? null,
+        avatarCrop: message.avatar_crop ?? null,
         room: message.room ?? null,
       },
     }

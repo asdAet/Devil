@@ -22,6 +22,10 @@ class Profile(models.Model):
     """Инкапсулирует логику класса `Profile`."""
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(default="default.jpg", upload_to="profile_pics")
+    avatar_crop_x = models.FloatField(null=True, blank=True)
+    avatar_crop_y = models.FloatField(null=True, blank=True)
+    avatar_crop_width = models.FloatField(null=True, blank=True)
+    avatar_crop_height = models.FloatField(null=True, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True)
     bio = models.TextField(blank=True, max_length=1000)
 

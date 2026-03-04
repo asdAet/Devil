@@ -3,16 +3,14 @@
 import { decodeChatWsEvent } from '../dto'
 import type { Message } from '../entities/message/types'
 import type { UserProfile } from '../entities/user/types'
-import type { ApiError } from '../shared/api/types'
 import { useChatActions } from '../hooks/useChatActions'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { usePublicRoom } from '../hooks/usePublicRoom'
 import { useReconnectingWebSocket } from '../hooks/useReconnectingWebSocket'
-import { usePresence } from '../shared/presence'
 import { debugLog } from '../shared/lib/debug'
 import { sanitizeText } from '../shared/lib/sanitize'
 import { getWebSocketBase } from '../shared/lib/ws'
-import { Avatar, Button, Card, Toast } from '../shared/ui'
+import { Toast } from '../shared/ui'
 import styles from '../styles/pages/HomePage.module.css'
 
 type Props = {
@@ -27,36 +25,14 @@ const buildTempId = (seed: number) => Date.now() * 1000 + seed
  * @param props Текущий пользователь и навигация.
  * @returns JSX главной страницы.
  */
-export function HomePage({ user, onNavigate }: Props) {
-  const { publicRoom, loading } = usePublicRoom(user)
-  const { getRoomDetails, getRoomMessages } = useChatActions()
+export function HomePage({ user }: Props) {
+  const { publicRoom } = usePublicRoom(user)
+  const { getRoomMessages } = useChatActions()
   const isOnline = useOnlineStatus()
-  const [liveMessages, setLiveMessages] = useState<Message[]>([])
-  const [creatingRoom, setCreatingRoom] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
+  const [, setLiveMessages] = useState<Message[]>([])
   const tempIdRef = useRef(0)
-  const { online, guests, status } = usePresence()
-
-  const presenceLoading = Boolean(user && status !== 'online')
-  const onlineUsernames = useMemo(
-    () =>
-      new Set(
-        status === 'online' ? online.map((entry) => entry.username) : [],
-      ),
-    [online, status],
-  )
 
   const visiblePublicRoom = useMemo(() => publicRoom, [publicRoom])
-  const isLoading = useMemo(() => loading, [loading])
-  const publicRoomLabel = visiblePublicRoom?.name || 'Комната для всех'
-
-  const openUserProfile = useCallback(
-    (username: string) => {
-      if (!username) return
-      onNavigate(`/users/${encodeURIComponent(username)}`)
-    },
-    [onNavigate],
-  )
 
   useEffect(() => {
     let active = true
@@ -121,24 +97,6 @@ export function HomePage({ user, onNavigate }: Props) {
     onMessage: handleLiveMessage,
     onError: (err) => debugLog('Live feed WS error', err),
   })
-
-  const createRoomSlug = (length = 12) => {
-    if (globalThis.crypto?.randomUUID) {
-      return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, length)
-    }
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    const values = new Uint8Array(length)
-    if (globalThis.crypto?.getRandomValues) {
-      globalThis.crypto.getRandomValues(values)
-      return Array.from(values, (value) => alphabet[value % alphabet.length]).join('')
-    }
-    let fallback = ''
-    for (let index = 0; index < length; index += 1) {
-      fallback += alphabet[Math.floor(Math.random() * alphabet.length)]
-    }
-    return fallback
-  }
-
 
   return (
     <div className={styles.stack}>

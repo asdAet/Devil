@@ -5,11 +5,20 @@ import type { DirectChatListItem, RoomDetails, RoomPeer } from '../../entities/r
 import { decodeOrThrow } from '../core/codec'
 
 const roomKindSchema = z.enum(['public', 'private', 'direct'])
+const avatarCropSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  })
+  .passthrough()
 
 const roomPeerSchema = z
   .object({
     username: z.string().min(1),
     profileImage: z.string().nullable().optional(),
+    avatarCrop: avatarCropSchema.nullable().optional(),
     lastSeen: z.string().nullable().optional(),
   })
   .passthrough()
@@ -31,6 +40,7 @@ const messageSchema = z
     username: z.string().min(1),
     content: z.string(),
     profilePic: z.string().nullable().optional(),
+    avatarCrop: avatarCropSchema.nullable().optional(),
     createdAt: z.string(),
   })
   .passthrough()
@@ -76,6 +86,7 @@ const directChatsSchema = z
 const mapPeer = (dto: z.infer<typeof roomPeerSchema>): RoomPeer => ({
   username: dto.username,
   profileImage: dto.profileImage ?? null,
+  avatarCrop: dto.avatarCrop ?? null,
   lastSeen: dto.lastSeen ?? null,
 })
 
@@ -93,6 +104,7 @@ const mapMessage = (dto: z.infer<typeof messageSchema>): Message => ({
   username: dto.username,
   content: dto.content,
   profilePic: dto.profilePic ?? null,
+  avatarCrop: dto.avatarCrop ?? null,
   createdAt: dto.createdAt,
 })
 

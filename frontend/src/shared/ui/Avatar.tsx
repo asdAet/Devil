@@ -1,4 +1,6 @@
+import type { AvatarCrop } from '../api/users'
 import { avatarFallback } from '../lib/format'
+import { AvatarMedia } from './AvatarMedia'
 
 import styles from '../../styles/ui/Avatar.module.css'
 
@@ -7,6 +9,7 @@ type AvatarSize = 'default' | 'small' | 'tiny'
 type AvatarProps = {
   username: string
   profileImage?: string | null
+  avatarCrop?: AvatarCrop | null
   size?: AvatarSize
   online?: boolean
   className?: string
@@ -27,6 +30,7 @@ const sizeClassMap: Record<AvatarSize, string> = {
 export function Avatar({
   username,
   profileImage = null,
+  avatarCrop = null,
   size = 'default',
   online = false,
   className,
@@ -46,7 +50,13 @@ export function Avatar({
       data-size={size}
     >
       {profileImage ? (
-        <img src={profileImage} alt={username} loading={loading} decoding="async" />
+        <AvatarMedia
+          src={profileImage}
+          alt={username}
+          avatarCrop={avatarCrop}
+          loading={loading}
+          decoding="async"
+        />
       ) : (
         <span>{avatarFallback(username)}</span>
       )}

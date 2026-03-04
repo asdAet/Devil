@@ -174,6 +174,18 @@ class RoomDetailsApiTests(TestCase):
 
     def test_direct_room_details_returns_peer(self):
         """Проверяет сценарий `test_direct_room_details_returns_peer`."""
+        self.member.profile.avatar_crop_x = 0.1
+        self.member.profile.avatar_crop_y = 0.2
+        self.member.profile.avatar_crop_width = 0.3
+        self.member.profile.avatar_crop_height = 0.4
+        self.member.profile.save(
+            update_fields=[
+                'avatar_crop_x',
+                'avatar_crop_y',
+                'avatar_crop_width',
+                'avatar_crop_height',
+            ]
+        )
         room = Room.objects.create(
             slug='dm_abc123',
             name='dm',
@@ -203,6 +215,10 @@ class RoomDetailsApiTests(TestCase):
         self.assertEqual(payload['kind'], Room.Kind.DIRECT)
         self.assertEqual(payload['peer']['username'], self.member.username)
         self.assertIn('lastSeen', payload['peer'])
+        self.assertEqual(
+            payload['peer']['avatarCrop'],
+            {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
+        )
 
     def test_direct_room_denies_non_member(self):
         """Проверяет сценарий `test_direct_room_denies_non_member`."""
@@ -293,6 +309,18 @@ class RoomMessagesApiTests(TestCase):
     @override_settings(CHAT_MESSAGES_PAGE_SIZE=50, CHAT_MESSAGES_MAX_PAGE_SIZE=200)
     def test_room_messages_default_pagination(self):
         """Проверяет сценарий `test_room_messages_default_pagination`."""
+        self.owner.profile.avatar_crop_x = 0.1
+        self.owner.profile.avatar_crop_y = 0.2
+        self.owner.profile.avatar_crop_width = 0.3
+        self.owner.profile.avatar_crop_height = 0.4
+        self.owner.profile.save(
+            update_fields=[
+                'avatar_crop_x',
+                'avatar_crop_y',
+                'avatar_crop_width',
+                'avatar_crop_height',
+            ]
+        )
         self._create_messages(60)
 
         response = self.client.get('/api/chat/rooms/public/messages/')
@@ -303,6 +331,10 @@ class RoomMessagesApiTests(TestCase):
         self.assertTrue(payload['pagination']['hasMore'])
         self.assertEqual(payload['pagination']['limit'], 50)
         self.assertEqual(payload['pagination']['nextBefore'], payload['messages'][0]['id'])
+        self.assertEqual(
+            payload['messages'][0]['avatarCrop'],
+            {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
+        )
 
     @override_settings(CHAT_MESSAGES_PAGE_SIZE=10, CHAT_MESSAGES_MAX_PAGE_SIZE=20)
     def test_room_messages_limit_is_capped_by_max_page_size(self):
@@ -441,6 +473,18 @@ class DirectApiTests(TestCase):
     def test_direct_chats_include_dialog_after_message(self):
         """Проверяет сценарий `test_direct_chats_include_dialog_after_message`."""
         self.client.force_login(self.owner)
+        self.peer.profile.avatar_crop_x = 0.1
+        self.peer.profile.avatar_crop_y = 0.2
+        self.peer.profile.avatar_crop_width = 0.3
+        self.peer.profile.avatar_crop_height = 0.4
+        self.peer.profile.save(
+            update_fields=[
+                'avatar_crop_x',
+                'avatar_crop_y',
+                'avatar_crop_width',
+                'avatar_crop_height',
+            ]
+        )
         start_response = self._post_start('peer')
         slug = start_response.json()['slug']
 
@@ -457,6 +501,10 @@ class DirectApiTests(TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]['peer']['username'], self.peer.username)
         self.assertIn('lastSeen', items[0]['peer'])
+        self.assertEqual(
+            items[0]['peer']['avatarCrop'],
+            {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
+        )
         self.assertEqual(items[0]['slug'], slug)
 
 
