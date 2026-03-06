@@ -24,7 +24,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from chat.utils import (
+from chat_app_django.media_utils import (
     build_profile_url_from_request,
     is_valid_media_signature,
     normalize_media_path,

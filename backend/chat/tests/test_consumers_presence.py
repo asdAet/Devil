@@ -11,10 +11,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TransactionTestCase
 
-from chat.routing import websocket_urlpatterns
+from presence.routing import websocket_urlpatterns as presence_urlpatterns
 
 User = get_user_model()
-application = URLRouter(websocket_urlpatterns)
+application = URLRouter(presence_urlpatterns)
 
 
 class PresenceConsumerTests(TransactionTestCase):

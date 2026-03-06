@@ -12,11 +12,15 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TransactionTestCase, override_settings
 
-from chat.models import ChatRole, Message, Room
-from chat.routing import websocket_urlpatterns
+from messages.models import Message
+from roles.models import Membership, Role
+from rooms.services import ensure_membership
+from rooms.models import Room
+from chat.routing import websocket_urlpatterns as chat_ws
+from direct_inbox.routing import websocket_urlpatterns as di_ws
 
 User = get_user_model()
-application = URLRouter(websocket_urlpatterns)
+application = URLRouter(chat_ws + di_ws)
 
 
 class ChatConsumerTests(TransactionTestCase):
@@ -34,20 +38,8 @@ class ChatConsumerTests(TransactionTestCase):
             kind=Room.Kind.PRIVATE,
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=self.private_room,
-            user=self.owner,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.owner.username,
-            granted_by=self.owner,
-        )
-        ChatRole.objects.create(
-            room=self.private_room,
-            user=self.member,
-            role=ChatRole.Role.MEMBER,
-            username_snapshot=self.member.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(self.private_room, self.owner, role_name="Owner")
+        ensure_membership(self.private_room, self.member, role_name="Member")
 
         self.direct_room = Room.objects.create(
             slug='dm_abc123',
@@ -56,20 +48,8 @@ class ChatConsumerTests(TransactionTestCase):
             direct_pair_key=f'{self.owner.pk}:{self.member.pk}',
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=self.direct_room,
-            user=self.owner,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.owner.username,
-            granted_by=self.owner,
-        )
-        ChatRole.objects.create(
-            room=self.direct_room,
-            user=self.member,
-            role=ChatRole.Role.MEMBER,
-            username_snapshot=self.member.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(self.direct_room, self.owner)
+        ensure_membership(self.direct_room, self.member)
 
     async def _connect(self, path: str, user=None):
         """Проверяет сценарий `_connect`."""
@@ -206,7 +186,12 @@ class ChatConsumerTests(TransactionTestCase):
 
     def test_viewer_cannot_write(self):
         """Проверяет сценарий `test_viewer_cannot_write`."""
-        ChatRole.objects.filter(room=self.private_room, user=self.member).update(role=ChatRole.Role.VIEWER)
+        membership = Membership.objects.get(room=self.private_room, user=self.member)
+        viewer_role = (
+            Role.objects.filter(room=self.private_room, name="Viewer").first()
+            or Role.create_defaults_for_room(self.private_room)["Viewer"]
+        )
+        membership.roles.set([viewer_role])
 
         async def run():
             """Проверяет сценарий `run`."""

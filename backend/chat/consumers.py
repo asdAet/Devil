@@ -1,58 +1,36 @@
-"""Содержит логику модуля `consumers` подсистемы `chat`."""
-
+"""WebSocket consumer for chat rooms."""
 
 import asyncio
 import json
 import re
 import time
-import uuid
 
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, OperationalError, ProgrammingError
 
 from chat_app_django.ip_utils import get_client_ip_from_scope
+from chat_app_django.media_utils import build_profile_url, serialize_avatar_crop
 from chat_app_django.security.audit import audit_ws_event
 from chat_app_django.security.rate_limit import DbRateLimiter, RateLimitPolicy
 
-from messages.models import Message
-from roles.access import READ_ROLES, can_read, can_write
-from roles.models import ChatRole
-from rooms.models import Room
-
-from .constants import (
-    CHAT_CLOSE_IDLE_CODE,
-    DIRECT_INBOX_CLOSE_IDLE_CODE,
-    PRESENCE_CACHE_KEY_AUTH,
-    PRESENCE_CACHE_KEY_GUEST,
-    PRESENCE_CACHE_TTL_SECONDS,
-    PRESENCE_CLOSE_IDLE_CODE,
-    PRESENCE_GROUP_AUTH,
-    PRESENCE_GROUP_GUEST,
-    PUBLIC_ROOM_NAME,
-    PUBLIC_ROOM_SLUG,
-)
-from .direct_inbox import (
-    clear_active_room,
-    get_unread_state,
+from direct_inbox.state import (
     is_room_active,
     mark_read,
     mark_unread,
-    set_active_room,
-    touch_active_room,
     user_group_name,
 )
-from .utils import build_profile_url, serialize_avatar_crop
+from messages.models import Message
+from roles.access import can_read, can_write
+from roles.models import Membership
+from rooms.models import Room
 
-User = get_user_model()
+from .constants import CHAT_CLOSE_IDLE_CODE, PUBLIC_ROOM_NAME, PUBLIC_ROOM_SLUG
 
 
 def _is_valid_room_slug(value: str) -> bool:
-    """Выполняет логику `_is_valid_room_slug` с параметрами из сигнатуры."""
     pattern = getattr(settings, "CHAT_ROOM_SLUG_REGEX", r"^[A-Za-z0-9_-]{3,50}$")
     try:
         return bool(re.match(pattern, value or ""))
@@ -71,12 +49,12 @@ def _ws_connect_rate_limited(scope, endpoint: str) -> bool:
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
-    """Инкапсулирует логику класса `ChatConsumer`."""
+    """WebSocket consumer for chat room messaging."""
+
     chat_idle_timeout = int(getattr(settings, "CHAT_WS_IDLE_TIMEOUT", 600))
     direct_inbox_unread_ttl = int(getattr(settings, "DIRECT_INBOX_UNREAD_TTL", 30 * 24 * 60 * 60))
 
     async def connect(self):
-        """Выполняет логику `connect` с параметрами из сигнатуры."""
         user = self.scope.get("user")
         if user is None:
             audit_ws_event("ws.connect.denied", self.scope, endpoint="chat", reason="missing_user", code=4401)
@@ -131,7 +109,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self._idle_task = asyncio.create_task(self._idle_watchdog())
 
     async def disconnect(self, code):
-        """Выполняет логику `disconnect` с параметрами из сигнатуры."""
         idle_task = getattr(self, "_idle_task", None)
         if idle_task:
             idle_task.cancel()
@@ -151,7 +128,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data=None, bytes_data=None):
-        """Выполняет логику `receive` с параметрами из сигнатуры."""
         self._last_activity = time.monotonic()
         if text_data is None and bytes_data is not None:
             try:
@@ -261,7 +237,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
 
     async def chat_message(self, event):
-        """Выполняет логику `chat_message` с параметрами из сигнатуры."""
         self._last_activity = time.monotonic()
         await self.send(
             text_data=json.dumps(
@@ -276,7 +251,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def _idle_watchdog(self):
-        """Выполняет логику `_idle_watchdog` с параметрами из сигнатуры."""
         interval = max(10, min(60, self.chat_idle_timeout))
         while True:
             await asyncio.sleep(interval)
@@ -287,7 +261,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def _load_room(self, slug: str):
-        """Выполняет логику `_load_room` с параметрами из сигнатуры."""
         try:
             if slug == PUBLIC_ROOM_SLUG:
                 room, _ = Room.objects.get_or_create(
@@ -310,17 +283,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def _can_read(self, room: Room, user) -> bool:
-        """Выполняет логику `_can_read` с параметрами из сигнатуры."""
         return can_read(room, user)
 
     @sync_to_async
     def _can_write(self, room: Room, user) -> bool:
-        """Выполняет логику `_can_write` с параметрами из сигнатуры."""
         return can_write(room, user)
 
     @sync_to_async
     def save_message(self, message, user, username, profile_pic, room):
-        """Выполняет логику `save_message` с параметрами из сигнатуры."""
         return Message.objects.create(
             message_content=message,
             username=username,
@@ -330,18 +300,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     @sync_to_async
-    def _get_profile_image_name(self, user) -> str:
-        """Выполняет логику `_get_profile_image_name` с параметрами из сигнатуры."""
-        try:
-            profile = user.profile
-            name = getattr(profile.image, "name", "")
-            return name or ""
-        except (AttributeError, ObjectDoesNotExist):
-            return ""
-
-    @sync_to_async
     def _get_profile_avatar_state(self, user):
-        """Возвращает имя файла аватарки и crop-метаданные пользователя."""
         try:
             profile = user.profile
             image = getattr(profile, "image", None)
@@ -361,13 +320,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def _build_direct_inbox_targets(self, room_id: int, sender_id: int, message: str, created_at: str):
-        """Выполняет логику `_build_direct_inbox_targets` с параметрами из сигнатуры."""
         room = Room.objects.filter(id=room_id, kind=Room.Kind.DIRECT).first()
         if not room:
             return []
 
-        roles = list(
-            ChatRole.objects.filter(room=room, role__in=list(READ_ROLES))
+        memberships = list(
+            Membership.objects.filter(room=room, is_banned=False)
             .select_related("user", "user__profile")
             .order_by("id")
         )
@@ -379,11 +337,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 pair_user_ids = {int(first), int(second)}
             except (TypeError, ValueError):
                 pair_user_ids = set()
+        if len(pair_user_ids) != 2:
+            return []
 
         participants = []
         seen_user_ids: set[int] = set()
-        for role in roles:
-            user = role.user
+        for ms in memberships:
+            user = ms.user
             if not user:
                 continue
             if pair_user_ids and user.pk not in pair_user_ids:
@@ -393,12 +353,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             seen_user_ids.add(user.pk)
             participants.append(user)
 
-        if pair_user_ids and len(participants) < len(pair_user_ids):
-            missing_ids = [user_id for user_id in pair_user_ids if user_id not in seen_user_ids]
-            if missing_ids:
-                for user in User.objects.filter(id__in=missing_ids).select_related("profile"):
-                    participants.append(user)
-                    seen_user_ids.add(user.pk)
+        if pair_user_ids and seen_user_ids != pair_user_ids:
+            return []
 
         if not participants:
             return []
@@ -447,617 +403,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
             targets.append({"group": user_group_name(participant.pk), "payload": payload})
         return targets
-
-
-class DirectInboxConsumer(AsyncWebsocketConsumer):
-    """Инкапсулирует логику класса `DirectInboxConsumer`."""
-    unread_ttl = int(getattr(settings, "DIRECT_INBOX_UNREAD_TTL", 30 * 24 * 60 * 60))
-    active_ttl = int(getattr(settings, "DIRECT_INBOX_ACTIVE_TTL", 90))
-    heartbeat_seconds = int(getattr(settings, "DIRECT_INBOX_HEARTBEAT", 20))
-    idle_timeout = int(getattr(settings, "DIRECT_INBOX_IDLE_TIMEOUT", 90))
-
-    async def connect(self):
-        """Выполняет логику `connect` с параметрами из сигнатуры."""
-        user = self.scope.get("user")
-        if not user or not user.is_authenticated:
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="direct_inbox", reason="unauthorized", code=4401)
-            await self.close(code=4401)
-            return
-
-        if await sync_to_async(_ws_connect_rate_limited)(self.scope, "direct_inbox"):
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="direct_inbox", reason="rate_limited", code=4429)
-            await self.close(code=4429)
-            return
-
-        self.user = user
-        self.conn_id = uuid.uuid4().hex
-        self.group_name = user_group_name(user.pk)
-
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
-        audit_ws_event("ws.connect.accepted", self.scope, endpoint="direct_inbox")
-
-        self._last_client_activity = time.monotonic()
-        self._heartbeat_task = asyncio.create_task(self._heartbeat())
-        self._idle_task = None
-        if self.idle_timeout > 0:
-            self._idle_task = asyncio.create_task(self._idle_watchdog())
-
-        await self._send_unread_state()
-
-    async def disconnect(self, code):
-        """Выполняет логику `disconnect` с параметрами из сигнатуры."""
-        for task_name in ("_heartbeat_task", "_idle_task"):
-            task = getattr(self, task_name, None)
-            if not task:
-                continue
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-
-        user = getattr(self, "user", None)
-        if user and user.is_authenticated:
-            await self._clear_active_room(conn_only=True)
-
-        if hasattr(self, "group_name"):
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
-        audit_ws_event("ws.disconnect", self.scope, endpoint="direct_inbox", code=code)
-
-    async def receive(self, text_data=None, bytes_data=None):
-        """Выполняет логику `receive` с параметрами из сигнатуры."""
-        if not text_data:
-            return
-
-        self._last_client_activity = time.monotonic()
-        try:
-            payload = json.loads(text_data)
-        except json.JSONDecodeError:
-            audit_ws_event("ws.direct_inbox.rejected", self.scope, endpoint="direct_inbox", reason="invalid_json")
-            return
-
-        event_type = payload.get("type")
-        if event_type == "ping":
-            await self._touch_active_room()
-            return
-
-        if event_type == "set_active_room":
-            raw_slug = payload.get("roomSlug")
-            if raw_slug is None:
-                await self._clear_active_room(conn_only=True)
-                audit_ws_event(
-                    "ws.direct_inbox.set_active_room.success",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    room_slug=None,
-                )
-                return
-            if not isinstance(raw_slug, str):
-                audit_ws_event(
-                    "ws.direct_inbox.set_active_room.rejected",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    reason="invalid_payload",
-                )
-                await self._send_error("invalid_payload")
-                return
-
-            room_slug = raw_slug.strip()
-            if not _is_valid_room_slug(room_slug):
-                audit_ws_event(
-                    "ws.direct_inbox.set_active_room.rejected",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    reason="forbidden",
-                    room_slug=room_slug,
-                )
-                await self._send_error("forbidden")
-                return
-
-            room = await self._load_room(room_slug)
-            if not room or room.kind != Room.Kind.DIRECT or not await self._can_read(room):
-                audit_ws_event(
-                    "ws.direct_inbox.set_active_room.rejected",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    reason="forbidden",
-                    room_slug=room_slug,
-                )
-                await self._send_error("forbidden")
-                return
-
-            await self._set_active_room(room_slug)
-            audit_ws_event(
-                "ws.direct_inbox.set_active_room.success",
-                self.scope,
-                endpoint="direct_inbox",
-                room_slug=room_slug,
-            )
-            return
-
-        if event_type == "mark_read":
-            raw_slug = payload.get("roomSlug")
-            if not isinstance(raw_slug, str):
-                audit_ws_event(
-                    "ws.direct_inbox.mark_read.rejected",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    reason="invalid_payload",
-                )
-                await self._send_error("invalid_payload")
-                return
-
-            room_slug = raw_slug.strip()
-            if not _is_valid_room_slug(room_slug):
-                audit_ws_event(
-                    "ws.direct_inbox.mark_read.rejected",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    reason="forbidden",
-                    room_slug=room_slug,
-                )
-                await self._send_error("forbidden")
-                return
-
-            room = await self._load_room(room_slug)
-            if not room or room.kind != Room.Kind.DIRECT or not await self._can_read(room):
-                audit_ws_event(
-                    "ws.direct_inbox.mark_read.rejected",
-                    self.scope,
-                    endpoint="direct_inbox",
-                    reason="forbidden",
-                    room_slug=room_slug,
-                )
-                await self._send_error("forbidden")
-                return
-
-            unread = await self._mark_read(room_slug)
-            audit_ws_event(
-                "ws.direct_inbox.mark_read.success",
-                self.scope,
-                endpoint="direct_inbox",
-                room_slug=room_slug,
-            )
-            await self.send(
-                text_data=json.dumps(
-                    {
-                        "type": "direct_mark_read_ack",
-                        "roomSlug": room_slug,
-                        "unread": unread,
-                    }
-                )
-            )
-            return
-
-        audit_ws_event(
-            "ws.direct_inbox.rejected",
-            self.scope,
-            endpoint="direct_inbox",
-            reason="unsupported_event",
-            event_type=event_type,
-        )
-
-    async def direct_inbox_event(self, event):
-        """Выполняет логику `direct_inbox_event` с параметрами из сигнатуры."""
-        payload = event.get("payload")
-        if not isinstance(payload, dict):
-            return
-        await self.send(text_data=json.dumps(payload))
-
-    async def _send_unread_state(self):
-        """Выполняет логику `_send_unread_state` с параметрами из сигнатуры."""
-        unread = await self._get_unread_state()
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "direct_unread_state",
-                    "unread": unread,
-                }
-            )
-        )
-
-    async def _send_error(self, code: str):
-        """Выполняет логику `_send_error` с параметрами из сигнатуры."""
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "error",
-                    "code": code,
-                }
-            )
-        )
-
-    async def _heartbeat(self):
-        """Выполняет логику `_heartbeat` с параметрами из сигнатуры."""
-        interval = max(5, self.heartbeat_seconds)
-        while True:
-            await asyncio.sleep(interval)
-            try:
-                await self.send(text_data=json.dumps({"type": "ping"}))
-            except Exception:
-                break
-
-    async def _idle_watchdog(self):
-        """Выполняет логику `_idle_watchdog` с параметрами из сигнатуры."""
-        interval = max(5, min(self.heartbeat_seconds, self.idle_timeout))
-        while True:
-            await asyncio.sleep(interval)
-            if (time.monotonic() - self._last_client_activity) <= self.idle_timeout:
-                continue
-            await self.close(code=DIRECT_INBOX_CLOSE_IDLE_CODE)
-            break
-
-    @sync_to_async
-    def _load_room(self, room_slug: str):
-        """Выполняет логику `_load_room` с параметрами из сигнатуры."""
-        return Room.objects.filter(slug=room_slug).first()
-
-    @sync_to_async
-    def _can_read(self, room: Room) -> bool:
-        """Выполняет логику `_can_read` с параметрами из сигнатуры."""
-        return can_read(room, self.user)
-
-    @sync_to_async
-    def _get_unread_state(self):
-        """Выполняет логику `_get_unread_state` с параметрами из сигнатуры."""
-        return get_unread_state(self.user.pk)
-
-    @sync_to_async
-    def _mark_read(self, room_slug: str):
-        """Выполняет логику `_mark_read` с параметрами из сигнатуры."""
-        return mark_read(self.user.pk, room_slug, self.unread_ttl)
-
-    @sync_to_async
-    def _set_active_room(self, room_slug: str):
-        """Выполняет логику `_set_active_room` с параметрами из сигнатуры."""
-        set_active_room(self.user.pk, room_slug, self.conn_id, self.active_ttl)
-
-    @sync_to_async
-    def _clear_active_room(self, conn_only: bool = False):
-        """Выполняет логику `_clear_active_room` с параметрами из сигнатуры."""
-        clear_active_room(self.user.pk, self.conn_id if conn_only else None)
-
-    @sync_to_async
-    def _touch_active_room(self):
-        """Выполняет логику `_touch_active_room` с параметрами из сигнатуры."""
-        touch_active_room(self.user.pk, self.conn_id, self.active_ttl)
-
-
-class PresenceConsumer(AsyncWebsocketConsumer):
-    """Инкапсулирует логику класса `PresenceConsumer`."""
-    group_name_auth = PRESENCE_GROUP_AUTH
-    group_name_guest = PRESENCE_GROUP_GUEST
-    cache_key = PRESENCE_CACHE_KEY_AUTH
-    guest_cache_key = PRESENCE_CACHE_KEY_GUEST
-    presence_ttl = int(getattr(settings, "PRESENCE_TTL", 90))
-    presence_grace = int(getattr(settings, "PRESENCE_GRACE", 5))
-    presence_heartbeat = int(getattr(settings, "PRESENCE_HEARTBEAT", 20))
-    presence_idle_timeout = int(getattr(settings, "PRESENCE_IDLE_TIMEOUT", 90))
-    cache_timeout_seconds = PRESENCE_CACHE_TTL_SECONDS
-    presence_touch_interval = int(getattr(settings, "PRESENCE_TOUCH_INTERVAL", 30))
-
-    async def connect(self):
-        """Выполняет логику `connect` с параметрами из сигнатуры."""
-        user = self.scope.get("user")
-        self.is_guest = not user or not user.is_authenticated
-        self.group_name = self.group_name_guest if self.is_guest else self.group_name_auth
-        self.guest_key = self._get_guest_session_key() if self.is_guest else None
-
-        if self.is_guest and not self.guest_key:
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="presence", reason="missing_guest_session", code=4401)
-            await self.close(code=4401)
-            return
-
-        if await sync_to_async(_ws_connect_rate_limited)(self.scope, "presence"):
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="presence", reason="rate_limited", code=4429)
-            await self.close(code=4429)
-            return
-
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
-        audit_ws_event("ws.connect.accepted", self.scope, endpoint="presence")
-
-        self._last_client_activity = time.monotonic()
-        self._next_presence_touch_at = 0.0
-        self._heartbeat_task = asyncio.create_task(self._heartbeat())
-        self._idle_task = None
-        if self.presence_idle_timeout > 0:
-            self._idle_task = asyncio.create_task(self._idle_watchdog())
-
-        if self.is_guest:
-            await self._add_guest(self.guest_key)
-        else:
-            await self._add_user(user)
-        await self._broadcast()
-
-    async def disconnect(self, code):
-        """Выполняет логику `disconnect` с параметрами из сигнатуры."""
-        for task_name in ("_heartbeat_task", "_idle_task"):
-            task = getattr(self, task_name, None)
-            if not task:
-                continue
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-
-        user = self.scope.get("user")
-        graceful = code in (1000, 1001)
-        if self.is_guest:
-            await self._remove_guest(self.guest_key, graceful=graceful)
-        elif user and user.is_authenticated:
-            await self._remove_user(user, graceful=graceful)
-
-        await self._broadcast()
-        await self.channel_layer.group_discard(self.group_name, self.channel_name)
-        audit_ws_event("ws.disconnect", self.scope, endpoint="presence", code=code)
-
-    async def receive(self, text_data=None, bytes_data=None):
-        """Выполняет логику `receive` с параметрами из сигнатуры."""
-        if not text_data:
-            return
-        now = time.monotonic()
-        self._last_client_activity = now
-        try:
-            payload = json.loads(text_data)
-        except json.JSONDecodeError:
-            audit_ws_event("ws.presence.rejected", self.scope, endpoint="presence", reason="invalid_json")
-            return
-        if payload.get("type") != "ping":
-            audit_ws_event(
-                "ws.presence.rejected",
-                self.scope,
-                endpoint="presence",
-                reason="unsupported_event",
-                event_type=payload.get("type"),
-            )
-            return
-
-        if now < self._next_presence_touch_at:
-            return
-        self._next_presence_touch_at = now + self.presence_touch_interval
-
-        user = self.scope.get("user")
-        if self.is_guest:
-            await self._touch_guest(self.guest_key)
-        elif user and user.is_authenticated:
-            await self._touch_user(user)
-
-    async def _broadcast(self):
-        """Выполняет логику `_broadcast` с параметрами из сигнатуры."""
-        online = await self._get_online()
-        guests = await self._get_guest_count()
-        await self.channel_layer.group_send(
-            self.group_name_guest,
-            {"type": "presence.update", "guests": guests},
-        )
-        await self.channel_layer.group_send(
-            self.group_name_auth,
-            {"type": "presence.update", "online": online, "guests": guests},
-        )
-
-    async def presence_update(self, event):
-        """Выполняет логику `presence_update` с параметрами из сигнатуры."""
-        payload = {}
-        if "online" in event:
-            payload["online"] = event["online"]
-        if "guests" in event:
-            payload["guests"] = event["guests"]
-        if payload:
-            await self.send(text_data=json.dumps(payload))
-
-    async def _heartbeat(self):
-        """Выполняет логику `_heartbeat` с параметрами из сигнатуры."""
-        interval = max(5, self.presence_heartbeat)
-        while True:
-            await asyncio.sleep(interval)
-            try:
-                await self.send(text_data=json.dumps({"type": "ping"}))
-            except Exception:
-                break
-
-    async def _idle_watchdog(self):
-        """Выполняет логику `_idle_watchdog` с параметрами из сигнатуры."""
-        interval = max(5, min(self.presence_heartbeat, self.presence_idle_timeout))
-        while True:
-            await asyncio.sleep(interval)
-            if (time.monotonic() - self._last_client_activity) <= self.presence_idle_timeout:
-                continue
-            await self.close(code=PRESENCE_CLOSE_IDLE_CODE)
-            break
-
-    @sync_to_async
-    def _add_user(self, user):
-        """Выполняет логику `_add_user` с параметрами из сигнатуры."""
-        data = cache.get(self.cache_key, {})
-        current = data.get(user.username, {})
-        count = current.get("count", 0) + 1
-        profile = getattr(user, "profile", None)
-        image_name = getattr(profile, "image", None)
-        image_name = image_name.name if image_name else ""
-        image_url = build_profile_url(self.scope, image_name) if image_name else None
-        avatar_crop = serialize_avatar_crop(profile)
-        data[user.username] = {
-            "count": count,
-            "profileImage": image_url,
-            "avatarCrop": avatar_crop,
-            "last_seen": time.time(),
-            "grace_until": 0,
-        }
-        cache.set(self.cache_key, data, timeout=self.cache_timeout_seconds)
-
-    @sync_to_async
-    def _remove_user(self, user, graceful: bool = False):
-        """Выполняет логику `_remove_user` с параметрами из сигнатуры."""
-        data = cache.get(self.cache_key, {})
-        if user.username in data:
-            entry = data[user.username]
-            count = entry.get("count", 1) - 1
-            now = time.time()
-            if count <= 0:
-                if graceful or self.presence_grace <= 0:
-                    data.pop(user.username, None)
-                else:
-                    entry["count"] = 0
-                    entry["last_seen"] = now
-                    entry["grace_until"] = now + self.presence_grace
-                    data[user.username] = entry
-            else:
-                entry["count"] = count
-                entry["last_seen"] = now
-                entry["grace_until"] = 0
-                data[user.username] = entry
-            cache.set(self.cache_key, data, timeout=self.cache_timeout_seconds)
-
-    @sync_to_async
-    def _get_online(self):
-        """Выполняет логику `_get_online` с параметрами из сигнатуры."""
-        data = cache.get(self.cache_key, {})
-        now = time.time()
-        cleaned = {}
-        for username, info in data.items():
-            try:
-                count = int(info.get("count", 0))
-            except (TypeError, ValueError):
-                count = 0
-            last_seen = info.get("last_seen", 0)
-            grace_until = info.get("grace_until", 0)
-            if count > 0 and (now - last_seen) <= self.presence_ttl:
-                cleaned[username] = info
-            elif (
-                count <= 0
-                and grace_until
-                and grace_until > now
-                and (now - last_seen) <= self.presence_ttl
-            ):
-                cleaned[username] = info
-        if cleaned != data:
-            cache.set(self.cache_key, cleaned, timeout=self.cache_timeout_seconds)
-        return [
-            {
-                "username": username,
-                "profileImage": info.get("profileImage"),
-                "avatarCrop": info.get("avatarCrop"),
-            }
-            for username, info in cleaned.items()
-        ]
-
-    @sync_to_async
-    def _add_guest(self, ip: str | None):
-        """Выполняет логику `_add_guest` с параметрами из сигнатуры."""
-        if not ip:
-            return
-        data = cache.get(self.guest_cache_key, {}) or {}
-        current = data.get(ip, {})
-        try:
-            count = int(current.get("count", 0))
-        except (TypeError, ValueError, AttributeError):
-            count = 0
-        data[ip] = {"count": count + 1, "last_seen": time.time(), "grace_until": 0}
-        cache.set(self.guest_cache_key, data, timeout=self.cache_timeout_seconds)
-
-    @sync_to_async
-    def _remove_guest(self, ip: str | None, graceful: bool = False):
-        """Выполняет логику `_remove_guest` с параметрами из сигнатуры."""
-        if not ip:
-            return
-        data = cache.get(self.guest_cache_key, {}) or {}
-        current = data.get(ip, {})
-        try:
-            count = int(current.get("count", 0))
-        except (TypeError, ValueError, AttributeError):
-            count = 0
-        count -= 1
-        now = time.time()
-        if count <= 0:
-            if graceful or self.presence_grace <= 0:
-                data.pop(ip, None)
-            else:
-                data[ip] = {"count": 0, "last_seen": now, "grace_until": now + self.presence_grace}
-        else:
-            data[ip] = {"count": count, "last_seen": now, "grace_until": 0}
-        if data:
-            cache.set(self.guest_cache_key, data, timeout=self.cache_timeout_seconds)
-        else:
-            cache.delete(self.guest_cache_key)
-
-    @sync_to_async
-    def _get_guest_count(self) -> int:
-        """Выполняет логику `_get_guest_count` с параметрами из сигнатуры."""
-        data = cache.get(self.guest_cache_key, {}) or {}
-        now = time.time()
-        cleaned = {}
-        for ip, info in data.items():
-            try:
-                count = int(info.get("count", 0))
-            except (TypeError, ValueError, AttributeError):
-                count = 0
-            last_seen = info.get("last_seen", 0)
-            grace_until = info.get("grace_until", 0)
-            if count > 0 and (now - last_seen) <= self.presence_ttl:
-                cleaned[ip] = info
-            elif (
-                count <= 0
-                and grace_until
-                and grace_until > now
-                and (now - last_seen) <= self.presence_ttl
-            ):
-                cleaned[ip] = info
-        if cleaned != data:
-            cache.set(self.guest_cache_key, cleaned, timeout=self.cache_timeout_seconds)
-        return len(cleaned)
-
-    @sync_to_async
-    def _touch_user(self, user):
-        """Выполняет логику `_touch_user` с параметрами из сигнатуры."""
-        data = cache.get(self.cache_key, {})
-        current = data.get(user.username)
-        profile = getattr(user, "profile", None)
-        image_name = getattr(profile, "image", None)
-        image_name = image_name.name if image_name else ""
-        image_url = build_profile_url(self.scope, image_name) if image_name else None
-        avatar_crop = serialize_avatar_crop(profile)
-        if not current:
-            data[user.username] = {
-                "count": 1,
-                "profileImage": image_url,
-                "avatarCrop": avatar_crop,
-                "last_seen": time.time(),
-                "grace_until": 0,
-            }
-        else:
-            current["last_seen"] = time.time()
-            current["grace_until"] = 0
-            current["profileImage"] = image_url
-            current["avatarCrop"] = avatar_crop
-            data[user.username] = current
-        cache.set(self.cache_key, data, timeout=self.cache_timeout_seconds)
-
-    @sync_to_async
-    def _touch_guest(self, ip: str | None):
-        """Выполняет логику `_touch_guest` с параметрами из сигнатуры."""
-        if not ip:
-            return
-        data = cache.get(self.guest_cache_key, {}) or {}
-        current = data.get(ip)
-        if not current:
-            data[ip] = {"count": 1, "last_seen": time.time(), "grace_until": 0}
-        else:
-            data[ip] = {
-                "count": current.get("count", 1),
-                "last_seen": time.time(),
-                "grace_until": 0,
-            }
-        cache.set(self.guest_cache_key, data, timeout=self.cache_timeout_seconds)
-
-    def _get_guest_session_key(self) -> str | None:
-        """Returns guest session key from scope when session is initialized."""
-        session = self.scope.get("session")
-        if not session:
-            return None
-        key = getattr(session, "session_key", None)
-        if not key:
-            return None
-        return str(key)

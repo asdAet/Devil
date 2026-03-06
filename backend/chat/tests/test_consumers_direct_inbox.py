@@ -12,12 +12,14 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TransactionTestCase, override_settings
 
-from chat.direct_inbox import mark_unread
-from chat.models import ChatRole, Room
-from chat.routing import websocket_urlpatterns
+from direct_inbox.state import mark_unread
+from rooms.services import ensure_membership
+from rooms.models import Room
+from chat.routing import websocket_urlpatterns as chat_ws
+from direct_inbox.routing import websocket_urlpatterns as di_ws
 
 User = get_user_model()
-application = URLRouter(websocket_urlpatterns)
+application = URLRouter(chat_ws + di_ws)
 
 
 class DirectInboxConsumerTests(TransactionTestCase):
@@ -36,20 +38,8 @@ class DirectInboxConsumerTests(TransactionTestCase):
             direct_pair_key=f'{self.owner.pk}:{self.member.pk}',
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=self.direct_room,
-            user=self.owner,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.owner.username,
-            granted_by=self.owner,
-        )
-        ChatRole.objects.create(
-            room=self.direct_room,
-            user=self.member,
-            role=ChatRole.Role.MEMBER,
-            username_snapshot=self.member.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(self.direct_room, self.owner, role_name='Owner')
+        ensure_membership(self.direct_room, self.member, role_name='Member')
 
         self.unrelated_room = Room.objects.create(
             slug='dm_unrelated_inbox',
@@ -58,20 +48,8 @@ class DirectInboxConsumerTests(TransactionTestCase):
             direct_pair_key=f'{self.member.pk}:{self.other.pk}',
             created_by=self.member,
         )
-        ChatRole.objects.create(
-            room=self.unrelated_room,
-            user=self.member,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.member.username,
-            granted_by=self.member,
-        )
-        ChatRole.objects.create(
-            room=self.unrelated_room,
-            user=self.other,
-            role=ChatRole.Role.MEMBER,
-            username_snapshot=self.other.username,
-            granted_by=self.member,
-        )
+        ensure_membership(self.unrelated_room, self.member, role_name='Owner')
+        ensure_membership(self.unrelated_room, self.other, role_name='Member')
 
     async def _connect_inbox(self, user=None):
         """Проверяет сценарий `_connect_inbox`."""
@@ -214,3 +192,4 @@ class DirectInboxConsumerTests(TransactionTestCase):
             await inbox.disconnect()
 
         async_to_sync(run)()
+

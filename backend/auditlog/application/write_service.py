@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import cast
 
 from asgiref.sync import sync_to_async
@@ -116,7 +116,11 @@ def _persist_event(payload: dict) -> None:
         return
 
     async def _persist_event_async() -> None:
-        await sync_to_async(_persist_event_row, thread_sensitive=True)(payload)
+        persist_row_async = cast(
+            Callable[[dict], Awaitable[None]],
+            sync_to_async(_persist_event_row, thread_sensitive=True),
+        )
+        await persist_row_async(payload)
 
     # WebSocket handlers run in async context, so persist through sync_to_async.
     loop.create_task(_persist_event_async())

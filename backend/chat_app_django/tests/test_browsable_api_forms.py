@@ -45,3 +45,13 @@ class BrowsableApiFormsTests(TestCase):
         self.assertIn('name="avatarCropY"', html)
         self.assertIn('name="avatarCropWidth"', html)
         self.assertIn('name="avatarCropHeight"', html)
+
+    def test_friends_send_request_form_shows_username_for_authenticated_user(self):
+        self.client.force_login(self.user)
+        html = self._get_html("/api/friends/requests/")
+        self.assertIn('name="username"', html)
+
+    def test_friends_block_form_shows_username_for_authenticated_user(self):
+        self.client.force_login(self.user)
+        html = self._get_html("/api/friends/block/")
+        self.assertIn('name="username"', html)

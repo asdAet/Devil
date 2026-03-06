@@ -1,5 +1,7 @@
 """Tests for API index and interactive renderer configuration."""
 
+from urllib.parse import unquote
+
 from django.test import TestCase
 
 from chat_app_django import settings as app_settings
@@ -16,6 +18,11 @@ class ApiIndexTests(TestCase):
         self.assertIn("auth", payload["endpoints"])
         self.assertIn("session", payload["endpoints"]["auth"])
         self.assertIn("/api/auth/session/", payload["endpoints"]["auth"]["session"])
+        self.assertIn("chatRoomRoles", payload["templates"])
+        self.assertIn(
+            "/api/chat/rooms/<room_slug>/roles/",
+            unquote(payload["templates"]["chatRoomRoles"]),
+        )
         self.assertIn("sessionAuth", payload["endpoints"])
         self.assertIn("/api-auth/login/", payload["endpoints"]["sessionAuth"]["login"])
         self.assertIn("/api-auth/logout/", payload["endpoints"]["sessionAuth"]["logout"])

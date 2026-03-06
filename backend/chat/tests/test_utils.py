@@ -5,8 +5,8 @@ from urllib.parse import parse_qs, urlparse
 
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
-from chat import utils
-from chat.utils import build_profile_url, build_profile_url_from_request
+from chat_app_django import media_utils as utils
+from chat_app_django.media_utils import build_profile_url, build_profile_url_from_request
 
 
 class UtilityHelpersTests(SimpleTestCase):

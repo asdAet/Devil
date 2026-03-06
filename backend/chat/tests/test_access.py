@@ -8,8 +8,9 @@ from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
 from django.test import TestCase
 
-from chat.access import can_read, can_write, ensure_can_read_or_404, ensure_can_write, get_user_role
-from chat.models import ChatRole, Room
+from roles.access import can_read, can_write, ensure_can_read_or_404, ensure_can_write, get_user_role
+from rooms.services import ensure_membership
+from rooms.models import Room
 
 User = get_user_model()
 
@@ -28,20 +29,8 @@ class ChatAccessTests(TestCase):
             kind=Room.Kind.PRIVATE,
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=self.private_room,
-            user=self.owner,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.owner.username,
-            granted_by=self.owner,
-        )
-        ChatRole.objects.create(
-            room=self.private_room,
-            user=self.member,
-            role=ChatRole.Role.MEMBER,
-            username_snapshot=self.member.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(self.private_room, self.owner, role_name="Owner")
+        ensure_membership(self.private_room, self.member, role_name="Member")
 
     def test_public_room_permissions(self):
         """Проверяет сценарий `test_public_room_permissions`."""
@@ -72,13 +61,7 @@ class ChatAccessTests(TestCase):
             direct_pair_key=None,
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=direct,
-            user=self.owner,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.owner.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(direct, self.owner)
 
         self.assertFalse(can_read(direct, self.owner))
         self.assertFalse(can_write(direct, self.owner))
@@ -92,13 +75,7 @@ class ChatAccessTests(TestCase):
             direct_pair_key='not-valid',
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=direct,
-            user=self.owner,
-            role=ChatRole.Role.OWNER,
-            username_snapshot=self.owner.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(direct, self.owner)
 
         self.assertFalse(can_read(direct, self.owner))
         self.assertFalse(can_write(direct, self.owner))
@@ -112,13 +89,7 @@ class ChatAccessTests(TestCase):
             direct_pair_key=f'{self.owner.pk}:{self.member.pk}',
             created_by=self.owner,
         )
-        ChatRole.objects.create(
-            room=direct,
-            user=self.other,
-            role=ChatRole.Role.ADMIN,
-            username_snapshot=self.other.username,
-            granted_by=self.owner,
-        )
+        ensure_membership(direct, self.other, role_name="Admin")
 
         self.assertFalse(can_read(direct, self.other))
         self.assertFalse(can_write(direct, self.other))

@@ -1,9 +1,31 @@
 from rest_framework import serializers
 
-from .models import ChatRole
+from .models import Membership, Role
 
 
-class ChatRoleSerializer(serializers.ModelSerializer):
+class RoleSerializer(serializers.ModelSerializer):
+    room_slug = serializers.SlugRelatedField(
+        source="room",
+        slug_field="slug",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Role
+        fields = (
+            "id",
+            "room_slug",
+            "name",
+            "color",
+            "position",
+            "permissions",
+            "is_default",
+            "created_at",
+        )
+        read_only_fields = fields
+
+
+class MembershipSerializer(serializers.ModelSerializer):
     room_slug = serializers.SlugRelatedField(
         source="room",
         slug_field="slug",
@@ -14,22 +36,17 @@ class ChatRoleSerializer(serializers.ModelSerializer):
         slug_field="username",
         read_only=True,
     )
-    granted_by_username = serializers.SlugRelatedField(
-        source="granted_by",
-        slug_field="username",
-        read_only=True,
-    )
+    roles = RoleSerializer(many=True, read_only=True)
 
     class Meta:
-        model = ChatRole
+        model = Membership
         fields = (
             "id",
             "room_slug",
             "username",
-            "role",
-            "username_snapshot",
-            "granted_by_username",
-            "created_at",
-            "updated_at",
+            "nickname",
+            "roles",
+            "is_banned",
+            "joined_at",
         )
         read_only_fields = fields

@@ -5,33 +5,51 @@ from django.dispatch import receiver
 
 from chat_app_django.security.audit import audit_security_event
 
-from .models import ChatRole
+from .models import Membership, Role
 
 
-@receiver(post_save, sender=ChatRole)
-def audit_chat_role_save(sender, instance: ChatRole, created: bool, **kwargs):
+@receiver(post_save, sender=Membership)
+def audit_membership_save(sender, instance: Membership, created: bool, **kwargs):
     audit_security_event(
-        "chat.role.created" if created else "chat.role.updated",
+        "membership.created" if created else "membership.updated",
         actor_user=instance.user,
         actor_user_id=getattr(instance.user, "id", None),
         actor_username=getattr(instance.user, "username", None),
         is_authenticated=bool(getattr(instance.user, "is_authenticated", False)),
         room_slug=getattr(instance.room, "slug", None),
         username=getattr(instance.user, "username", None),
-        role=instance.role,
-        granted_by=getattr(instance.granted_by, "username", None),
+        is_banned=instance.is_banned,
     )
 
 
-@receiver(post_delete, sender=ChatRole)
-def audit_chat_role_delete(sender, instance: ChatRole, **kwargs):
+@receiver(post_delete, sender=Membership)
+def audit_membership_delete(sender, instance: Membership, **kwargs):
     audit_security_event(
-        "chat.role.deleted",
+        "membership.deleted",
         actor_user=instance.user,
         actor_user_id=getattr(instance.user, "id", None),
         actor_username=getattr(instance.user, "username", None),
         is_authenticated=bool(getattr(instance.user, "is_authenticated", False)),
         room_slug=getattr(instance.room, "slug", None),
         username=getattr(instance.user, "username", None),
-        role=instance.role,
+    )
+
+
+@receiver(post_save, sender=Role)
+def audit_role_save(sender, instance: Role, created: bool, **kwargs):
+    audit_security_event(
+        "role.created" if created else "role.updated",
+        room_slug=getattr(instance.room, "slug", None),
+        role_name=instance.name,
+        position=instance.position,
+        permissions=instance.permissions,
+    )
+
+
+@receiver(post_delete, sender=Role)
+def audit_role_delete(sender, instance: Role, **kwargs):
+    audit_security_event(
+        "role.deleted",
+        room_slug=getattr(instance.room, "slug", None),
+        role_name=instance.name,
     )

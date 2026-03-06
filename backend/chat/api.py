@@ -1,9 +1,6 @@
 """API endpoints for the chat subsystem."""
 
-import hashlib
-import hmac
 import re
-import time
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -17,13 +14,23 @@ from rest_framework.response import Response
 
 from messages.models import Message
 from messages.serializers import MessageSerializer
-from roles.access import READ_ROLES, ensure_can_read_or_404
-from roles.models import ChatRole
+from roles.access import ensure_can_read_or_404
+from roles.models import Membership
 from rooms.models import Room
 from rooms.serializers import RoomPublicSerializer
+from rooms.services import (
+    direct_pair_key,
+    direct_peer_for_user,
+    direct_room_slug,
+    ensure_direct_roles,
+    ensure_direct_room_with_retry,
+    ensure_role,
+    ensure_room_owner_role,
+    parse_pair_key_users,
+)
 
 from .constants import PUBLIC_ROOM_NAME, PUBLIC_ROOM_SLUG
-from .utils import build_profile_url_from_request, serialize_avatar_crop
+from chat_app_django.media_utils import build_profile_url_from_request, serialize_avatar_crop
 
 User = get_user_model()
 
@@ -66,130 +73,6 @@ def _normalize_username(raw_username):
     if value.startswith("@"):
         value = value[1:]
     return value.strip()
-
-
-def _direct_pair_key(user_a_id: int, user_b_id: int) -> str:
-    low, high = sorted([int(user_a_id), int(user_b_id)])
-    return f"{low}:{high}"
-
-
-def _direct_room_slug(pair_key: str) -> str:
-    salt = str(getattr(settings, "CHAT_DIRECT_SLUG_SALT", "") or settings.SECRET_KEY)
-    digest = hmac.new(
-        salt.encode("utf-8"),
-        pair_key.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()[:24]
-    return f"dm_{digest}"
-
-
-def _parse_pair_key_users(pair_key: str | None) -> tuple[int, int] | None:
-    if not pair_key or ":" not in pair_key:
-        return None
-    first, second = pair_key.split(":", 1)
-    try:
-        return int(first), int(second)
-    except (TypeError, ValueError):
-        return None
-
-
-def _ensure_role(room: Room, user, role: str, granted_by=None):
-    role_obj, _ = ChatRole.objects.get_or_create(
-        room=room,
-        user=user,
-        defaults={
-            "role": role,
-            "username_snapshot": user.username,
-            "granted_by": granted_by,
-        },
-    )
-    changed_fields = []
-    if role_obj.username_snapshot != user.username:
-        role_obj.username_snapshot = user.username
-        changed_fields.append("username_snapshot")
-    granted_by_pk = getattr(granted_by, "pk", None) if granted_by else None
-    if granted_by and getattr(role_obj, "granted_by_id", None) != granted_by_pk:
-        role_obj.granted_by = granted_by
-        changed_fields.append("granted_by")
-    if changed_fields:
-        role_obj.save(update_fields=changed_fields)
-    return role_obj
-
-
-def _ensure_room_owner_role(room: Room):
-    if not room.created_by:
-        return
-    _ensure_role(room, room.created_by, ChatRole.Role.OWNER, granted_by=room.created_by)
-
-
-def _ensure_direct_roles(room: Room, initiator, peer, created: bool):
-    initiator_role = ChatRole.Role.OWNER if created else ChatRole.Role.MEMBER
-    _ensure_role(room, initiator, initiator_role, granted_by=initiator)
-    _ensure_role(room, peer, ChatRole.Role.MEMBER, granted_by=initiator)
-
-
-def _create_or_get_direct_room(initiator, target, pair_key: str, slug: str):
-    room, created = Room.objects.get_or_create(
-        direct_pair_key=pair_key,
-        defaults={
-            "slug": slug,
-            "name": f"{initiator.username} - {target.username}",
-            "kind": Room.Kind.DIRECT,
-            "created_by": initiator,
-        },
-    )
-
-    changed_fields = []
-    if room.kind != Room.Kind.DIRECT:
-        room.kind = Room.Kind.DIRECT
-        changed_fields.append("kind")
-    if not room.slug:
-        room.slug = slug
-        changed_fields.append("slug")
-    if not room.name:
-        room.name = f"{initiator.username} - {target.username}"
-        changed_fields.append("name")
-    if changed_fields:
-        room.save(update_fields=changed_fields)
-
-    return room, created
-
-
-def _ensure_direct_room_with_retry(initiator, target, pair_key: str, slug: str):
-    attempts = max(1, int(getattr(settings, "CHAT_DIRECT_START_RETRIES", 3)))
-
-    for attempt in range(attempts):
-        try:
-            with transaction.atomic():
-                return _create_or_get_direct_room(initiator, target, pair_key, slug)
-        except IntegrityError:
-            room = Room.objects.filter(direct_pair_key=pair_key).first()
-            if room:
-                return room, False
-            if attempt == attempts - 1:
-                raise
-        except OperationalError as exc:
-            room = Room.objects.filter(direct_pair_key=pair_key).first()
-            if room:
-                return room, False
-            if "locked" not in str(exc).lower() or attempt == attempts - 1:
-                raise
-            time.sleep(0.05 * (attempt + 1))
-
-    raise OperationalError("failed to create direct room")
-
-
-def _direct_peer_for_user(room: Room, user):
-    peer_role = (
-        ChatRole.objects.filter(room=room)
-        .exclude(user=user)
-        .select_related("user", "user__profile")
-        .order_by("id")
-        .first()
-    )
-    if not peer_role:
-        return None
-    return peer_role.user
 
 
 def _public_room():
@@ -252,7 +135,7 @@ def _serialize_room_details(request, room: Room, created: bool):
     }
 
     if room.kind == Room.Kind.DIRECT and request.user and request.user.is_authenticated:
-        peer = _direct_peer_for_user(room, request.user)
+        peer = direct_peer_for_user(room, request.user)
         if peer:
             payload["peer"] = _serialize_peer(request, peer)
 
@@ -265,41 +148,6 @@ def public_room(request):
     room = _public_room()
     serializer = RoomPublicSerializer({"slug": room.slug, "name": room.name, "kind": room.kind})
     return Response(serializer.data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def direct_start(request):
-    target_username = _normalize_username(request.data.get("username"))
-    if not target_username:
-        return Response({"error": "username is required"}, status=http_status.HTTP_400_BAD_REQUEST)
-
-    target = User.objects.filter(username=target_username).select_related("profile").first()
-    if not target:
-        return Response({"error": "Not found"}, status=http_status.HTTP_404_NOT_FOUND)
-
-    if target.pk == request.user.pk:
-        return Response({"error": "Cannot start direct chat with yourself"}, status=http_status.HTTP_400_BAD_REQUEST)
-
-    pair_key = _direct_pair_key(request.user.pk, target.pk)
-    slug = _direct_room_slug(pair_key)
-
-    try:
-        room, created = _ensure_direct_room_with_retry(request.user, target, pair_key, slug)
-    except OperationalError:
-        return Response({"error": "Service unavailable"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    try:
-        with transaction.atomic():
-            _ensure_direct_roles(room, request.user, target, created=created)
-    except OperationalError:
-        return Response({"error": "Service unavailable"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    return Response({
-        "slug": room.slug,
-        "kind": room.kind,
-        "peer": _serialize_peer(request, target),
-    })
 
 
 class DirectStartApiView(GenericAPIView):
@@ -321,17 +169,17 @@ class DirectStartApiView(GenericAPIView):
         if target.pk == request.user.pk:
             return Response({"error": "Cannot start direct chat with yourself"}, status=http_status.HTTP_400_BAD_REQUEST)
 
-        pair_key = _direct_pair_key(request.user.pk, target.pk)
-        slug = _direct_room_slug(pair_key)
+        pair_key = direct_pair_key(request.user.pk, target.pk)
+        slug = direct_room_slug(pair_key)
 
         try:
-            room, created = _ensure_direct_room_with_retry(request.user, target, pair_key, slug)
+            room, created = ensure_direct_room_with_retry(request.user, target, pair_key, slug)
         except OperationalError:
             return Response({"error": "Service unavailable"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
 
         try:
             with transaction.atomic():
-                _ensure_direct_roles(room, request.user, target, created=created)
+                ensure_direct_roles(room, request.user, target, created=created)
         except OperationalError:
             return Response({"error": "Service unavailable"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -350,20 +198,20 @@ direct_start = DirectStartApiView.as_view()
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def direct_chats(request):
-    role_qs = (
-        ChatRole.objects.filter(
+    membership_qs = (
+        Membership.objects.filter(
             user=request.user,
             room__kind=Room.Kind.DIRECT,
-            role__in=list(READ_ROLES),
+            is_banned=False,
         )
         .select_related("room")
-        .order_by("-updated_at")
+        .order_by("-joined_at")
     )
 
     seen_room_ids: set[int] = set()
     items = []
-    for role in role_qs:
-        room = role.room
+    for membership in membership_qs:
+        room = membership.room
         room_pk = getattr(room, "pk", None)
         if room_pk is None:
             continue
@@ -371,29 +219,28 @@ def direct_chats(request):
             continue
         seen_room_ids.add(room_pk)
 
-        pair = _parse_pair_key_users(room.direct_pair_key)
+        pair = parse_pair_key_users(room.direct_pair_key)
         if not pair or request.user.pk not in pair:
             continue
 
-        last_message = (
-            Message.objects.filter(room=room)
-            .order_by("-date_added", "-id")
-            .first()
-        )
-        if not last_message:
-            continue
+        last_message = Message.objects.filter(room=room).order_by("-date_added", "-id").first()
 
-        peer = _direct_peer_for_user(room, request.user)
+        peer = direct_peer_for_user(room, request.user)
         if not peer:
             continue
 
+        sort_key = (
+            last_message.date_added.timestamp()
+            if last_message is not None
+            else membership.joined_at.timestamp()
+        )
         items.append(
             {
                 "slug": room.slug,
                 "peer": _serialize_peer(request, peer),
-                "lastMessage": last_message.message_content,
-                "lastMessageAt": last_message.date_added.isoformat(),
-                "sortKey": last_message.date_added.timestamp(),
+                "lastMessage": last_message.message_content if last_message else "",
+                "lastMessageAt": last_message.date_added.isoformat() if last_message else None,
+                "sortKey": sort_key,
             }
         )
 
@@ -423,14 +270,14 @@ def room_details(request, room_slug):
                 kind=Room.Kind.PRIVATE,
                 created_by=request.user,
             )
-            _ensure_role(room, request.user, ChatRole.Role.OWNER, granted_by=request.user)
+            ensure_role(room, request.user, "Owner", granted_by=request.user)
             created = True
         else:
             if room.kind in {Room.Kind.PRIVATE, Room.Kind.DIRECT}:
                 try:
                     ensure_can_read_or_404(room, request.user)
                 except Http404:
-                    _ensure_room_owner_role(room)
+                    ensure_room_owner_role(room)
                     try:
                         ensure_can_read_or_404(room, request.user)
                     except Http404:
