@@ -10,6 +10,7 @@ urlpatterns = [
     # Group CRUD
     path("", views.GroupCreateInteractiveView.as_view(), name="create"),
     path("public/", views.list_public_groups, name="list-public"),
+    path("my/", views.list_my_groups, name="list-my"),
     path("<slug:slug>/", views.GroupDetailInteractiveView.as_view(), name="detail"),
 
     # Members

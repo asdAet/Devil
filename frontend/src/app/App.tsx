@@ -8,10 +8,9 @@ import { debugLog } from '../shared/lib/debug'
 import { PresenceProvider } from '../shared/presence'
 import { DirectInboxProvider } from '../shared/directInbox'
 import { RuntimeConfigProvider } from '../shared/config/RuntimeConfigProvider'
-import { Toast } from '../shared/ui'
-import { TopBar } from '../widgets/layout/TopBar'
+import { AppShell } from '../widgets/layout/AppShell'
 import { AppRoutes } from './routes'
-import styles from '../styles/pages/AppShell.module.css'
+import shellStyles from '../styles/layout/AppShell.module.css'
 
 type ProfileFieldErrors = Record<string, string[]>
 type ProfileSaveResult =
@@ -19,10 +18,9 @@ type ProfileSaveResult =
   | { ok: false; errors?: ProfileFieldErrors; message?: string }
 
 /**
- * Внутренний роутинг-слой приложения с глобальными провайдерами и баннерами.
- * @returns JSX-разметка основного shell приложения.
+ * Внутренний роутинг-слой приложения с глобальными провайдерами.
  */
-function AppShell() {
+function AppInner() {
   const navigate = useNavigate()
   const location = useLocation()
   const { auth, login, register, logout, updateProfile } = useAuth()
@@ -191,34 +189,38 @@ function AppShell() {
 
   const isAuthRoute = location.pathname === '/login' || location.pathname === '/register'
 
+  const routesElement = (
+    <AppRoutes
+      user={auth.user}
+      error={error}
+      passwordRules={passwordRules}
+      onNavigate={onNavigate}
+      onLogin={handleLogin}
+      onRegister={handleRegister}
+      onLogout={handleLogout}
+      onProfileSave={handleProfileSave}
+    />
+  )
+
   return (
     <PresenceProvider user={auth.user} ready={!auth.loading}>
       <DirectInboxProvider user={auth.user} ready={!auth.loading}>
-        <div className={styles.appShell}>
-          <TopBar user={auth.user} onNavigate={onNavigate} onLogout={handleLogout} />
-          <main className={styles.content}>
-            {banner && (
-              <Toast variant="success" role="status">
-                {banner}
-              </Toast>
-            )}
-            {error && !isAuthRoute && (
-              <Toast variant="danger" role="alert">
-                {error}
-              </Toast>
-            )}
-            <AppRoutes
-              user={auth.user}
-              error={error}
-              passwordRules={passwordRules}
-              onNavigate={onNavigate}
-              onLogin={handleLogin}
-              onRegister={handleRegister}
-              onLogout={handleLogout}
-              onProfileSave={handleProfileSave}
-            />
-          </main>
-        </div>
+        {isAuthRoute ? (
+          <div className={shellStyles.authPage}>
+            {routesElement}
+          </div>
+        ) : (
+          <AppShell
+            user={auth.user}
+            onNavigate={onNavigate}
+            onLogout={handleLogout}
+            banner={banner}
+            error={error}
+            isAuthRoute={isAuthRoute}
+          >
+            {routesElement}
+          </AppShell>
+        )}
       </DirectInboxProvider>
     </PresenceProvider>
   )
@@ -226,13 +228,12 @@ function AppShell() {
 
 /**
  * Корневой компонент frontend-приложения.
- * @returns JSX-разметка с BrowserRouter.
  */
 export function App() {
   return (
     <BrowserRouter>
       <RuntimeConfigProvider>
-        <AppShell />
+        <AppInner />
       </RuntimeConfigProvider>
     </BrowserRouter>
   )

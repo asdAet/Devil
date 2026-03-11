@@ -213,6 +213,9 @@ else:
             "default": {
                 "ENGINE": "django.db.backends.sqlite3",
                 "NAME": sqlite_path or (BASE_DIR / "db.sqlite3"),
+                "OPTIONS": {
+                    "timeout": 30,
+                },
             }
         }
 
@@ -365,6 +368,19 @@ else:
 
 
 LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO").upper()
+
+
+# ── SQLite PRAGMAs via connection signal ──────────────────────────────
+def _sqlite_pragmas(sender, connection, **kwargs):
+    if connection.vendor == "sqlite":
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.execute("PRAGMA busy_timeout=30000;")
+
+
+from django.db.backends.signals import connection_created  # noqa: E402
+
+connection_created.connect(_sqlite_pragmas)
 
 LOGGING = {
     "version": 1,

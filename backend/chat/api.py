@@ -1,10 +1,13 @@
 """API endpoints for the chat subsystem."""
 
+import mimetypes
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, OperationalError, ProgrammingError, transaction
+from django.db.models import Q
 from django.http import Http404
 from rest_framework import serializers, status as http_status
 from rest_framework.decorators import api_view, parser_classes, permission_classes
@@ -13,7 +16,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from messages.models import Message, MessageAttachment
+from messages.models import Message, MessageAttachment, MessageReadState
 from messages.serializers import MessageSerializer
 from roles.access import ensure_can_read_or_404, has_permission
 from roles.models import Membership
@@ -63,7 +66,7 @@ def _build_profile_pic_url(request, profile_pic):
     return build_profile_url_from_request(request, raw_value)
 
 
-def _serialize_peer(request, user):
+def _serialize_peer(request, user, *, is_blocked: bool = False):
     profile_pic = None
     profile = getattr(user, "profile", None)
     image = getattr(profile, "image", None) if profile else None
@@ -72,11 +75,42 @@ def _serialize_peer(request, user):
 
     profile = getattr(user, "profile", None)
     last_seen = getattr(profile, "last_seen", None)
+    # If blocked, hide real online status
+    if is_blocked:
+        last_seen = None
     return {
+        "userId": user.pk,
         "username": user.username,
         "profileImage": profile_pic,
         "avatarCrop": serialize_avatar_crop(profile),
         "lastSeen": last_seen.isoformat() if last_seen else None,
+        "bio": getattr(profile, "bio", "") or "",
+        "blocked": is_blocked,
+    }
+
+
+def _serialize_reply_to(message: Message | None):
+    if not message:
+        return None
+    if message.is_deleted:
+        return {"id": message.pk, "username": None, "content": "[deleted]"}
+    return {
+        "id": message.pk,
+        "username": message.user.username if message.user else message.username,
+        "content": message.message_content[:150],
+    }
+
+
+def _serialize_attachment_item(request, attachment: MessageAttachment):
+    return {
+        "id": attachment.pk,
+        "originalFilename": attachment.original_filename,
+        "contentType": attachment.content_type,
+        "fileSize": attachment.file_size,
+        "url": _build_profile_pic_url(request, attachment.file),
+        "thumbnailUrl": _build_profile_pic_url(request, attachment.thumbnail) if attachment.thumbnail else None,
+        "width": attachment.width,
+        "height": attachment.height,
     }
 
 
@@ -143,10 +177,27 @@ def _serialize_room_details(request, room: Room, created: bool):
         "peer": None,
     }
 
+    if request.user and request.user.is_authenticated:
+        read_state = MessageReadState.objects.filter(
+            user=request.user, room=room
+        ).values_list("last_read_message_id", flat=True).first()
+        payload["lastReadMessageId"] = read_state
+
     if room.kind == Room.Kind.DIRECT and request.user and request.user.is_authenticated:
         peer = direct_peer_for_user(room, request.user)
         if peer:
-            payload["peer"] = _serialize_peer(request, peer)
+            from friends.application.friend_service import is_blocked_between
+            from friends.models import Friendship
+            blocked = is_blocked_between(request.user, peer)
+            # Determine who blocked whom
+            blocker = False
+            if blocked:
+                blocker = Friendship.objects.filter(
+                    from_user=request.user, to_user=peer, status=Friendship.Status.BLOCKED
+                ).exists()
+            payload["peer"] = _serialize_peer(request, peer, is_blocked=blocked)
+            payload["blocked"] = blocked
+            payload["blockedByMe"] = blocker
 
     return payload
 
@@ -540,7 +591,7 @@ def message_reaction_remove(request, room_slug, message_id, emoji):
 
 # ── File Attachments ──────────────────────────────────────────────────
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser])
 def upload_attachments(request, room_slug):
@@ -554,6 +605,62 @@ def upload_attachments(request, room_slug):
         _ensure_room_read_access(request, room)
     except Http404:
         return Response({"error": "Not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        limit_raw = request.query_params.get("limit")
+        before_raw = request.query_params.get("before")
+
+        if limit_raw is None:
+            limit = 40
+        else:
+            try:
+                limit = _parse_positive_int(limit_raw, "limit")
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+        limit = min(limit, 200)
+
+        before_id = None
+        if before_raw is not None:
+            try:
+                before_id = _parse_positive_int(before_raw, "before")
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        qs = (
+            MessageAttachment.objects.filter(message__room=room, message__is_deleted=False)
+            .select_related("message", "message__user")
+            .order_by("-id")
+        )
+        if before_id is not None:
+            qs = qs.filter(id__lt=before_id)
+
+        batch = list(qs[: limit + 1])
+        has_more = len(batch) > limit
+        if has_more:
+            batch = batch[:limit]
+
+        items = [
+            {
+                **_serialize_attachment_item(request, attachment),
+                "messageId": attachment.message_id,
+                "createdAt": attachment.message.date_added.isoformat(),
+                "username": attachment.message.user.username
+                if attachment.message.user
+                else attachment.message.username,
+            }
+            for attachment in batch
+        ]
+
+        return Response(
+            {
+                "items": items,
+                "pagination": {
+                    "limit": limit,
+                    "hasMore": has_more,
+                    "nextBefore": batch[-1].pk if has_more and batch else None,
+                },
+            }
+        )
 
     if not has_permission(room, request.user, Perm.ATTACH_FILES):
         return Response({"error": "Missing ATTACH_FILES permission"}, status=http_status.HTTP_403_FORBIDDEN)
@@ -570,10 +677,6 @@ def upload_attachments(request, room_slug):
         )
 
     max_size = int(getattr(settings, "CHAT_ATTACHMENT_MAX_SIZE_MB", 10)) * 1024 * 1024
-    allowed_types = getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [
-        "image/jpeg", "image/png", "image/gif", "image/webp",
-        "application/pdf", "text/plain", "video/mp4", "audio/mpeg", "audio/webm",
-    ])
 
     for f in files:
         if f.size > max_size:
@@ -581,28 +684,47 @@ def upload_attachments(request, room_slug):
                 {"error": f"File '{f.name}' exceeds maximum size"},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
-        if f.content_type not in allowed_types:
-            return Response(
-                {"error": f"File type '{f.content_type}' is not allowed"},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
+
+    def _resolve_content_type(uploaded_file) -> str:
+        raw_content_type = (getattr(uploaded_file, "content_type", "") or "").strip().lower()
+        guessed_content_type, _ = mimetypes.guess_type(getattr(uploaded_file, "name", "") or "")
+        if raw_content_type and raw_content_type != "application/octet-stream":
+            return raw_content_type
+        if guessed_content_type:
+            return guessed_content_type.lower()
+        if raw_content_type:
+            return raw_content_type
+        return "application/octet-stream"
 
     message_content = request.data.get("messageContent", "")
     if not isinstance(message_content, str):
         message_content = ""
 
+    reply_to_raw = request.data.get("replyTo")
+    reply_to_id = None
+    if reply_to_raw not in (None, ""):
+        try:
+            reply_to_id = _parse_positive_int(str(reply_to_raw), "replyTo")
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+        if not Message.objects.filter(pk=reply_to_id, room=room, is_deleted=False).exists():
+            return Response({"error": "Reply target not found"}, status=http_status.HTTP_400_BAD_REQUEST)
+
     user = request.user
     profile = getattr(user, "profile", None)
     image = getattr(profile, "image", None) if profile else None
     profile_pic = getattr(image, "name", "") or ""
+    message_kwargs = {
+        "message_content": message_content,
+        "username": user.username,
+        "user": user,
+        "profile_pic": profile_pic,
+        "room": room,
+    }
+    if reply_to_id:
+        message_kwargs["reply_to_id"] = reply_to_id
 
-    msg = Message.objects.create(
-        message_content=message_content,
-        username=user.username,
-        user=user,
-        profile_pic=profile_pic,
-        room=room,
-    )
+    msg = Message.objects.create(**message_kwargs)
 
     from messages.thumbnail import generate_thumbnail
 
@@ -612,11 +734,12 @@ def upload_attachments(request, room_slug):
             message=msg,
             file=f,
             original_filename=f.name or "file",
-            content_type=f.content_type or "application/octet-stream",
+            content_type=_resolve_content_type(f),
             file_size=f.size,
         )
 
-        if f.content_type and f.content_type.startswith("image/"):
+        attachment_content_type = attachment.content_type or ""
+        if attachment_content_type.startswith("image/"):
             thumb_info = generate_thumbnail(attachment.file)
             if thumb_info:
                 attachment.thumbnail = thumb_info["path"]
@@ -624,16 +747,7 @@ def upload_attachments(request, room_slug):
                 attachment.height = thumb_info.get("height")
                 attachment.save(update_fields=["thumbnail", "width", "height"])
 
-        attachments_data.append({
-            "id": attachment.pk,
-            "originalFilename": attachment.original_filename,
-            "contentType": attachment.content_type,
-            "fileSize": attachment.file_size,
-            "url": _build_profile_pic_url(request, attachment.file),
-            "thumbnailUrl": _build_profile_pic_url(request, attachment.thumbnail) if attachment.thumbnail else None,
-            "width": attachment.width,
-            "height": attachment.height,
-        })
+        attachments_data.append(_serialize_attachment_item(request, attachment))
 
     profile_url = _build_profile_pic_url(request, image) if image else None
     _broadcast_to_room(room, {
@@ -644,7 +758,8 @@ def upload_attachments(request, room_slug):
         "avatar_crop": serialize_avatar_crop(profile),
         "room": room.slug,
         "id": msg.pk,
-        "date_added": msg.date_added.isoformat(),
+        "createdAt": msg.date_added.isoformat(),
+        "replyTo": _serialize_reply_to(msg.reply_to),
         "attachments": attachments_data,
     })
 
@@ -746,6 +861,145 @@ def search_messages(request, room_slug):
 
 
 # ── Read Receipts ─────────────────────────────────────────────────────
+
+def _parse_section_limit(request, key: str, default: int, max_value: int) -> int:
+    raw = request.query_params.get(key)
+    if raw is None:
+        return default
+    try:
+        parsed = _parse_positive_int(raw, key)
+    except ValueError:
+        return default
+    return min(parsed, max_value)
+
+
+def _interaction_room_ids(user) -> set[int]:
+    room_ids = set(
+        Membership.objects.filter(
+            user=user,
+            is_banned=False,
+            room__kind__in=[Room.Kind.DIRECT, Room.Kind.GROUP, Room.Kind.PRIVATE],
+        ).values_list("room_id", flat=True)
+    )
+    public_room = _public_room()
+    public_room_id = getattr(public_room, "pk", None)
+    if public_room_id:
+        room_ids.add(int(public_room_id))
+    return room_ids
+
+
+def _interaction_user_ids(user, room_ids: set[int]) -> set[int]:
+    if not room_ids:
+        return set()
+
+    member_user_ids = set(
+        Membership.objects.filter(
+            room_id__in=room_ids,
+            is_banned=False,
+        ).values_list("user_id", flat=True)
+    )
+
+    message_user_ids = set(
+        Message.objects.filter(
+            room_id__in=room_ids,
+            is_deleted=False,
+            user_id__isnull=False,
+        ).values_list("user_id", flat=True)
+    )
+
+    interacted_user_ids = member_user_ids | message_user_ids
+    actor_id = getattr(user, "pk", None)
+    if actor_id is not None:
+        interacted_user_ids.discard(int(actor_id))
+    return interacted_user_ids
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def global_search(request):
+    raw_q = request.query_params.get("q", "").strip()
+    is_handle_query = raw_q.startswith("@")
+    q = raw_q[1:].strip() if is_handle_query else raw_q
+    if len(q) < 2:
+        return Response({"error": "Query must be at least 2 characters"}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    users_limit = _parse_section_limit(request, "usersLimit", 8, 20)
+    groups_limit = _parse_section_limit(request, "groupsLimit", 8, 20)
+    messages_limit = _parse_section_limit(request, "messagesLimit", 15, 50)
+
+    interaction_room_ids = _interaction_room_ids(request.user)
+    interaction_user_ids = _interaction_user_ids(request.user, interaction_room_ids)
+
+    users_qs = (
+        User.objects.filter(pk__in=interaction_user_ids)
+        .filter(username__icontains=q)
+        .select_related("profile")
+        .order_by("username")[:users_limit]
+    )
+    users = [_serialize_peer(request, found_user) for found_user in users_qs]
+
+    group_filters = (
+        Q(username__icontains=q)
+        if is_handle_query
+        else (Q(name__icontains=q) | Q(username__icontains=q))
+    )
+    groups_qs = (
+        Room.objects.filter(
+            kind=Room.Kind.GROUP,
+        )
+        .filter(
+            Q(id__in=interaction_room_ids) | Q(is_public=True)
+        )
+        .filter(group_filters)
+        .distinct()
+        .order_by("-member_count", "name")[:groups_limit]
+    )
+    groups = [
+        {
+            "slug": room.slug,
+            "name": room.name,
+            "description": room.description[:200],
+            "username": room.username,
+            "memberCount": room.member_count,
+            "isPublic": room.is_public,
+        }
+        for room in groups_qs
+    ]
+
+    if interaction_room_ids:
+        messages_qs = (
+            Message.objects.filter(
+                room_id__in=interaction_room_ids,
+                is_deleted=False,
+                message_content__icontains=q,
+            )
+            .select_related("room", "user")
+            .order_by("-id")[:messages_limit]
+        )
+    else:
+        messages_qs = Message.objects.none()
+
+    messages = [
+        {
+            "id": msg.pk,
+            "username": msg.user.username if msg.user else msg.username,
+            "content": msg.message_content,
+            "createdAt": msg.date_added.isoformat(),
+            "roomSlug": msg.room.slug if msg.room else "",
+            "roomName": msg.room.name if msg.room else "",
+            "roomKind": msg.room.kind if msg.room else "",
+        }
+        for msg in messages_qs
+    ]
+
+    return Response(
+        {
+            "users": users,
+            "groups": groups,
+            "messages": messages,
+        }
+    )
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

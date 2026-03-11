@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from django.db import transaction
+from django.db import models, transaction
 
 from chat_app_django.security.audit import audit_security_event
 from friends.application.errors import (
@@ -64,6 +64,21 @@ def list_incoming_requests(actor) -> list:
 def list_outgoing_requests(actor) -> list:
     _ensure_authenticated(actor)
     return list(repositories.list_pending_outgoing(actor))
+
+
+def list_blocked(actor) -> list:
+    _ensure_authenticated(actor)
+    return list(repositories.list_blocked_by_user(actor))
+
+
+def is_blocked_between(user_a, user_b) -> bool:
+    """Return True if either user has blocked the other."""
+    return Friendship.objects.filter(
+        status=Friendship.Status.BLOCKED,
+    ).filter(
+        models.Q(from_user=user_a, to_user=user_b)
+        | models.Q(from_user=user_b, to_user=user_a)
+    ).exists()
 
 
 # ── Send request ──────────────────────────────────────────────────────

@@ -14,11 +14,16 @@ class GroupCreateInputSerializer(serializers.Serializer):
 
 class GroupUpdateInputSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=50, required=False)
-    description = serializers.CharField(max_length=2000, required=False)
+    description = serializers.CharField(max_length=2000, required=False, allow_blank=True)
     isPublic = serializers.BooleanField(required=False)
-    username = serializers.CharField(max_length=50, required=False, allow_null=True)
+    username = serializers.CharField(max_length=50, required=False, allow_null=True, allow_blank=True)
     slowModeSeconds = serializers.IntegerField(required=False, min_value=0, max_value=86400)
     joinApprovalRequired = serializers.BooleanField(required=False)
+    avatarCropX = serializers.FloatField(required=False)
+    avatarCropY = serializers.FloatField(required=False)
+    avatarCropWidth = serializers.FloatField(required=False)
+    avatarCropHeight = serializers.FloatField(required=False)
+    avatarAction = serializers.ChoiceField(choices=["remove"], required=False)
 
 
 class GroupOutputSerializer(serializers.Serializer):
@@ -32,6 +37,7 @@ class GroupOutputSerializer(serializers.Serializer):
     joinApprovalRequired = serializers.BooleanField()
     createdBy = serializers.CharField(allow_null=True)
     avatarUrl = serializers.CharField(allow_null=True)
+    avatarCrop = serializers.DictField(allow_null=True)
 
 
 class GroupListItemSerializer(serializers.Serializer):
@@ -40,6 +46,8 @@ class GroupListItemSerializer(serializers.Serializer):
     description = serializers.CharField()
     username = serializers.CharField(allow_null=True)
     memberCount = serializers.IntegerField()
+    avatarUrl = serializers.CharField(allow_null=True)
+    avatarCrop = serializers.DictField(allow_null=True)
 
 
 # ── Invite ─────────────────────────────────────────────────────────────
@@ -80,6 +88,8 @@ class MemberOutputSerializer(serializers.Serializer):
     userId = serializers.IntegerField()
     username = serializers.CharField()
     nickname = serializers.CharField(allow_null=True)
+    profileImage = serializers.CharField(allow_null=True, required=False)
+    avatarCrop = serializers.DictField(allow_null=True, required=False)
     roles = serializers.ListField()
     joinedAt = serializers.CharField()
     isMuted = serializers.BooleanField()

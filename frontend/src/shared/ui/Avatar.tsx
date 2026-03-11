@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 import type { AvatarCrop } from '../api/users'
 import { avatarFallback } from '../lib/format'
 import { AvatarMedia } from './AvatarMedia'
@@ -36,6 +38,12 @@ export function Avatar({
   className,
   loading = 'lazy',
 }: AvatarProps) {
+  const [isBroken, setIsBroken] = useState(false)
+
+  useEffect(() => {
+    setIsBroken(false)
+  }, [profileImage])
+
   return (
     <div
       className={[
@@ -49,13 +57,14 @@ export function Avatar({
       data-online={online ? 'true' : 'false'}
       data-size={size}
     >
-      {profileImage ? (
+      {profileImage && !isBroken ? (
         <AvatarMedia
           src={profileImage}
           alt={username}
           avatarCrop={avatarCrop}
           loading={loading}
           decoding="async"
+          onError={() => setIsBroken(true)}
         />
       ) : (
         <span>{avatarFallback(username)}</span>

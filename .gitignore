@@ -182,3 +182,8 @@ backend/.venv_fresh/
 trash/
 .claude/
 .ruff_cache/
+chat_attachments/
+chat_thumbnails/
+group_avatars/
+
+db.*

@@ -91,15 +91,21 @@ PRESET_MEMBER = (
 PRESET_VIEWER = Perm.READ_MESSAGES
 
 # Default @everyone permissions per room kind
-EVERYONE_PUBLIC = Perm.SEND_MESSAGES | Perm.READ_MESSAGES | Perm.ADD_REACTIONS
+EVERYONE_PUBLIC = Perm.SEND_MESSAGES | Perm.READ_MESSAGES | Perm.ADD_REACTIONS | Perm.ATTACH_FILES
 EVERYONE_PRIVATE = Perm(0)  # invite-only, no default access
 
 # Group @everyone defaults
-EVERYONE_GROUP_PUBLIC = Perm.SEND_MESSAGES | Perm.READ_MESSAGES | Perm.ADD_REACTIONS | Perm.INVITE_USERS
-EVERYONE_GROUP_PRIVATE = Perm.READ_MESSAGES | Perm.SEND_MESSAGES | Perm.ADD_REACTIONS
+EVERYONE_GROUP_PUBLIC = Perm.SEND_MESSAGES | Perm.READ_MESSAGES | Perm.ADD_REACTIONS | Perm.ATTACH_FILES | Perm.INVITE_USERS
+EVERYONE_GROUP_PRIVATE = Perm.READ_MESSAGES | Perm.SEND_MESSAGES | Perm.ADD_REACTIONS | Perm.ATTACH_FILES
 
 # Full access for DM participants (no roles, just pair_key check)
-DM_PARTICIPANT = Perm.SEND_MESSAGES | Perm.READ_MESSAGES | Perm.ATTACH_FILES | Perm.EMBED_LINKS
+DM_PARTICIPANT = (
+    Perm.SEND_MESSAGES
+    | Perm.READ_MESSAGES
+    | Perm.ATTACH_FILES
+    | Perm.EMBED_LINKS
+    | Perm.ADD_REACTIONS
+)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────

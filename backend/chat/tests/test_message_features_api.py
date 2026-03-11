@@ -1,0 +1,230 @@
+"""API coverage for message payload/reactions/search/attachments features."""
+
+from __future__ import annotations
+
+import json
+
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase
+
+from messages.models import Message, Reaction
+from rooms.models import Room
+from rooms.services import ensure_membership
+
+User = get_user_model()
+
+
+class ChatMessageFeatureApiTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.owner = User.objects.create_user(username="owner_feat", password="pass12345")
+        self.peer = User.objects.create_user(username="peer_feat", password="pass12345")
+        self.outsider = User.objects.create_user(username="outsider_feat", password="pass12345")
+
+        self.direct_room = Room.objects.create(
+            slug="dm_features_01",
+            name="dm features",
+            kind=Room.Kind.DIRECT,
+            direct_pair_key=f"{self.owner.pk}:{self.peer.pk}",
+            created_by=self.owner,
+        )
+        ensure_membership(self.direct_room, self.owner)
+        ensure_membership(self.direct_room, self.peer)
+
+    def test_reactions_allowed_in_direct_room(self):
+        message = Message.objects.create(
+            username=self.peer.username,
+            user=self.peer,
+            room=self.direct_room,
+            message_content="reaction target",
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/messages/{message.pk}/reactions/",
+            data=json.dumps({"emoji": "\U0001F44D"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Reaction.objects.filter(
+                message=message,
+                user=self.owner,
+                emoji="\U0001F44D",
+            ).exists()
+        )
+
+    def test_global_search_respects_interaction_scope_for_all_sections(self):
+        visible_group = Room.objects.create(
+            slug="group_features_01",
+            name="scope visible group",
+            kind=Room.Kind.GROUP,
+            is_public=False,
+            created_by=self.owner,
+        )
+        ensure_membership(visible_group, self.owner, role_name="Owner")
+
+        scope_friend = User.objects.create_user(username="scope_friend", password="pass12345")
+        ensure_membership(visible_group, scope_friend, role_name="Member")
+
+        hidden_group = Room.objects.create(
+            slug="group_features_hidden",
+            name="scope hidden group",
+            kind=Room.Kind.GROUP,
+            is_public=False,
+            created_by=self.outsider,
+        )
+        ensure_membership(hidden_group, self.outsider, role_name="Owner")
+
+        hidden_scope_user = User.objects.create_user(username="scope_hidden", password="pass12345")
+        ensure_membership(hidden_group, hidden_scope_user, role_name="Member")
+
+        visible_msg = Message.objects.create(
+            username=self.peer.username,
+            user=self.peer,
+            room=self.direct_room,
+            message_content="scope visible message",
+        )
+        hidden_msg = Message.objects.create(
+            username=self.outsider.username,
+            user=self.outsider,
+            room=hidden_group,
+            message_content="scope hidden message",
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.get("/api/chat/search/global/?q=scope")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        self.assertIn("users", payload)
+        self.assertIn("groups", payload)
+        self.assertIn("messages", payload)
+
+        found_usernames = {item["username"] for item in payload["users"]}
+        self.assertIn(scope_friend.username, found_usernames)
+        self.assertNotIn(hidden_scope_user.username, found_usernames)
+
+        found_group_slugs = {item["slug"] for item in payload["groups"]}
+        self.assertIn(visible_group.slug, found_group_slugs)
+        self.assertNotIn(hidden_group.slug, found_group_slugs)
+
+        found_message_ids = {item["id"] for item in payload["messages"]}
+        self.assertIn(visible_msg.pk, found_message_ids)
+        self.assertNotIn(hidden_msg.pk, found_message_ids)
+        self.assertFalse(any("hidden" in item["content"] for item in payload["messages"]))
+
+    def test_global_search_includes_any_matching_public_groups_without_interaction(self):
+        public_group_one = Room.objects.create(
+            slug="group_public_visible_one",
+            name="Catalog Group One",
+            kind=Room.Kind.GROUP,
+            is_public=True,
+            username="catalog_group_one",
+            created_by=self.outsider,
+        )
+        ensure_membership(public_group_one, self.outsider, role_name="Owner")
+
+        public_group_two = Room.objects.create(
+            slug="group_public_visible_two",
+            name="Catalog Group Two",
+            kind=Room.Kind.GROUP,
+            is_public=True,
+            username="catalog_group_two",
+            created_by=self.peer,
+        )
+        ensure_membership(public_group_two, self.peer, role_name="Owner")
+
+        private_group = Room.objects.create(
+            slug="group_private_catalog",
+            name="Catalog Private Group",
+            kind=Room.Kind.GROUP,
+            is_public=False,
+            username="catalog_private_group",
+            created_by=self.outsider,
+        )
+        ensure_membership(private_group, self.outsider, role_name="Owner")
+
+        self.client.force_login(self.owner)
+        response = self.client.get("/api/chat/search/global/?q=catalog")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        found_group_slugs = {item["slug"] for item in payload["groups"]}
+        self.assertIn(public_group_one.slug, found_group_slugs)
+        self.assertIn(public_group_two.slug, found_group_slugs)
+        self.assertNotIn(private_group.slug, found_group_slugs)
+
+    def test_global_search_supports_handle_query_for_group_username(self):
+        group_username = "public_handle_group"
+        public_group = Room.objects.create(
+            slug="group_public_handle",
+            name="Another public group",
+            kind=Room.Kind.GROUP,
+            is_public=True,
+            username=group_username,
+            created_by=self.outsider,
+        )
+        ensure_membership(public_group, self.outsider, role_name="Owner")
+
+        self.client.force_login(self.owner)
+        response = self.client.get(f"/api/chat/search/global/?q=@{group_username}")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        found_group_slugs = {item["slug"] for item in payload["groups"]}
+        self.assertIn(public_group.slug, found_group_slugs)
+
+    def test_attachment_upload_accepts_reply_to_and_get_lists_items(self):
+        reply_target = Message.objects.create(
+            username=self.peer.username,
+            user=self.peer,
+            room=self.direct_room,
+            message_content="reply target",
+        )
+        self.client.force_login(self.owner)
+
+        upload_file = SimpleUploadedFile(
+            "note.txt",
+            b"hello attachment",
+            content_type="text/plain",
+        )
+        post_response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={
+                "files": [upload_file],
+                "messageContent": "file message",
+                "replyTo": str(reply_target.pk),
+            },
+        )
+        self.assertEqual(post_response.status_code, 201)
+        created_id = post_response.json()["id"]
+        created_message = Message.objects.get(pk=created_id)
+        self.assertEqual(created_message.reply_to_id, reply_target.pk)
+
+        get_response = self.client.get(f"/api/chat/rooms/{self.direct_room.slug}/attachments/")
+        self.assertEqual(get_response.status_code, 200)
+        items = get_response.json()["items"]
+        self.assertTrue(any(item["messageId"] == created_id for item in items))
+
+    def test_attachment_upload_accepts_unknown_content_type(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "archive.bin",
+            b"\x00\x01\x02\x03",
+            content_type="application/x-custom-binary",
+        )
+        post_response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"files": [upload_file]},
+        )
+
+        self.assertEqual(post_response.status_code, 201)
+        payload = post_response.json()
+        self.assertTrue(payload["attachments"])
+        self.assertEqual(
+            payload["attachments"][0]["contentType"],
+            "application/x-custom-binary",
+        )

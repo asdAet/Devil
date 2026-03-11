@@ -13,6 +13,7 @@ type AvatarMediaProps = {
   decoding?: ImgHTMLAttributes<HTMLImageElement>['decoding']
   draggable?: boolean
   className?: string
+  onError?: ImgHTMLAttributes<HTMLImageElement>['onError']
 }
 
 export function AvatarMedia({
@@ -23,6 +24,7 @@ export function AvatarMedia({
   decoding = 'async',
   draggable = false,
   className,
+  onError,
 }: AvatarMediaProps) {
   const crop = normalizeAvatarCrop(avatarCrop)
   const imageClassName = [styles.image, className].filter(Boolean).join(' ')
@@ -36,6 +38,7 @@ export function AvatarMedia({
         decoding={decoding}
         draggable={draggable}
         className={imageClassName}
+        onError={onError}
       />
     )
   }
@@ -50,6 +53,7 @@ export function AvatarMedia({
         draggable={draggable}
         className={[styles.image, styles.croppedImage, className].filter(Boolean).join(' ')}
         style={buildAvatarCropImageStyle(crop)}
+        onError={onError}
       />
     </span>
   )

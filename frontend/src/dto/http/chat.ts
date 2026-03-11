@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
 import type { Message } from '../../entities/message/types'
-import type { DirectChatListItem, RoomDetails, RoomPeer } from '../../entities/room/types'
+import type { DirectChatListItem, RoomDetails, RoomKind, RoomPeer } from '../../entities/room/types'
 import { decodeOrThrow } from '../core/codec'
 
-const roomKindSchema = z.enum(['public', 'private', 'direct'])
+const roomKindSchema = z.enum(['public', 'private', 'direct', 'group'])
 const avatarCropSchema = z
   .object({
     x: z.number(),
@@ -20,6 +20,7 @@ const roomPeerSchema = z
     profileImage: z.string().nullable().optional(),
     avatarCrop: avatarCropSchema.nullable().optional(),
     lastSeen: z.string().nullable().optional(),
+    bio: z.string().nullable().optional(),
   })
   .passthrough()
 
@@ -34,6 +35,35 @@ const roomDetailsSchema = z
   })
   .passthrough()
 
+const replyToSchema = z
+  .object({
+    id: z.number(),
+    username: z.string().nullable(),
+    content: z.string(),
+  })
+  .passthrough()
+
+const attachmentSchema = z
+  .object({
+    id: z.number(),
+    originalFilename: z.string(),
+    contentType: z.string(),
+    fileSize: z.number(),
+    url: z.string().nullable().optional(),
+    thumbnailUrl: z.string().nullable().optional(),
+    width: z.number().nullable().optional(),
+    height: z.number().nullable().optional(),
+  })
+  .passthrough()
+
+const reactionSummarySchema = z
+  .object({
+    emoji: z.string(),
+    count: z.number(),
+    me: z.boolean(),
+  })
+  .passthrough()
+
 const messageSchema = z
   .object({
     id: z.number(),
@@ -42,6 +72,11 @@ const messageSchema = z
     profilePic: z.string().nullable().optional(),
     avatarCrop: avatarCropSchema.nullable().optional(),
     createdAt: z.string(),
+    editedAt: z.string().nullable().optional(),
+    isDeleted: z.boolean().optional(),
+    replyTo: replyToSchema.nullable().optional(),
+    attachments: z.array(attachmentSchema).optional(),
+    reactions: z.array(reactionSummarySchema).optional(),
   })
   .passthrough()
 
@@ -83,21 +118,32 @@ const directChatsSchema = z
   })
   .passthrough()
 
-const mapPeer = (dto: z.infer<typeof roomPeerSchema>): RoomPeer => ({
-  username: dto.username,
-  profileImage: dto.profileImage ?? null,
-  avatarCrop: dto.avatarCrop ?? null,
-  lastSeen: dto.lastSeen ?? null,
-})
+const mapPeer = (dto: z.infer<typeof roomPeerSchema>): RoomPeer => {
+  const raw = dto as Record<string, unknown>
+  return {
+    userId: typeof raw.userId === 'number' ? raw.userId : undefined,
+    username: dto.username,
+    profileImage: dto.profileImage ?? null,
+    avatarCrop: dto.avatarCrop ?? null,
+    lastSeen: dto.lastSeen ?? null,
+    bio: dto.bio ?? null,
+  }
+}
 
-const mapRoomDetails = (dto: z.infer<typeof roomDetailsSchema>): RoomDetails => ({
-  slug: dto.slug,
-  name: dto.name,
-  kind: dto.kind,
-  peer: dto.peer ? mapPeer(dto.peer) : dto.peer ?? undefined,
-  created: dto.created,
-  createdBy: dto.createdBy ?? null,
-})
+const mapRoomDetails = (dto: z.infer<typeof roomDetailsSchema>): RoomDetails => {
+  const raw = dto as Record<string, unknown>
+  return {
+    slug: dto.slug,
+    name: dto.name,
+    kind: dto.kind,
+    peer: dto.peer ? mapPeer(dto.peer) : dto.peer ?? undefined,
+    created: dto.created,
+    createdBy: dto.createdBy ?? null,
+    blocked: typeof raw.blocked === 'boolean' ? raw.blocked : undefined,
+    blockedByMe: typeof raw.blockedByMe === 'boolean' ? raw.blockedByMe : undefined,
+    lastReadMessageId: typeof raw.lastReadMessageId === 'number' ? raw.lastReadMessageId : null,
+  }
+}
 
 const mapMessage = (dto: z.infer<typeof messageSchema>): Message => ({
   id: dto.id,
@@ -106,6 +152,24 @@ const mapMessage = (dto: z.infer<typeof messageSchema>): Message => ({
   profilePic: dto.profilePic ?? null,
   avatarCrop: dto.avatarCrop ?? null,
   createdAt: dto.createdAt,
+  editedAt: dto.editedAt ?? null,
+  isDeleted: dto.isDeleted ?? false,
+  replyTo: dto.replyTo ?? null,
+  attachments: (dto.attachments ?? []).map((a) => ({
+    id: a.id,
+    originalFilename: a.originalFilename,
+    contentType: a.contentType,
+    fileSize: a.fileSize,
+    url: a.url ?? null,
+    thumbnailUrl: a.thumbnailUrl ?? null,
+    width: a.width ?? null,
+    height: a.height ?? null,
+  })),
+  reactions: (dto.reactions ?? []).map((r) => ({
+    emoji: r.emoji,
+    count: r.count,
+    me: r.me,
+  })),
 })
 
 export type RoomMessagesDto = {
@@ -184,4 +248,239 @@ export const decodeDirectChatsResponse = (input: unknown): DirectChatsResponseDt
       lastMessageAt: item.lastMessageAt,
     })),
   }
-}
+}
+
+// ── Message operations DTO schemas ──────────────────────────────────
+
+const editMessageResponseSchema = z
+  .object({ id: z.number(), content: z.string(), editedAt: z.string() })
+  .passthrough()
+
+const reactionResponseSchema = z
+  .object({
+    messageId: z.number(),
+    emoji: z.string(),
+    userId: z.number(),
+    username: z.string(),
+  })
+  .passthrough()
+
+const searchResultSchema = z
+  .object({
+    id: z.number(),
+    username: z.string(),
+    content: z.string(),
+    createdAt: z.string(),
+    highlight: z.string().nullable().optional(),
+  })
+  .passthrough()
+
+const searchResponseSchema = z
+  .object({
+    results: z.array(searchResultSchema),
+    pagination: roomMessagesPaginationSchema.optional(),
+  })
+  .passthrough()
+
+const uploadResponseSchema = z
+  .object({
+    id: z.number(),
+    content: z.string(),
+    attachments: z.array(attachmentSchema),
+  })
+  .passthrough()
+
+const roomAttachmentItemSchema = attachmentSchema
+  .extend({
+    messageId: z.number(),
+    createdAt: z.string(),
+    username: z.string(),
+  })
+  .passthrough()
+
+const roomAttachmentsResponseSchema = z
+  .object({
+    items: z.array(roomAttachmentItemSchema),
+    pagination: roomMessagesPaginationSchema,
+  })
+  .passthrough()
+
+const readStateResponseSchema = z
+  .object({ roomSlug: z.string(), lastReadMessageId: z.number() })
+  .passthrough()
+
+const unreadCountItemSchema = z
+  .object({ roomSlug: z.string(), unreadCount: z.number() })
+  .passthrough()
+
+const unreadCountsResponseSchema = z
+  .object({ items: z.array(unreadCountItemSchema) })
+  .passthrough()
+
+const globalSearchUserSchema = roomPeerSchema
+const globalSearchGroupSchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    username: z.string().nullable().optional(),
+    memberCount: z.number().optional(),
+    isPublic: z.boolean().optional(),
+  })
+  .passthrough()
+
+const globalSearchMessageSchema = z
+  .object({
+    id: z.number(),
+    username: z.string(),
+    content: z.string(),
+    createdAt: z.string(),
+    roomSlug: z.string(),
+    roomName: z.string().optional(),
+    roomKind: roomKindSchema.optional(),
+  })
+  .passthrough()
+
+const globalSearchResponseSchema = z
+  .object({
+    users: z.array(globalSearchUserSchema),
+    groups: z.array(globalSearchGroupSchema),
+    messages: z.array(globalSearchMessageSchema),
+  })
+  .passthrough()
+
+export type EditMessageResponse = { id: number; content: string; editedAt: string }
+export type ReactionResponse = { messageId: number; emoji: string; userId: number; username: string }
+export type SearchResult = { id: number; username: string; content: string; createdAt: string; highlight: string | null }
+export type SearchResponse = { results: SearchResult[]; pagination?: { limit: number; hasMore: boolean; nextBefore: number | null } }
+export type UploadResponse = { id: number; content: string; attachments: import('../../entities/message/types').Attachment[] }
+export type ReadStateResponse = { roomSlug: string; lastReadMessageId: number }
+export type UnreadCountItem = { roomSlug: string; unreadCount: number }
+export type RoomAttachmentItem = import('../../domain/interfaces/IApiService').RoomAttachmentItem
+export type RoomAttachmentsResponse = {
+  items: RoomAttachmentItem[]
+  pagination: { limit: number; hasMore: boolean; nextBefore: number | null }
+}
+export type GlobalSearchResponse = {
+  users: {
+    username: string
+    profileImage: string | null
+    avatarCrop: { x: number; y: number; width: number; height: number } | null
+    lastSeen: string | null
+  }[]
+  groups: {
+    slug: string
+    name: string
+    description: string
+    username: string | null
+    memberCount: number
+    isPublic: boolean
+  }[]
+  messages: {
+    id: number
+    username: string
+    content: string
+    createdAt: string
+    roomSlug: string
+    roomName: string
+    roomKind: RoomKind
+  }[]
+}
+
+export const decodeEditMessageResponse = (input: unknown): EditMessageResponse => {
+  return decodeOrThrow(editMessageResponseSchema, input, 'chat/edit-message')
+}
+
+export const decodeReactionResponse = (input: unknown): ReactionResponse => {
+  return decodeOrThrow(reactionResponseSchema, input, 'chat/reaction')
+}
+
+export const decodeSearchResponse = (input: unknown): SearchResponse => {
+  const parsed = decodeOrThrow(searchResponseSchema, input, 'chat/search')
+  return {
+    results: parsed.results.map((r) => ({
+      id: r.id,
+      username: r.username,
+      content: r.content,
+      createdAt: r.createdAt,
+      highlight: r.highlight ?? null,
+    })),
+    pagination: parsed.pagination,
+  }
+}
+
+export const decodeUploadResponse = (input: unknown): UploadResponse => {
+  const parsed = decodeOrThrow(uploadResponseSchema, input, 'chat/upload')
+  return {
+    id: parsed.id,
+    content: parsed.content,
+    attachments: parsed.attachments.map((a) => ({
+      id: a.id,
+      originalFilename: a.originalFilename,
+      contentType: a.contentType,
+      fileSize: a.fileSize,
+      url: a.url ?? null,
+      thumbnailUrl: a.thumbnailUrl ?? null,
+      width: a.width ?? null,
+      height: a.height ?? null,
+    })),
+  }
+}
+
+export const decodeReadStateResponse = (input: unknown): ReadStateResponse => {
+  return decodeOrThrow(readStateResponseSchema, input, 'chat/read-state')
+}
+
+export const decodeUnreadCountsResponse = (input: unknown): UnreadCountItem[] => {
+  const parsed = decodeOrThrow(unreadCountsResponseSchema, input, 'chat/unread-counts')
+  return parsed.items
+}
+
+export const decodeRoomAttachmentsResponse = (input: unknown): RoomAttachmentsResponse => {
+  const parsed = decodeOrThrow(roomAttachmentsResponseSchema, input, 'chat/room-attachments')
+  return {
+    items: parsed.items.map((a) => ({
+      id: a.id,
+      originalFilename: a.originalFilename,
+      contentType: a.contentType,
+      fileSize: a.fileSize,
+      url: a.url ?? null,
+      thumbnailUrl: a.thumbnailUrl ?? null,
+      width: a.width ?? null,
+      height: a.height ?? null,
+      messageId: a.messageId,
+      createdAt: a.createdAt,
+      username: a.username,
+    })),
+    pagination: parsed.pagination,
+  }
+}
+
+export const decodeGlobalSearchResponse = (input: unknown): GlobalSearchResponse => {
+  const parsed = decodeOrThrow(globalSearchResponseSchema, input, 'chat/global-search')
+  return {
+    users: parsed.users.map((u) => ({
+      username: u.username,
+      profileImage: u.profileImage ?? null,
+      avatarCrop: u.avatarCrop ?? null,
+      lastSeen: u.lastSeen ?? null,
+    })),
+    groups: parsed.groups.map((g) => ({
+      slug: g.slug,
+      name: g.name,
+      description: g.description ?? '',
+      username: g.username ?? null,
+      memberCount: g.memberCount ?? 0,
+      isPublic: g.isPublic ?? false,
+    })),
+    messages: parsed.messages.map((m) => ({
+      id: m.id,
+      username: m.username,
+      content: m.content,
+      createdAt: m.createdAt,
+      roomSlug: m.roomSlug,
+      roomName: m.roomName ?? '',
+      roomKind: m.roomKind ?? 'public',
+    })),
+  }
+}

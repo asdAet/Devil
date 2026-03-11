@@ -1,0 +1,129 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--tg-bg-secondary, #181818);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  animation: panelSlideIn 220ms ease;
+}
+
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--tg-bg-primary, #212121);
+}
+
+.headerTitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--tg-text-secondary, #aaa);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--tg-text-primary, #fff);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  padding: 14px;
+}
+
+.bodyCompact {
+  padding: 10px;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tg-text-secondary, #aaa);
+  font-size: 14px;
+  text-align: center;
+  gap: 12px;
+}
+
+.overlay {
+  display: none;
+}
+
+/* ---- mobile / tablet ---- */
+
+@media (max-width: 1024px) {
+  .panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: min(420px, 92vw);
+    max-width: 92vw;
+    z-index: 90;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+    transform: translateX(0);
+    transition: transform 0.24s ease;
+    animation: panelMobileIn 220ms ease;
+  }
+
+  @keyframes panelMobileIn {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .panelHidden {
+    transform: translateX(100%);
+    pointer-events: none;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 89;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 1;
+    transition: opacity 0.24s ease;
+    display: block;
+  }
+
+  .overlayHidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

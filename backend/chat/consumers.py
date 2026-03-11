@@ -173,6 +173,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             audit_ws_event("ws.message.rejected", self.scope, endpoint="chat", reason="unauthorized")
             return
 
+        if self.room.kind == Room.Kind.DIRECT and await self._is_blocked_in_dm(self.room, user):
+            await self.send(text_data=json.dumps({"error": "forbidden"}))
+            return
+
         if not await self._can_write(self.room, user):
             audit_ws_event(
                 "ws.message.rejected",
@@ -265,6 +269,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "profile_pic": event["profile_pic"],
                     "avatar_crop": event.get("avatar_crop"),
                     "room": event["room"],
+                    "id": event.get("id"),
+                    "createdAt": event.get("createdAt") or event.get("date_added"),
+                    "replyTo": event.get("replyTo"),
+                    "attachments": event.get("attachments", []),
                 }
             )
         )
@@ -334,6 +342,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return name, serialize_avatar_crop(profile)
         except (AttributeError, ObjectDoesNotExist):
             return "", None
+
+    @sync_to_async
+    def _is_blocked_in_dm(self, room: Room, user) -> bool:
+        """Check if either user in a DM has blocked the other."""
+        from friends.application.friend_service import is_blocked_between
+        if room.kind != Room.Kind.DIRECT:
+            return False
+        other = Membership.objects.filter(room=room).exclude(user=user).values_list("user", flat=True).first()
+        if not other:
+            return False
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        other_user = User.objects.filter(pk=other).first()
+        if not other_user:
+            return False
+        return is_blocked_between(user, other_user)
 
     @sync_to_async
     def _rate_limited(self, user) -> bool:
@@ -455,6 +479,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # ── Mark read via WS ──────────────────────────────────────────────
 
+    async def chat_membership_revoked(self, event):
+        target_user_id = event.get("targetUserId")
+        if target_user_id is None:
+            return
+        user = self.scope.get("user")
+        current_user_id = getattr(user, "pk", None)
+        if current_user_id is None:
+            return
+        try:
+            if int(current_user_id) != int(target_user_id):
+                return
+        except (TypeError, ValueError):
+            return
+        await self.close(code=4403)
+
     async def _handle_mark_read(self, data):
         user = self.scope.get("user")
         if user is None or not getattr(user, "is_authenticated", False):
@@ -571,3 +610,4 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
             targets.append({"group": user_group_name(participant.pk), "payload": payload})
         return targets
+

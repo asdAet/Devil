@@ -1,11 +1,21 @@
 """Tests for the friends management API."""
 
+from urllib.parse import parse_qs, urlparse
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
 from friends.models import Friendship
 
 User = get_user_model()
+
+
+def _assert_signed_media_url(url: str):
+    parsed = urlparse(url)
+    assert parsed.path.startswith("/api/auth/media/")
+    query = parse_qs(parsed.query)
+    assert "exp" in query
+    assert "sig" in query
 
 
 class FriendsApiTestBase(TestCase):
@@ -183,6 +193,10 @@ class ListTests(FriendsApiTestBase):
         items = resp.json()["items"]
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["user"]["username"], "bob")
+        self.assertIn("profileImage", items[0]["user"])
+        self.assertIn("avatarCrop", items[0]["user"])
+        if items[0]["user"]["profileImage"] is not None:
+            _assert_signed_media_url(items[0]["user"]["profileImage"])
 
     def test_list_friends_excludes_pending(self):
         Friendship.objects.create(
@@ -203,6 +217,8 @@ class ListTests(FriendsApiTestBase):
         items = resp.json()["items"]
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["user"]["username"], "bob")
+        self.assertIn("profileImage", items[0]["user"])
+        self.assertIn("avatarCrop", items[0]["user"])
 
     def test_list_outgoing_requests(self):
         Friendship.objects.create(
@@ -214,10 +230,25 @@ class ListTests(FriendsApiTestBase):
         items = resp.json()["items"]
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["user"]["username"], "bob")
+        self.assertIn("profileImage", items[0]["user"])
+        self.assertIn("avatarCrop", items[0]["user"])
 
     def test_list_friends_unauthenticated(self):
         resp = self.client.get("/api/friends/")
         self.assertEqual(resp.status_code, 403)
+
+    def test_list_blocked_includes_avatar_fields(self):
+        Friendship.objects.create(
+            from_user=self.alice, to_user=self.bob, status=Friendship.Status.BLOCKED
+        )
+        self._login(self.alice)
+        resp = self.client.get("/api/friends/blocked/")
+        self.assertEqual(resp.status_code, 200)
+        items = resp.json()["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["user"]["username"], "bob")
+        self.assertIn("profileImage", items[0]["user"])
+        self.assertIn("avatarCrop", items[0]["user"])
 
 
 class RemoveFriendTests(FriendsApiTestBase):

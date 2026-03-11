@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from chat_app_django.media_utils import build_profile_url_from_request, serialize_avatar_crop
 from friends.models import Friendship
 from friends.utils import get_from_user_id, get_to_user_id
 
@@ -25,6 +26,29 @@ def _require_to_user_id(obj: Friendship) -> int:
 class _UserBriefSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     username = serializers.CharField()
+    profileImage = serializers.CharField(allow_null=True)
+    avatarCrop = serializers.DictField(allow_null=True)
+
+
+def _serialize_user_brief(user, request) -> dict:
+    profile = getattr(user, "profile", None)
+    profile_image = None
+    if profile and getattr(profile, "image", None):
+        image_name = getattr(profile.image, "name", "")
+        if image_name:
+            if request is not None:
+                profile_image = build_profile_url_from_request(request, image_name)
+            else:
+                try:
+                    profile_image = profile.image.url
+                except (AttributeError, ValueError):
+                    profile_image = None
+    return {
+        "id": user.pk,
+        "username": user.username,
+        "profileImage": profile_image,
+        "avatarCrop": serialize_avatar_crop(profile),
+    }
 
 
 class FriendOutputSerializer(serializers.ModelSerializer):
@@ -37,7 +61,8 @@ class FriendOutputSerializer(serializers.ModelSerializer):
         fields = ("id", "user", "created_at")
 
     def get_user(self, obj: Friendship) -> dict:
-        return {"id": _require_to_user_id(obj), "username": obj.to_user.username}
+        request = self.context.get("request")
+        return _serialize_user_brief(obj.to_user, request)
 
 
 class IncomingRequestOutputSerializer(serializers.ModelSerializer):
@@ -50,7 +75,8 @@ class IncomingRequestOutputSerializer(serializers.ModelSerializer):
         fields = ("id", "user", "created_at")
 
     def get_user(self, obj: Friendship) -> dict:
-        return {"id": _require_from_user_id(obj), "username": obj.from_user.username}
+        request = self.context.get("request")
+        return _serialize_user_brief(obj.from_user, request)
 
 
 class OutgoingRequestOutputSerializer(serializers.ModelSerializer):
@@ -63,7 +89,22 @@ class OutgoingRequestOutputSerializer(serializers.ModelSerializer):
         fields = ("id", "user", "created_at")
 
     def get_user(self, obj: Friendship) -> dict:
-        return {"id": _require_to_user_id(obj), "username": obj.to_user.username}
+        request = self.context.get("request")
+        return _serialize_user_brief(obj.to_user, request)
+
+
+class BlockedOutputSerializer(serializers.ModelSerializer):
+    """Serializes a blocked user — shows who is blocked (to_user)."""
+
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Friendship
+        fields = ("id", "user", "created_at")
+
+    def get_user(self, obj: Friendship) -> dict:
+        request = self.context.get("request")
+        return _serialize_user_brief(obj.to_user, request)
 
 
 class UsernameInputSerializer(serializers.Serializer):

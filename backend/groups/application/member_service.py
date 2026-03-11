@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from chat_app_django.media_utils import build_profile_url_from_request, serialize_avatar_crop
 from chat_app_django.security.audit import audit_security_event
 from groups.application.group_service import (
     GroupError,
@@ -32,6 +35,28 @@ from rooms.models import Room
 User = get_user_model()
 
 
+def _broadcast_membership_revoked(room: Room, target_user_id: int) -> None:
+    """Force-close active chat sockets for a user in the room."""
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+    room_identifier = room.pk if getattr(room, "pk", None) else room.slug
+    group_name = f"chat_room_{room_identifier}"
+    async_to_sync(channel_layer.group_send)(
+        group_name,
+        {
+            "type": "chat_membership_revoked",
+            "targetUserId": int(target_user_id),
+        },
+    )
+
+
+def _schedule_membership_revoked(room: Room, target_user_id: int) -> None:
+    transaction.on_commit(
+        lambda: _broadcast_membership_revoked(room, int(target_user_id))
+    )
+
+
 def _get_membership_or_raise(room: Room, user) -> Membership:
     membership = Membership.objects.filter(room=room, user=user).first()
     if not membership:
@@ -53,6 +78,14 @@ def _ensure_hierarchy(room: Room, actor, target_membership: Membership) -> None:
         target_position=target_pos,
     ):
         raise GroupForbiddenError("Cannot manage a member at your level or higher")
+
+
+def _ensure_not_self(actor, target_user_id: int) -> None:
+    actor_id = getattr(actor, "pk", None)
+    if actor_id is None:
+        return
+    if int(actor_id) == int(target_user_id):
+        raise GroupError("Cannot apply this action to yourself")
 
 
 def join_group(actor, room_slug: str) -> Membership:
@@ -108,10 +141,21 @@ def leave_group(actor, room_slug: str) -> None:
 
     membership = _get_membership_or_raise(room, actor)
 
-    # Check if actor is the owner
+    # Check if actor is the owner — owner leaving deletes the group
     owner_role = Role.objects.filter(room=room, name=Role.OWNER).first()
     if owner_role and membership.roles.filter(pk=owner_role.pk).exists():
-        raise GroupError("Owner must transfer ownership before leaving")
+        room_slug = room.slug
+        with transaction.atomic():
+            room.delete()
+        audit_security_event(
+            "group.deleted_by_owner_leave",
+            actor_user=actor,
+            actor_user_id=getattr(actor, "pk", None),
+            actor_username=getattr(actor, "username", None),
+            is_authenticated=True,
+            room_slug=room_slug,
+        )
+        return
 
     with transaction.atomic():
         membership.delete()
@@ -133,6 +177,7 @@ def kick_member(actor, room_slug: str, target_user_id: int) -> None:
     """Kick a member from the group."""
     _ensure_authenticated(actor)
     room = _load_group_or_raise(room_slug)
+    _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.KICK_MEMBERS):
         raise GroupForbiddenError("Missing KICK_MEMBERS permission")
@@ -147,10 +192,13 @@ def kick_member(actor, room_slug: str, target_user_id: int) -> None:
 
     target_username = target_membership.user.username
     with transaction.atomic():
+        was_active = not target_membership.is_banned
         target_membership.delete()
-        Room.objects.filter(pk=room.pk).update(
-            member_count=F("member_count") - 1
-        )
+        if was_active:
+            Room.objects.filter(pk=room.pk).update(
+                member_count=F("member_count") - 1
+            )
+        _schedule_membership_revoked(room, int(target_user_id))
 
     audit_security_event(
         "group.member.kicked",
@@ -174,6 +222,7 @@ def ban_member(
     """Ban a member from the group."""
     _ensure_authenticated(actor)
     room = _load_group_or_raise(room_slug)
+    _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.BAN_MEMBERS):
         raise GroupForbiddenError("Missing BAN_MEMBERS permission")
@@ -206,16 +255,19 @@ def ban_member(
 
     _ensure_hierarchy(room, actor, target_membership)
 
-    was_active = not target_membership.is_banned
-    target_membership.is_banned = True
-    target_membership.ban_reason = reason
-    target_membership.banned_by = actor
-    target_membership.save(update_fields=["is_banned", "ban_reason", "banned_by"])
+    with transaction.atomic():
+        was_active = not target_membership.is_banned
+        target_membership.is_banned = True
+        target_membership.ban_reason = reason
+        target_membership.banned_by = actor
+        target_membership.save(update_fields=["is_banned", "ban_reason", "banned_by"])
 
-    if was_active:
-        Room.objects.filter(pk=room.pk).update(
-            member_count=F("member_count") - 1
-        )
+        if was_active:
+            Room.objects.filter(pk=room.pk).update(
+                member_count=F("member_count") - 1
+            )
+
+        _schedule_membership_revoked(room, int(target_user_id))
 
     audit_security_event(
         "group.member.banned",
@@ -243,12 +295,8 @@ def unban_member(actor, room_slug: str, target_user_id: int) -> None:
     if not membership:
         raise GroupNotFoundError("Banned member not found")
 
-    membership.is_banned = False
-    membership.ban_reason = ""
-    membership.banned_by = None
-    membership.save(update_fields=["is_banned", "ban_reason", "banned_by"])
-
-    Room.objects.filter(pk=room.pk).update(member_count=F("member_count") + 1)
+    with transaction.atomic():
+        membership.delete()
 
     audit_security_event(
         "group.member.unbanned",
@@ -271,6 +319,7 @@ def mute_member(
     """Mute a member for a specified duration."""
     _ensure_authenticated(actor)
     room = _load_group_or_raise(room_slug)
+    _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.MUTE_MEMBERS):
         raise GroupForbiddenError("Missing MUTE_MEMBERS permission")
@@ -309,6 +358,7 @@ def unmute_member(actor, room_slug: str, target_user_id: int) -> Membership:
     """Unmute a member."""
     _ensure_authenticated(actor)
     room = _load_group_or_raise(room_slug)
+    _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.MUTE_MEMBERS):
         raise GroupForbiddenError("Missing MUTE_MEMBERS permission")
@@ -336,7 +386,7 @@ def unmute_member(actor, room_slug: str, target_user_id: int) -> Membership:
 
 
 def list_members(
-    actor, room_slug: str, *, page: int = 1, page_size: int = 50
+    actor, room_slug: str, *, page: int = 1, page_size: int = 50, request=None
 ) -> dict:
     """List group members with their roles."""
     _ensure_authenticated(actor)
@@ -349,28 +399,50 @@ def list_members(
         Membership.objects.filter(room=room, is_banned=False)
         .select_related("user", "user__profile")
         .prefetch_related("roles")
-        .order_by("-roles__position", "joined_at")
+        .order_by("joined_at")
     )
 
     total = qs.count()
     offset = (max(1, page) - 1) * page_size
     members = list(qs[offset : offset + page_size])
+    actor_user_id = getattr(actor, "pk", None)
+
+    def _member_dict(m):
+        profile = getattr(m.user, "profile", None)
+        profile_image = None
+        avatar_crop = None
+        if profile:
+            image = getattr(profile, "image", None)
+            if image:
+                image_name = getattr(image, "name", "")
+                if image_name:
+                    if request is not None:
+                        profile_image = build_profile_url_from_request(request, image_name)
+                    else:
+                        try:
+                            profile_image = image.url
+                        except (AttributeError, ValueError):
+                            profile_image = None
+            avatar_crop = serialize_avatar_crop(profile)
+        return {
+            "userId": m.user_id,
+            "username": m.user.username,
+            "nickname": m.nickname or None,
+            "profileImage": profile_image,
+            "avatarCrop": avatar_crop,
+            "roles": [
+                {"id": r.pk, "name": r.name, "color": r.color}
+                for r in m.roles.all()
+            ],
+            "joinedAt": m.joined_at.isoformat(),
+            "isMuted": m.is_muted,
+            "isSelf": bool(
+                actor_user_id is not None and int(actor_user_id) == int(m.user_id)
+            ),
+        }
 
     return {
-        "items": [
-            {
-                "userId": m.user_id,
-                "username": m.user.username,
-                "nickname": m.nickname or None,
-                "roles": [
-                    {"id": r.pk, "name": r.name, "color": r.color}
-                    for r in m.roles.all()
-                ],
-                "joinedAt": m.joined_at.isoformat(),
-                "isMuted": m.is_muted,
-            }
-            for m in members
-        ],
+        "items": [_member_dict(m) for m in members],
         "total": total,
         "page": page,
         "pageSize": page_size,

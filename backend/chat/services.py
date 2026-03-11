@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import time
+
 from django.conf import settings
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.utils import timezone
 
 from messages.models import Message, MessageReadState, Reaction
@@ -142,18 +144,25 @@ def mark_read(user, room: Room, last_read_message_id: int) -> MessageReadState:
     if not Message.objects.filter(pk=last_read_message_id, room=room).exists():
         raise MessageNotFoundError("Message not found")
 
-    with transaction.atomic():
-        state, created = MessageReadState.objects.select_for_update().get_or_create(
-            user=user, room=room,
-            defaults={"last_read_message_id": last_read_message_id},
-        )
-        if not created:
-            current_id = state.last_read_message_id or 0
-            if last_read_message_id > current_id:
-                state.last_read_message_id = last_read_message_id
-                state.save(update_fields=["last_read_message_id", "last_read_at"])
-
-    return state
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with transaction.atomic():
+                state, created = MessageReadState.objects.select_for_update().get_or_create(
+                    user=user, room=room,
+                    defaults={"last_read_message_id": last_read_message_id},
+                )
+                if not created:
+                    current_id = state.last_read_message_id or 0
+                    if last_read_message_id > current_id:
+                        state.last_read_message_id = last_read_message_id
+                        state.save(update_fields=["last_read_message_id", "last_read_at"])
+            return state
+        except OperationalError:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(0.1 * (attempt + 1))
+    raise OperationalError("database is locked")
 
 
 def get_unread_counts(user) -> list[dict]:

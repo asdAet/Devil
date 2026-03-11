@@ -5,6 +5,7 @@
 import json
 
 from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
@@ -245,6 +246,10 @@ class ChatConsumerTests(TransactionTestCase):
             event = json.loads(await communicator.receive_from(timeout=2))
             self.assertEqual(event.get('message'), 'hello')
             self.assertEqual(event.get('username'), self.member.username)
+            self.assertIsInstance(event.get('id'), int)
+            self.assertTrue(event.get('createdAt'))
+            self.assertIn('replyTo', event)
+            self.assertIn('attachments', event)
             self.assertEqual(
                 event.get('avatar_crop'),
                 {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
@@ -317,6 +322,28 @@ class ChatConsumerTests(TransactionTestCase):
 
             await chat_owner.disconnect()
             await inbox_outsider.disconnect()
+
+        async_to_sync(run)()
+
+    def test_membership_revoked_closes_target_socket(self):
+        """Disconnect target user socket when membership is revoked in room."""
+        async def run():
+            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            self.assertTrue(connected)
+
+            channel_layer = get_channel_layer()
+            self.assertIsNotNone(channel_layer)
+            await channel_layer.group_send(
+                f"chat_room_{self.private_room.pk}",
+                {
+                    "type": "chat_membership_revoked",
+                    "targetUserId": self.member.pk,
+                },
+            )
+
+            output = await communicator.receive_output(timeout=2)
+            self.assertEqual(output.get("type"), "websocket.close")
+            self.assertEqual(output.get("code"), 4403)
 
         async_to_sync(run)()
 

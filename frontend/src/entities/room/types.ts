@@ -1,12 +1,15 @@
 import type { AvatarCrop } from '../../shared/api/users'
 
-export type RoomKind = 'public' | 'private' | 'direct'
+export type RoomKind = 'public' | 'private' | 'direct' | 'group'
 
 export type RoomPeer = {
+  userId?: number
   username: string
   profileImage: string | null
   avatarCrop?: AvatarCrop | null
   lastSeen?: string | null
+  bio?: string | null
+  blocked?: boolean
 }
 
 export type RoomDetails = {
@@ -16,6 +19,9 @@ export type RoomDetails = {
   peer?: RoomPeer | null
   created?: boolean
   createdBy?: string | null
+  blocked?: boolean
+  blockedByMe?: boolean
+  lastReadMessageId?: number | null
 }
 
 export type DirectChatListItem = {

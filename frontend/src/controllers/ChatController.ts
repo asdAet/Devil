@@ -5,6 +5,17 @@ import type {
   RoomMessagesDto,
   RoomMessagesParams,
 } from '../dto'
+import type {
+  EditMessageResult,
+  GlobalSearchResult,
+  ReactionResult,
+  RoomAttachmentsResult,
+  SearchResult,
+  UploadResult,
+  UploadAttachmentsOptions,
+  ReadStateResult,
+  UnreadCountItem,
+} from '../domain/interfaces/IApiService'
 import type { RoomDetails as RoomDetailsDto } from '../entities/room/types'
 
 let publicRoomInFlight: Promise<RoomDetailsDto> | null = null
@@ -122,6 +133,45 @@ class ChatController {
       })
 
     return directChatsInFlight
+  }
+  public async getUnreadCounts(): Promise<UnreadCountItem[]> {
+    return apiService.getUnreadCounts()
+  }
+
+  public async editMessage(slug: string, messageId: number, content: string): Promise<EditMessageResult> {
+    return apiService.editMessage(slug, messageId, content)
+  }
+
+  public async deleteMessage(slug: string, messageId: number): Promise<void> {
+    return apiService.deleteMessage(slug, messageId)
+  }
+
+  public async addReaction(slug: string, messageId: number, emoji: string): Promise<ReactionResult> {
+    return apiService.addReaction(slug, messageId, emoji)
+  }
+
+  public async removeReaction(slug: string, messageId: number, emoji: string): Promise<void> {
+    return apiService.removeReaction(slug, messageId, emoji)
+  }
+
+  public async searchMessages(slug: string, query: string): Promise<SearchResult> {
+    return apiService.searchMessages(slug, query)
+  }
+
+  public async uploadAttachments(slug: string, files: File[], options?: UploadAttachmentsOptions): Promise<UploadResult> {
+    return apiService.uploadAttachments(slug, files, options)
+  }
+
+  public async markRead(slug: string, messageId?: number): Promise<ReadStateResult> {
+    return apiService.markRead(slug, messageId)
+  }
+
+  public async globalSearch(query: string, params?: { usersLimit?: number; groupsLimit?: number; messagesLimit?: number }): Promise<GlobalSearchResult> {
+    return apiService.globalSearch(query, params)
+  }
+
+  public async getRoomAttachments(slug: string, params?: { limit?: number; before?: number }): Promise<RoomAttachmentsResult> {
+    return apiService.getRoomAttachments(slug, params)
   }
 }
 

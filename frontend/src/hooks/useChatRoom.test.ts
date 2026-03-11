@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RoomMessagesDto } from '../dto'
+import type { Message } from '../entities/message/types'
 import type { RoomDetails as RoomDetailsDto } from '../entities/room/types'
 
 const controllerMocks = vi.hoisted(() => ({
@@ -26,21 +27,25 @@ const authUser = {
   registeredAt: null,
 }
 
-describe('useChatRoom', () => {
-  /**
-   * Выполняет метод `beforeEach`.
-   * @returns Результат выполнения `beforeEach`.
-   */
+const makeMessage = (overrides: Pick<Message, 'id' | 'username' | 'content' | 'createdAt'> & Partial<Message>): Message => ({
+  id: overrides.id,
+  username: overrides.username,
+  content: overrides.content,
+  createdAt: overrides.createdAt,
+  profilePic: overrides.profilePic ?? null,
+  avatarCrop: overrides.avatarCrop ?? null,
+  editedAt: overrides.editedAt ?? null,
+  isDeleted: overrides.isDeleted ?? false,
+  replyTo: overrides.replyTo ?? null,
+  attachments: overrides.attachments ?? [],
+  reactions: overrides.reactions ?? [],
+})
 
+describe('useChatRoom', () => {
   beforeEach(() => {
     controllerMocks.getRoomDetails.mockReset()
     controllerMocks.getRoomMessages.mockReset()
   })
-
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
 
   it('loads initial room details and deduplicates messages', async () => {
     controllerMocks.getRoomDetails.mockResolvedValue({
@@ -52,20 +57,18 @@ describe('useChatRoom', () => {
     })
     controllerMocks.getRoomMessages.mockResolvedValue({
       messages: [
-        {
+        makeMessage({
           id: 1,
           username: 'alice',
           content: 'Hello',
-          profilePic: null,
           createdAt: '2026-01-01T00:00:00.000Z',
-        },
-        {
+        }),
+        makeMessage({
           id: 1,
           username: 'alice',
           content: 'Hello',
-          profilePic: null,
           createdAt: '2026-01-01T00:00:00.000Z',
-        },
+        }),
       ],
       pagination: { limit: 50, hasMore: false, nextBefore: null },
     })
@@ -73,31 +76,10 @@ describe('useChatRoom', () => {
     const { result } = renderHook(() => useChatRoom('public', authUser))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
-
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.details?.slug).toBe('public')
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.messages).toHaveLength(1)
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.hasMore).toBe(false)
   })
-
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
 
   it('loads older messages by nextBefore cursor', async () => {
     controllerMocks.getRoomDetails.mockResolvedValue({
@@ -110,25 +92,23 @@ describe('useChatRoom', () => {
     controllerMocks.getRoomMessages
       .mockResolvedValueOnce({
         messages: [
-          {
+          makeMessage({
             id: 2,
             username: 'alice',
             content: 'Second',
-            profilePic: null,
             createdAt: '2026-01-01T00:02:00.000Z',
-          },
+          }),
         ],
         pagination: { limit: 50, hasMore: true, nextBefore: 2 },
       })
       .mockResolvedValueOnce({
         messages: [
-          {
+          makeMessage({
             id: 1,
             username: 'alice',
             content: 'First',
-            profilePic: null,
             createdAt: '2026-01-01T00:01:00.000Z',
-          },
+          }),
         ],
         pagination: { limit: 50, hasMore: false, nextBefore: null },
       })
@@ -141,33 +121,13 @@ describe('useChatRoom', () => {
       await result.current.loadMore()
     })
 
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(controllerMocks.getRoomMessages).toHaveBeenNthCalledWith(2, 'public', {
       limit: 50,
       beforeId: 2,
     })
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.messages.map((item) => item.id)).toEqual([1, 2])
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.hasMore).toBe(false)
   })
-
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
 
   it('sets load_failed when initial request fails', async () => {
     controllerMocks.getRoomDetails.mockRejectedValue(new Error('boom'))
@@ -179,19 +139,8 @@ describe('useChatRoom', () => {
     const { result } = renderHook(() => useChatRoom('public', authUser))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.error).toBe('load_failed')
   })
-
-
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
 
   it('derives pagination when backend omits pagination payload', async () => {
     controllerMocks.getRoomDetails.mockResolvedValue({
@@ -201,51 +150,31 @@ describe('useChatRoom', () => {
       created: false,
       createdBy: null,
     })
-    const messages = Array.from({ length: 50 }, (_, idx) => ({
-      id: idx + 1,
-      username: 'alice',
-      content: `m-${idx + 1}`,
-      profilePic: null,
-      createdAt: `2026-01-01T00:${String(idx).padStart(2, '0')}:00.000Z`,
-    }))
+    const messages = Array.from({ length: 50 }, (_, idx) =>
+      makeMessage({
+        id: idx + 1,
+        username: 'alice',
+        content: `m-${idx + 1}`,
+        createdAt: `2026-01-01T00:${String(idx).padStart(2, '0')}:00.000Z`,
+      }),
+    )
     controllerMocks.getRoomMessages.mockResolvedValue({ messages })
 
     const { result } = renderHook(() => useChatRoom('public', authUser))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
-
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.hasMore).toBe(true)
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.messages).toHaveLength(50)
 
     await act(async () => {
       await result.current.loadMore()
     })
 
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(controllerMocks.getRoomMessages).toHaveBeenNthCalledWith(2, 'public', {
       limit: 50,
       beforeId: 1,
     })
   })
-
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
 
   it('stops pagination when nextBefore cursor is missing', async () => {
     controllerMocks.getRoomDetails.mockResolvedValue({
@@ -263,66 +192,26 @@ describe('useChatRoom', () => {
     const { result } = renderHook(() => useChatRoom('public', authUser))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.hasMore).toBe(true)
 
     await act(async () => {
       await result.current.loadMore()
     })
 
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.hasMore).toBe(false)
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(controllerMocks.getRoomMessages).toHaveBeenCalledTimes(1)
   })
 
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
-
   it('does not load private room for guests', async () => {
-    /**
-     * Выполняет метод `renderHook`.
-     * @returns Результат выполнения `renderHook`.
-     */
-
     renderHook(() => useChatRoom('private123', null))
 
     await act(async () => {
       await Promise.resolve()
     })
 
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(controllerMocks.getRoomDetails).not.toHaveBeenCalled()
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(controllerMocks.getRoomMessages).not.toHaveBeenCalled()
   })
-
-  /**
-   * Выполняет метод `it`.
-   * @returns Результат выполнения `it`.
-   */
 
   it('keeps messages when loadMore request fails', async () => {
     controllerMocks.getRoomDetails.mockResolvedValue({
@@ -335,13 +224,12 @@ describe('useChatRoom', () => {
     controllerMocks.getRoomMessages
       .mockResolvedValueOnce({
         messages: [
-          {
+          makeMessage({
             id: 10,
             username: 'alice',
             content: 'latest',
-            profilePic: null,
             createdAt: '2026-01-01T00:10:00.000Z',
-          },
+          }),
         ],
         pagination: { limit: 50, hasMore: true, nextBefore: 10 },
       })
@@ -355,18 +243,7 @@ describe('useChatRoom', () => {
       await result.current.loadMore()
     })
 
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.messages.map((m) => m.id)).toEqual([10])
-    /**
-     * Выполняет метод `expect`.
-     * @returns Результат выполнения `expect`.
-     */
-
     expect(result.current.loadingMore).toBe(false)
   })
-
 })

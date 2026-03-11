@@ -8,6 +8,7 @@ urlpatterns = [
     path("public-room/", api.public_room, name="api-public-room"),
     path("direct/start/", api.direct_start, name="api-direct-start"),
     path("direct/chats/", api.direct_chats, name="api-direct-chats"),
+    path("search/global/", api.global_search, name="api-global-search"),
     path("rooms/unread/", api.unread_counts, name="api-unread-counts"),
     path("rooms/<str:room_slug>/", include("roles.interfaces.urls")),
     path("rooms/<path:room_slug>/messages/search/", api.search_messages, name="api-search-messages"),

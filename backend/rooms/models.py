@@ -37,6 +37,10 @@ class Room(models.Model):
     # ── Group-specific fields ──────────────────────────────────────────
     description = models.TextField(blank=True, default="", max_length=2000)
     avatar = models.ImageField(upload_to="group_avatars/", null=True, blank=True)
+    avatar_crop_x = models.FloatField(null=True, blank=True)
+    avatar_crop_y = models.FloatField(null=True, blank=True)
+    avatar_crop_width = models.FloatField(null=True, blank=True)
+    avatar_crop_height = models.FloatField(null=True, blank=True)
     is_public = models.BooleanField(
         default=False,
         help_text="Public groups are discoverable and joinable without invite.",

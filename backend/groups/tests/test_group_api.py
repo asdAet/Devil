@@ -1,7 +1,10 @@
 """Tests for group CRUD API endpoints."""
 
+from urllib.parse import parse_qs, urlparse
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from rooms.models import Room
@@ -13,6 +16,14 @@ User = get_user_model()
 
 class APITestCase(TestCase):
     api_client: TypedAPIClient
+
+
+def _assert_signed_media_url(url: str):
+    parsed = urlparse(url)
+    assert parsed.path.startswith("/api/auth/media/")
+    query = parse_qs(parsed.query)
+    assert "exp" in query
+    assert "sig" in query
 
 
 @pytest.mark.django_db
@@ -122,6 +133,77 @@ class TestGroupDetail(APITestCase):
         resp = self.api_client.delete(f"/api/groups/{self.slug}/")
         assert resp.status_code == 403
 
+    def test_update_group_avatar_with_multipart_patch(self):
+        avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
+        resp = self.api_client.patch(
+            f"/api/groups/{self.slug}/",
+            {"avatar": avatar},
+            format="multipart",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["avatarUrl"] is not None
+        _assert_signed_media_url(data["avatarUrl"])
+        assert data["avatarCrop"] is None
+
+    def test_update_group_avatar_crop_persists(self):
+        avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
+        set_resp = self.api_client.patch(
+            f"/api/groups/{self.slug}/",
+            {"avatar": avatar},
+            format="multipart",
+        )
+        assert set_resp.status_code == 200
+
+        crop_resp = self.api_client.patch(
+            f"/api/groups/{self.slug}/",
+            {
+                "avatarCropX": 0.1,
+                "avatarCropY": 0.2,
+                "avatarCropWidth": 0.3,
+                "avatarCropHeight": 0.4,
+            },
+            format="json",
+        )
+        assert crop_resp.status_code == 200
+        payload = crop_resp.json()
+        assert payload["avatarCrop"] == {
+            "x": 0.1,
+            "y": 0.2,
+            "width": 0.3,
+            "height": 0.4,
+        }
+
+        room = Room.objects.get(slug=self.slug)
+        assert room.avatar_crop_x == 0.1
+        assert room.avatar_crop_y == 0.2
+        assert room.avatar_crop_width == 0.3
+        assert room.avatar_crop_height == 0.4
+
+    def test_remove_group_avatar_via_avatar_action(self):
+        avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
+        set_resp = self.api_client.patch(
+            f"/api/groups/{self.slug}/",
+            {"avatar": avatar},
+            format="multipart",
+        )
+        assert set_resp.status_code == 200
+
+        remove_resp = self.api_client.patch(
+            f"/api/groups/{self.slug}/",
+            {"avatarAction": "remove"},
+            format="json",
+        )
+        assert remove_resp.status_code == 200
+        assert remove_resp.json()["avatarUrl"] is None
+        assert remove_resp.json()["avatarCrop"] is None
+
+        room = Room.objects.get(slug=self.slug)
+        assert room.avatar_crop_x is None
+        assert room.avatar_crop_y is None
+        assert room.avatar_crop_width is None
+        assert room.avatar_crop_height is None
+
 
 @pytest.mark.django_db
 class TestPublicGroupList(APITestCase):
@@ -139,18 +221,76 @@ class TestPublicGroupList(APITestCase):
         self.api_client.post("/api/groups/", {"name": "Private Group"}, format="json")
 
     def test_list_public_groups(self):
+        avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
+        room = Room.objects.get(username="grp0")
+        room.avatar.save(avatar.name, avatar, save=False)
+        room.save(update_fields=["avatar"])
+
         self.api_client.force_authenticate(user=None)
         resp = self.api_client.get("/api/groups/public/")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 3
         assert len(data["items"]) == 3
+        for item in data["items"]:
+            assert "avatarUrl" in item
+            assert "avatarCrop" in item
+        with_avatar = next((item for item in data["items"] if item["username"] == "grp0"), None)
+        assert with_avatar is not None
+        assert with_avatar["avatarUrl"] is not None
+        _assert_signed_media_url(with_avatar["avatarUrl"])
 
     def test_search_public_groups(self):
         self.api_client.force_authenticate(user=None)
         resp = self.api_client.get("/api/groups/public/?search=grp1")
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
+
+
+@pytest.mark.django_db
+class TestMyGroupList(APITestCase):
+    def setUp(self):
+        self.api_client = TypedAPIClient()
+        self.user = User.objects.create_user(username="member", password="testpass123")
+        self.other = User.objects.create_user(username="other", password="testpass123")
+        self.api_client.force_authenticate(user=self.user)
+
+        self.api_client.post("/api/groups/", {"name": "Private Mine"}, format="json")
+        self.api_client.post(
+            "/api/groups/",
+            {"name": "Public Mine", "isPublic": True, "username": "minepub"},
+            format="json",
+        )
+
+        other_client = TypedAPIClient()
+        other_client.force_authenticate(user=self.other)
+        other_client.post(
+            "/api/groups/",
+            {"name": "Other Public", "isPublic": True, "username": "otherpub"},
+            format="json",
+        )
+
+    def test_list_my_groups(self):
+        resp = self.api_client.get("/api/groups/my/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        names = sorted([item["name"] for item in data["items"]])
+        assert names == ["Private Mine", "Public Mine"]
+        assert all("avatarUrl" in item for item in data["items"])
+        assert all("avatarCrop" in item for item in data["items"])
+
+    def test_search_my_groups(self):
+        resp = self.api_client.get("/api/groups/my/?search=minepub")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["name"] == "Public Mine"
+
+    def test_my_groups_requires_auth(self):
+        self.api_client.force_authenticate(user=None)
+        resp = self.api_client.get("/api/groups/my/")
+        assert resp.status_code == 403
 
 
 @pytest.mark.django_db

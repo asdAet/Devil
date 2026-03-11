@@ -8,6 +8,10 @@ import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
 import { ProfilePage } from '../pages/ProfilePage'
 import { RegisterPage } from '../pages/RegisterPage'
+import { FriendsPage } from '../pages/FriendsPage'
+import { GroupsPage } from '../pages/GroupsPage'
+import { InvitePreviewPage } from '../pages/InvitePreviewPage'
+import { SettingsPage } from '../pages/SettingsPage'
 import { UserProfilePage } from '../pages/UserProfilePage'
 
 type ProfileFieldErrors = Record<string, string[]>
@@ -92,6 +96,18 @@ function RoomRoute({ user, onNavigate }: Pick<AppRoutesProps, 'user' | 'onNaviga
 }
 
 /**
+ * Обертка для инвайт-превью с получением code из URL.
+ */
+function InviteRoute({ onNavigate }: Pick<AppRoutesProps, 'onNavigate'>) {
+  const params = useParams<{ code: string }>()
+  const code = params.code || ''
+  if (!code) {
+    return <Navigate to="/" replace />
+  }
+  return <InvitePreviewPage code={code} onNavigate={onNavigate} />
+}
+
+/**
  * Декларация всех frontend-маршрутов приложения.
  */
 export function AppRoutes({
@@ -133,6 +149,10 @@ export function AppRoutes({
           />
         }
       />
+      <Route path="/settings" element={<SettingsPage user={user} onNavigate={onNavigate} onLogout={onLogout} />} />
+      <Route path="/friends" element={<FriendsPage user={user} onNavigate={onNavigate} />} />
+      <Route path="/groups" element={<GroupsPage user={user} onNavigate={onNavigate} />} />
+      <Route path="/invite/:code" element={<InviteRoute onNavigate={onNavigate} />} />
       <Route path="/direct" element={<DirectLayout user={user} onNavigate={onNavigate} />} />
       <Route path="/direct/:username" element={<DirectByUsernameRoute user={user} onNavigate={onNavigate} />} />
       <Route

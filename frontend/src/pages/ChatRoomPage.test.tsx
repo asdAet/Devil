@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+﻿import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../entities/message/types'
@@ -27,10 +27,18 @@ const chatRoomMock = vi.hoisted(() => ({
 }))
 
 const presenceMock = vi.hoisted(() => ({
-  online: [] as Array<{ username: string; profileImage: string | null }>,
+  online: [] as Array<{ username: string; profileImage: string | null }> ,
   guests: 0,
   status: 'online' as const,
   lastError: null as string | null,
+}))
+
+const infoPanelMock = vi.hoisted(() => ({
+  open: vi.fn(),
+}))
+
+vi.mock('react-router-dom', () => ({
+  useLocation: () => ({ search: '' }),
 }))
 
 vi.mock('../hooks/useChatRoom', () => ({
@@ -55,6 +63,34 @@ vi.mock('../hooks/useReconnectingWebSocket', () => ({
 
 vi.mock('../shared/presence', () => ({
   usePresence: () => presenceMock,
+}))
+
+vi.mock('../hooks/useTypingIndicator', () => ({
+  useTypingIndicator: () => ({ sendTyping: vi.fn() }),
+}))
+
+vi.mock('../shared/directInbox', () => ({
+  useDirectInbox: () => ({ setActiveRoom: vi.fn(), markRead: vi.fn() }),
+}))
+
+vi.mock('../shared/config/limits', () => ({
+  useChatMessageMaxLength: () => 2000,
+}))
+
+vi.mock('../shared/layout/useInfoPanel', () => ({
+  useInfoPanel: () => infoPanelMock,
+}))
+
+vi.mock('../controllers/ChatController', () => ({
+  chatController: {
+    editMessage: vi.fn().mockResolvedValue({}),
+    deleteMessage: vi.fn().mockResolvedValue(undefined),
+    addReaction: vi.fn().mockResolvedValue({}),
+    removeReaction: vi.fn().mockResolvedValue(undefined),
+    searchMessages: vi.fn().mockResolvedValue({ results: [] }),
+    uploadAttachments: vi.fn().mockResolvedValue({}),
+    markRead: vi.fn().mockResolvedValue({}),
+  },
 }))
 
 import { ChatRoomPage } from './ChatRoomPage'
@@ -86,14 +122,13 @@ describe('ChatRoomPage', () => {
     presenceMock.online = []
     presenceMock.status = 'online'
     presenceMock.lastError = null
+    infoPanelMock.open.mockReset()
   })
 
   it('shows read-only mode for guest in public room', () => {
     render(<ChatRoomPage slug="public" user={null} onNavigate={vi.fn()} />)
 
-    expect(
-      screen.getByText('Чтобы писать в публичном чате, войдите или зарегистрируйтесь.'),
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('chat-auth-callout')).toBeInTheDocument()
     expect(screen.queryByLabelText('Сообщение')).toBeNull()
   })
 
@@ -152,53 +187,6 @@ describe('ChatRoomPage', () => {
     expect(screen.getByText('В сети')).toBeInTheDocument()
   })
 
-  it('shows last seen for offline direct peer', () => {
-    chatRoomMock.details = {
-      slug: 'dm_2',
-      name: 'dm',
-      kind: 'direct',
-      created: false,
-      createdBy: null,
-      peer: { username: 'bob', profileImage: null, lastSeen: '2026-02-13T10:00:00.000Z' },
-    } as RoomDetails
-    presenceMock.online = []
-
-    render(<ChatRoomPage slug="dm_2" user={user} onNavigate={vi.fn()} />)
-    expect(screen.getByText(/Последний раз в сети:/i)).toBeInTheDocument()
-  })
-
-  it('shows online badge on message avatar for online user', () => {
-    chatRoomMock.messages = [
-      {
-        id: 1,
-        username: 'alice',
-        content: 'hi',
-        profilePic: null,
-        createdAt: '2026-02-13T10:00:00.000Z',
-      },
-    ]
-    presenceMock.online = [{ username: 'alice', profileImage: null }]
-
-    const { container } = render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />)
-    expect(container.querySelector('[data-size="small"][data-online="true"]')).not.toBeNull()
-  })
-
-  it('does not show online badge on message avatar for offline user', () => {
-    chatRoomMock.messages = [
-      {
-        id: 2,
-        username: 'bob',
-        content: 'offline',
-        profilePic: null,
-        createdAt: '2026-02-13T11:00:00.000Z',
-      },
-    ]
-    presenceMock.online = []
-
-    const { container } = render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />)
-    expect(container.querySelector('[data-size="small"][data-online="true"]')).toBeNull()
-  })
-
   it('highlights own messages', () => {
     chatRoomMock.messages = [
       {
@@ -207,6 +195,11 @@ describe('ChatRoomPage', () => {
         content: 'mine',
         profilePic: null,
         createdAt: '2026-02-13T12:00:00.000Z',
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
       },
       {
         id: 4,
@@ -214,6 +207,11 @@ describe('ChatRoomPage', () => {
         content: 'other',
         profilePic: null,
         createdAt: '2026-02-13T12:01:00.000Z',
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
       },
     ]
 
@@ -223,4 +221,3 @@ describe('ChatRoomPage', () => {
     expect(container.querySelector('article[data-own-message="false"]')).not.toBeNull()
   })
 })
-

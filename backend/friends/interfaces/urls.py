@@ -20,6 +20,7 @@ urlpatterns = [
         views.DeclineRequestApiView.as_view(),
         name="api-friends-decline",
     ),
+    path("blocked/", views.BlockedListApiView.as_view(), name="api-friends-blocked-list"),
     path("block/", views.BlockUserApiView.as_view(), name="api-friends-block"),
     path("block/<int:user_id>/", views.UnblockUserApiView.as_view(), name="api-friends-unblock"),
 ]

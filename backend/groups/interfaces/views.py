@@ -4,8 +4,9 @@ from functools import wraps
 from typing import Any, cast
 
 from rest_framework import status as http_status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.generics import GenericAPIView
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -81,7 +82,7 @@ def create_group(request):
         is_public=bool(data.get("isPublic", False)),
         username=data.get("username"),
     )
-    info = group_service.get_group_info(room.slug, request.user)
+    info = group_service.get_group_info(room.slug, request.user, request=request)
     return Response(GroupOutputSerializer(info).data, status=http_status.HTTP_201_CREATED)
 
 
@@ -92,19 +93,43 @@ def list_public_groups(request):
     search = request.query_params.get("search")
     page = int(request.query_params.get("page", 1))
     page_size = min(int(request.query_params.get("pageSize", 20)), 100)
-    result = group_service.list_public_groups(search=search, page=page, page_size=page_size)
+    result = group_service.list_public_groups(
+        search=search,
+        page=page,
+        page_size=page_size,
+        request=request,
+    )
+    result["items"] = GroupListItemSerializer(result["items"], many=True).data
+    return Response(result)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+@_handle_group_errors
+def list_my_groups(request):
+    search = request.query_params.get("search")
+    page = int(request.query_params.get("page", 1))
+    page_size = min(int(request.query_params.get("pageSize", 20)), 100)
+    result = group_service.list_my_groups(
+        request.user,
+        search=search,
+        page=page,
+        page_size=page_size,
+        request=request,
+    )
     result["items"] = GroupListItemSerializer(result["items"], many=True).data
     return Response(result)
 
 
 @api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([AllowAny])
+@parser_classes([JSONParser, FormParser, MultiPartParser])
 @_handle_group_errors
 def group_detail(request, slug):
     if request.method == "GET":
         user = getattr(request, "user", None)
         actor = user if user and getattr(user, "is_authenticated", False) else None
-        info = group_service.get_group_info(slug, actor)
+        info = group_service.get_group_info(slug, actor, request=request)
         return Response(GroupOutputSerializer(info).data)
 
     if request.method == "PATCH":
@@ -126,8 +151,25 @@ def group_detail(request, slug):
             kwargs["slow_mode_seconds"] = d["slowModeSeconds"]
         if "joinApprovalRequired" in d:
             kwargs["join_approval_required"] = d["joinApprovalRequired"]
+        if "avatarAction" in d:
+            kwargs["avatar_action"] = d["avatarAction"]
+        if (
+            "avatarCropX" in d
+            or "avatarCropY" in d
+            or "avatarCropWidth" in d
+            or "avatarCropHeight" in d
+        ):
+            kwargs["avatar_crop"] = {
+                "avatar_crop_x": d.get("avatarCropX"),
+                "avatar_crop_y": d.get("avatarCropY"),
+                "avatar_crop_width": d.get("avatarCropWidth"),
+                "avatar_crop_height": d.get("avatarCropHeight"),
+            }
+        avatar_file = request.FILES.get("avatar")
+        if avatar_file is not None:
+            kwargs["avatar"] = avatar_file
         room = group_service.update_group(request.user, slug, **kwargs)
-        info = group_service.get_group_info(room.slug, request.user)
+        info = group_service.get_group_info(room.slug, request.user, request=request)
         return Response(GroupOutputSerializer(info).data)
 
     # DELETE
@@ -161,7 +203,13 @@ def leave_group(request, slug):
 def list_members(request, slug):
     page = int(request.query_params.get("page", 1))
     page_size = min(int(request.query_params.get("pageSize", 50)), 200)
-    result = member_service.list_members(request.user, slug, page=page, page_size=page_size)
+    result = member_service.list_members(
+        request.user,
+        slug,
+        page=page,
+        page_size=page_size,
+        request=request,
+    )
     return Response(result)
 
 
@@ -380,7 +428,7 @@ class GroupCreateInteractiveView(_HandledGroupAPIView):
                 is_public=bool(data.get("isPublic", False)),
                 username=data.get("username"),
             )
-            info = group_service.get_group_info(room.slug, request.user)
+            info = group_service.get_group_info(room.slug, request.user, request=request)
             return Response(
                 GroupOutputSerializer(info).data,
                 status=http_status.HTTP_201_CREATED,
@@ -392,12 +440,13 @@ class GroupCreateInteractiveView(_HandledGroupAPIView):
 class GroupDetailInteractiveView(_HandledGroupAPIView):
     permission_classes = [AllowAny]
     serializer_class = GroupUpdateInputSerializer
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get(self, request, slug):
         def _impl():
             user = getattr(request, "user", None)
             actor = user if user and getattr(user, "is_authenticated", False) else None
-            info = group_service.get_group_info(slug, actor)
+            info = group_service.get_group_info(slug, actor, request=request)
             return Response(GroupOutputSerializer(info).data)
 
         return self._execute(_impl)
@@ -422,9 +471,26 @@ class GroupDetailInteractiveView(_HandledGroupAPIView):
                 kwargs["slow_mode_seconds"] = data["slowModeSeconds"]
             if "joinApprovalRequired" in data:
                 kwargs["join_approval_required"] = data["joinApprovalRequired"]
+            if "avatarAction" in data:
+                kwargs["avatar_action"] = data["avatarAction"]
+            if (
+                "avatarCropX" in data
+                or "avatarCropY" in data
+                or "avatarCropWidth" in data
+                or "avatarCropHeight" in data
+            ):
+                kwargs["avatar_crop"] = {
+                    "avatar_crop_x": data.get("avatarCropX"),
+                    "avatar_crop_y": data.get("avatarCropY"),
+                    "avatar_crop_width": data.get("avatarCropWidth"),
+                    "avatar_crop_height": data.get("avatarCropHeight"),
+                }
+            avatar_file = request.FILES.get("avatar")
+            if avatar_file is not None:
+                kwargs["avatar"] = avatar_file
 
             room = group_service.update_group(request.user, slug, **kwargs)
-            info = group_service.get_group_info(room.slug, request.user)
+            info = group_service.get_group_info(room.slug, request.user, request=request)
             return Response(GroupOutputSerializer(info).data)
 
         return self._execute(_impl)

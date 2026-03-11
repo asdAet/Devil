@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from friends.application import friend_service
 from friends.application.errors import FriendServiceError
 from friends.interfaces.serializers import (
+    BlockedOutputSerializer,
     FriendOutputSerializer,
     IncomingRequestOutputSerializer,
     OutgoingRequestOutputSerializer,
@@ -33,7 +34,7 @@ class FriendListApiView(APIView):
             items = friend_service.list_friends(request.user)
         except FriendServiceError as exc:
             return _service_error_response(exc)
-        serializer = FriendOutputSerializer(items, many=True)
+        serializer = FriendOutputSerializer(items, many=True, context={"request": request})
         return Response({"items": serializer.data})
 
 
@@ -45,7 +46,7 @@ class IncomingRequestsApiView(APIView):
             items = friend_service.list_incoming_requests(request.user)
         except FriendServiceError as exc:
             return _service_error_response(exc)
-        serializer = IncomingRequestOutputSerializer(items, many=True)
+        serializer = IncomingRequestOutputSerializer(items, many=True, context={"request": request})
         return Response({"items": serializer.data})
 
 
@@ -57,7 +58,7 @@ class OutgoingRequestsApiView(APIView):
             items = friend_service.list_outgoing_requests(request.user)
         except FriendServiceError as exc:
             return _service_error_response(exc)
-        serializer = OutgoingRequestOutputSerializer(items, many=True)
+        serializer = OutgoingRequestOutputSerializer(items, many=True, context={"request": request})
         return Response({"items": serializer.data})
 
 
@@ -79,7 +80,7 @@ class SendRequestApiView(GenericAPIView):
             )
         except FriendServiceError as exc:
             return _service_error_response(exc)
-        output = OutgoingRequestOutputSerializer(friendship)
+        output = OutgoingRequestOutputSerializer(friendship, context={"request": request})
         return Response({"item": output.data}, status=http_status.HTTP_201_CREATED)
 
 
@@ -91,7 +92,7 @@ class AcceptRequestApiView(APIView):
             friendship = friend_service.accept_request(request.user, int(friendship_id))
         except FriendServiceError as exc:
             return _service_error_response(exc)
-        output = IncomingRequestOutputSerializer(friendship)
+        output = IncomingRequestOutputSerializer(friendship, context={"request": request})
         return Response({"item": output.data})
 
 
@@ -103,7 +104,7 @@ class DeclineRequestApiView(APIView):
             friendship = friend_service.decline_request(request.user, int(friendship_id))
         except FriendServiceError as exc:
             return _service_error_response(exc)
-        output = IncomingRequestOutputSerializer(friendship)
+        output = IncomingRequestOutputSerializer(friendship, context={"request": request})
         return Response({"item": output.data})
 
 
@@ -116,6 +117,18 @@ class RemoveFriendApiView(APIView):
         except FriendServiceError as exc:
             return _service_error_response(exc)
         return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+class BlockedListApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            items = friend_service.list_blocked(request.user)
+        except FriendServiceError as exc:
+            return _service_error_response(exc)
+        serializer = BlockedOutputSerializer(items, many=True, context={"request": request})
+        return Response({"items": serializer.data})
 
 
 class BlockUserApiView(GenericAPIView):

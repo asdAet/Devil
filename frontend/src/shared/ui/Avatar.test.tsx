@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { Avatar } from './Avatar'
@@ -48,5 +48,25 @@ describe('Avatar', () => {
     expect(parseFloat(image?.style.top || '0')).toBeCloseTo(-1150, 3)
     expect(image?.style.objectFit).toBe('fill')
     expect(image?.style.borderRadius).toBe('0')
+  })
+
+  it('falls back to initials when image fails to load', () => {
+    render(<Avatar username="alice" profileImage="https://cdn.example.com/alice.jpg" />)
+
+    const image = screen.getByRole('img', { name: 'alice' })
+    fireEvent.error(image)
+
+    expect(screen.queryByRole('img', { name: 'alice' })).toBeNull()
+    expect(screen.getByText('A')).toBeInTheDocument()
+  })
+
+  it('resets failed-image state when profileImage changes', () => {
+    const { rerender } = render(<Avatar username="alice" profileImage="https://cdn.example.com/a.jpg" />)
+
+    fireEvent.error(screen.getByRole('img', { name: 'alice' }))
+    expect(screen.queryByRole('img', { name: 'alice' })).toBeNull()
+
+    rerender(<Avatar username="alice" profileImage="https://cdn.example.com/b.jpg" />)
+    expect(screen.getByRole('img', { name: 'alice' })).toBeInTheDocument()
   })
 })

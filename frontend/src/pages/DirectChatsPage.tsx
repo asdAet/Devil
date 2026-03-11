@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+﻿import { useEffect, useMemo } from 'react'
 
 import type { UserProfile } from '../entities/user/types'
 import { formatTimestamp } from '../shared/lib/format'
@@ -18,11 +18,6 @@ type ListProps = Props & {
   className?: string
 }
 
-/**
- * Список direct-диалогов пользователя.
- * @param props Входные параметры состояния и навигации.
- * @returns JSX-блок списка direct-чатов.
- */
 export function DirectChatsList({
   user,
   onNavigate,
@@ -68,13 +63,6 @@ export function DirectChatsList({
 
   return (
     <Card as="section" className={[styles.directInbox, className].filter(Boolean).join(' ')}>
-      <div className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Личные чаты</p>
-          <h2 className={styles.title}>Диалоги</h2>
-        </div>
-      </div>
-
       {loading && <p className={styles.muted}>Загрузка диалогов...</p>}
       {error && <Toast variant="danger">{error}</Toast>}
 
@@ -123,12 +111,6 @@ export function DirectChatsList({
   )
 }
 
-/**
- * Страница списка direct-диалогов.
- * @param props Входные параметры пользователя и навигации.
- * @returns JSX-страница direct-инбокса.
- */
 export function DirectChatsPage({ user, onNavigate }: Props) {
   return <DirectChatsList user={user} onNavigate={onNavigate} />
 }
-
