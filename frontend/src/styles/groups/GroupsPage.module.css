@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px;
+  padding: 16px var(--app-gutter, 20px);
   border-bottom: 1px solid var(--color-border, #2a2a2a);
 }
 
@@ -27,7 +27,8 @@
   color: #181818;
   font-size: 13px;
   font-weight: 600;
-  padding: 6px 14px;
+  min-height: var(--touch-target-min, 44px);
+  padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -43,7 +44,8 @@
 .tabs {
   display: flex;
   border-bottom: 1px solid var(--color-border, #2a2a2a);
-  padding: 0 20px;
+  padding: 0 var(--app-gutter, 20px);
+  overflow-x: auto;
 }
 
 .tab {
@@ -52,6 +54,7 @@
   color: var(--color-muted, #9eb0c7);
   font-size: 13px;
   font-weight: 600;
+  min-height: var(--touch-target-min, 44px);
   padding: 10px 16px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -67,7 +70,7 @@
 
 /* Search */
 .searchRow {
-  padding: 8px 20px;
+  padding: 8px var(--app-gutter, 20px);
   border-bottom: 1px solid var(--color-border, #2a2a2a);
 }
 
@@ -98,7 +101,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
+  padding: 10px var(--app-gutter, 20px);
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -164,6 +167,7 @@
   font-size: 12px;
   font-weight: 500;
   padding: 4px 10px;
+  min-height: 36px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
@@ -215,6 +219,8 @@
   padding: 24px;
   width: 400px;
   max-width: 90vw;
+  max-height: calc(var(--app-height, 100vh) - 48px);
+  overflow: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -385,5 +391,113 @@
 .inviteJoinBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .header,
+  .tabs,
+  .searchRow,
+  .item {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    gap: 8px;
+    padding-top: calc(var(--safe-top, 0px) + 12px);
+  }
+
+  .createBtn {
+    min-height: var(--touch-target-min, 44px);
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+
+  .tabs {
+    padding-inline: 8px;
+  }
+
+  .tab {
+    white-space: nowrap;
+    font-size: 12px;
+    padding-inline: 12px;
+  }
+
+  .searchInput {
+    font-size: 16px;
+  }
+
+  .item {
+    align-items: flex-start;
+    gap: 10px;
+    padding-inline: 10px;
+  }
+
+  .itemActions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .actionBtn {
+    min-height: var(--touch-target-min, 44px);
+    font-size: 13px;
+  }
+
+  .dialog {
+    align-items: flex-end;
+    padding: 8px 8px max(8px, var(--safe-bottom, 0px));
+  }
+
+  .dialogCard {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(var(--app-height, 100vh) - var(--safe-top, 0px) - 16px);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .dialogInput,
+  .dialogTextarea {
+    font-size: 16px;
+  }
+
+  .dialogCancelBtn,
+  .dialogSubmitBtn {
+    min-height: var(--touch-target-min, 44px);
+    flex: 1;
+  }
+
+  .inviteRoot {
+    padding: 12px;
+  }
+
+  .inviteCard {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header,
+  .tabs,
+  .searchRow,
+  .item {
+    padding-inline: 8px;
+  }
+
+  .item {
+    flex-wrap: wrap;
+  }
+
+  .itemActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .inviteGroupName {
+    font-size: 20px;
+  }
 }
 

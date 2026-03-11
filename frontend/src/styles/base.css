@@ -10,6 +10,12 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  width: 100%;
+  height: 100%;
+  min-height: var(--app-height);
+}
+
 *,
 *::before,
 *::after {
@@ -18,13 +24,18 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  width: 100%;
+  min-height: var(--app-height);
   background: var(--tg-bg-secondary);
   color: var(--tg-text-primary);
+  overflow-x: hidden;
 }
 
 #root {
-  min-height: 100vh;
+  min-height: var(--app-height);
+  height: var(--app-height);
+  width: 100%;
+  max-width: 100%;
 }
 
 a {
@@ -41,6 +52,13 @@ input,
 textarea,
 button {
   outline: none;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
 }
 
 /* Scrollbar styling */
@@ -67,12 +85,18 @@ button {
   body {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
-    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: none;
   }
 
   /* prevent iOS zoom on input focus */
   input, textarea, select {
     font-size: 16px;
+  }
+
+  button,
+  [role="button"] {
+    touch-action: manipulation;
   }
 
   /* hide scrollbars on mobile */

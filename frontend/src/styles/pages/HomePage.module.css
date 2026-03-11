@@ -2,7 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  min-height: 100%;
+  padding: max(12px, var(--safe-top, 0px)) max(12px, var(--safe-right, 0px)) max(12px, var(--safe-bottom, 0px)) max(12px, var(--safe-left, 0px));
   background: var(--tg-bg-chat, #0e0e0e);
 }
 
@@ -12,8 +13,8 @@
   align-items: center;
   gap: 16px;
   text-align: center;
-  padding: 32px;
-  max-width: 360px;
+  padding: clamp(16px, 4vw, 32px);
+  max-width: min(520px, 100%);
   animation: fadeUp 400ms ease;
 }
 
@@ -47,4 +48,26 @@
   display: flex;
   gap: 10px;
   margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .welcomeTitle {
+    font-size: 22px;
+  }
+
+  .welcomeText {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .illustration svg {
+    width: 132px;
+    height: 132px;
+  }
+
+  .welcomeActions {
+    width: 100%;
+    flex-direction: column;
+  }
 }

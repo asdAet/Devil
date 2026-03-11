@@ -43,7 +43,7 @@
 
 .body {
   min-width: 0;
-  max-width: 65%;
+  max-width: min(78%, 720px);
   display: flex;
   flex-direction: column;
 }
@@ -207,11 +207,12 @@
 
 .attachments [data-testid="audio-attachment-player"] {
   width: 100%;
-  max-width: 320px;
+  max-width: min(100%, 360px);
 }
 
 .attachImage {
-  max-width: 280px;
+  width: min(100%, clamp(180px, 62vw, 340px));
+  max-width: min(100%, 340px);
   max-height: 240px;
   border-radius: 6px;
   object-fit: cover;
@@ -224,7 +225,8 @@
 }
 
 .attachVideo {
-  max-width: 320px;
+  width: min(100%, clamp(200px, 64vw, 360px));
+  max-width: min(100%, 360px);
   max-height: 280px;
   border-radius: 6px;
   background: #000;
@@ -240,7 +242,7 @@
   color: var(--tg-text-primary, #fff);
   text-decoration: none;
   font-size: 13px;
-  max-width: 240px;
+  max-width: min(100%, 320px);
   transition: background var(--tg-transition-fast, 150ms);
 }
 
@@ -429,21 +431,23 @@
   }
 
   .body {
-    max-width: 80%;
+    max-width: 86%;
   }
 
   .attachImage {
-    max-width: 220px;
+    width: min(100%, clamp(170px, 70vw, 280px));
+    max-width: min(100%, 280px);
     max-height: 200px;
   }
 
   .attachVideo {
-    max-width: 260px;
+    width: min(100%, clamp(190px, 72vw, 300px));
+    max-width: min(100%, 300px);
     max-height: 220px;
   }
 
   .attachments [data-testid="audio-attachment-player"] {
-    max-width: 260px;
+    max-width: min(100%, 300px);
   }
 
   .actions {
@@ -477,6 +481,14 @@
   }
 
   .body {
-    max-width: 85%;
+    max-width: 92%;
+  }
+
+  .message {
+    padding-inline: 6px;
+  }
+
+  .messageOwn {
+    padding-inline: 6px;
   }
 }

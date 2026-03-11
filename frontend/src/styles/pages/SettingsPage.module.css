@@ -28,6 +28,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--color-border, #2a2a2a);
 }
@@ -84,6 +85,7 @@
 
 .themeBtn {
   flex: 1;
+  min-height: var(--touch-target-min, 44px);
   padding: 10px;
   border: 2px solid var(--color-border, #2a2a2a);
   border-radius: 10px;
@@ -111,6 +113,7 @@
   color: #ff6b6b;
   font-size: 13px;
   font-weight: 600;
+  min-height: var(--touch-target-min, 44px);
   padding: 8px 20px;
   border-radius: 8px;
   cursor: pointer;
@@ -139,5 +142,44 @@
   padding: 2px 8px;
   font-size: 12px;
   color: var(--color-text, #e2e8f5);
+}
+
+@media (max-width: 768px) {
+  .root {
+    max-width: 100%;
+    padding: calc(var(--safe-top, 0px) + 16px) 12px max(16px, var(--safe-bottom, 0px));
+  }
+
+  .title {
+    margin-bottom: 18px;
+    font-size: 20px;
+  }
+
+  .row {
+    align-items: flex-start;
+  }
+
+  .themeRow {
+    flex-direction: column;
+  }
+
+  .shortcutRow {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .root {
+    padding-inline: 8px;
+  }
+
+  .rowLabel {
+    font-size: 13px;
+  }
+
+  .rowDesc {
+    font-size: 11px;
+  }
 }
 

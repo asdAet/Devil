@@ -579,6 +579,26 @@ class ChatApiExtraCoverageTests(TestCase):
 
         self.assertEqual(response.status_code, 503)
 
+    def test_direct_start_retries_role_assignment_on_transient_lock(self):
+        """Повторяет роль-синк при кратковременной DB lock-ошибке и завершает запрос успешно."""
+        self.client.force_login(self.owner)
+        room = Room.objects.create(
+            slug='dm_retry_role_01',
+            name='stub',
+            kind=Room.Kind.DIRECT,
+            direct_pair_key=f'{self.owner.pk}:{self.peer.pk}',
+            created_by=self.owner,
+        )
+
+        with patch('chat.api.ensure_direct_room_with_retry', return_value=(room, False)), patch(
+            'chat.api.ensure_direct_roles',
+            side_effect=[OperationalError('database is locked'), None],
+        ) as ensure_roles_mock:
+            response = self._post_direct_start(self.peer.username)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ensure_roles_mock.call_count, 2)
+
     def test_room_details_returns_fallback_payload_when_db_unavailable(self):
         """Проверяет сценарий `test_room_details_returns_fallback_payload_when_db_unavailable`."""
         with patch('chat.api._resolve_room', side_effect=OperationalError):

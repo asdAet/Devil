@@ -29,6 +29,25 @@ function AppInner() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const root = document.documentElement
+    const updateViewportVars = () => {
+      root.style.setProperty('--app-height', `${window.innerHeight}px`)
+      root.style.setProperty('--app-width', `${window.innerWidth}px`)
+    }
+
+    updateViewportVars()
+    window.addEventListener('resize', updateViewportVars, { passive: true })
+    window.addEventListener('orientationchange', updateViewportVars, { passive: true })
+    window.visualViewport?.addEventListener('resize', updateViewportVars)
+
+    return () => {
+      window.removeEventListener('resize', updateViewportVars)
+      window.removeEventListener('orientationchange', updateViewportVars)
+      window.visualViewport?.removeEventListener('resize', updateViewportVars)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!banner) return
     const timerId = window.setTimeout(() => setBanner(null), 4200)
     return () => window.clearTimeout(timerId)

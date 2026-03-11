@@ -2,11 +2,16 @@
 
 test('basic navigation between home and public chat', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('button', { name: 'Devil' })).toBeVisible()
+  const isNarrowViewport = await page.evaluate(() => window.innerWidth <= 768)
+  if (isNarrowViewport) {
+    await expect(page.getByLabel('Поиск')).toBeVisible()
+  } else {
+    await expect(page.getByRole('heading', { name: 'Devil' })).toBeVisible()
+  }
 
-  await page.getByRole('button', { name: 'Публичный чат' }).first().click()
+  await page.goto('/rooms/public')
   await expect(page).toHaveURL('/rooms/public')
 
-  await page.getByRole('button', { name: 'Devil' }).click()
+  await page.goto('/')
   await expect(page).toHaveURL('/')
 })

@@ -57,6 +57,7 @@ export function AuthForm({
             <span>Имя пользователя</span>
             <input
               type="text"
+              data-testid="auth-username-input"
               autoComplete="username"
               value={username}
               maxLength={usernameMaxLength}
@@ -67,6 +68,7 @@ export function AuthForm({
             <span>Пароль</span>
             <input
               type="password"
+              data-testid="auth-password-input"
               autoComplete={requireConfirm ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -77,6 +79,7 @@ export function AuthForm({
               <span>Повторите пароль</span>
               <input
                 type="password"
+                data-testid="auth-confirm-input"
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
@@ -93,7 +96,7 @@ export function AuthForm({
               </ul>
             </div>
           )}
-          <Button variant="primary" type="submit">
+          <Button variant="primary" type="submit" data-testid="auth-submit-button">
             {submitLabel}
           </Button>
         </form>
@@ -118,4 +121,3 @@ export function AuthForm({
     </div>
   )
 }
-

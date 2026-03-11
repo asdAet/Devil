@@ -266,6 +266,7 @@ export function ProfilePage({ user, onSave, onNavigate }: Props) {
             <span>Имя пользователя</span>
             <input
               type="text"
+              data-testid="profile-username-input"
               value={form.username}
               maxLength={usernameMaxLength}
               onChange={(event) => {
@@ -311,6 +312,7 @@ export function ProfilePage({ user, onSave, onNavigate }: Props) {
           >
             <span>О себе</span>
             <textarea
+              data-testid="profile-bio-input"
               value={form.bio}
               onChange={(event) => {
                 setForm({ ...form, bio: event.target.value })

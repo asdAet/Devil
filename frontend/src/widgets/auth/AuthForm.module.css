@@ -79,3 +79,29 @@
   padding: 0;
 }
 
+@media (max-width: 768px) {
+  .auth {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .card {
+    max-width: 100%;
+  }
+
+  .field input {
+    font-size: 16px;
+    min-height: var(--touch-target-min, 44px);
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    margin: 4px 0 8px;
+  }
+
+  .note,
+  .authSwitch {
+    font-size: 13px;
+  }
+}

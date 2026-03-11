@@ -202,6 +202,7 @@ export function MessageInput({
               className={styles.attachBtn}
               onClick={() => fileInputRef.current?.click()}
               aria-label="Прикрепить файл"
+              data-testid="chat-attach-button"
               disabled={disabled || uploading || rateLimitActive}
             >
               <IconAttach />
@@ -218,6 +219,7 @@ export function MessageInput({
 
         <textarea
           className={styles.textArea}
+          data-testid="chat-message-input"
           value={draft}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -230,6 +232,7 @@ export function MessageInput({
         <button
           type="button"
           className={styles.sendBtn}
+          data-testid="chat-send-button"
           onClick={onSend}
           disabled={!canSend || disabled || rateLimitActive || uploading}
           aria-label="Отправить сообщение"

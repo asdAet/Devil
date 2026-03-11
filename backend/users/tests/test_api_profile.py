@@ -3,7 +3,7 @@
 
 
 import io
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 from PIL import Image
 from django.contrib.auth import get_user_model
@@ -287,6 +287,32 @@ class ProfileApiTests(TestCase):
         if expired_url is None:
             self.fail("Expected signed media url")
         self.assertEqual(self.client.get(expired_url).status_code, 403)
+
+    @override_settings(DEBUG=True)
+    def test_signed_media_endpoint_accepts_double_encoded_path_for_legacy_clients(self):
+        """Поддерживает legacy-клиентов, передающих уже percent-encoded путь второй раз."""
+        self.client.force_login(self.user)
+        csrf = self._csrf()
+        update = self.client.post(
+            '/api/auth/profile/',
+            data={
+                'username': self.user.username,
+                'email': self.user.email,
+                'bio': 'has cyrillic image',
+                'image': self._image_upload(filename='Цветок.png'),
+            },
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(update.status_code, 200)
+        signed_url = update.json()['user']['profileImage']
+
+        parsed = urlparse(signed_url)
+        media_path = parsed.path.removeprefix("/api/auth/media/")
+        double_encoded_path = quote(media_path, safe="/")
+        legacy_url = f"/api/auth/media/{double_encoded_path}?{parsed.query}"
+
+        valid_response = self.client.get(legacy_url)
+        self.assertEqual(valid_response.status_code, 200)
 
     def test_public_profile_hides_email(self):
         """Проверяет сценарий `test_public_profile_hides_email`."""

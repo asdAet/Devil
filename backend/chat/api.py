@@ -1,6 +1,7 @@
 ﻿"""API endpoints for the chat subsystem."""
 
 import mimetypes
+import time
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -173,6 +174,33 @@ def _parse_positive_int(raw_value: str | None, param_name: str) -> int:
     return parsed
 
 
+def _is_transient_db_lock(exc: OperationalError) -> bool:
+    message = str(exc).lower()
+    return "locked" in message or "deadlock" in message
+
+
+def _ensure_direct_roles_with_retry(room: Room, initiator, peer, *, created: bool) -> None:
+    attempts = max(
+        1,
+        int(
+            getattr(
+                settings,
+                "CHAT_DIRECT_ROLE_SYNC_RETRIES",
+                getattr(settings, "CHAT_DIRECT_START_RETRIES", 3),
+            )
+        ),
+    )
+    for attempt in range(attempts):
+        try:
+            with transaction.atomic():
+                ensure_direct_roles(room, initiator, peer, created=created)
+            return
+        except OperationalError as exc:
+            if attempt == attempts - 1 or not _is_transient_db_lock(exc):
+                raise
+            time.sleep(0.05 * (attempt + 1))
+
+
 def _resolve_room(room_slug: str):
     if room_slug == PUBLIC_ROOM_SLUG:
         return _public_room(), None
@@ -258,8 +286,7 @@ class DirectStartApiView(GenericAPIView):
             return Response({"error": "Сервис временно недоступен"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
 
         try:
-            with transaction.atomic():
-                ensure_direct_roles(room, request.user, target, created=created)
+            _ensure_direct_roles_with_retry(room, request.user, target, created=created)
         except OperationalError:
             return Response({"error": "Сервис временно недоступен"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
 

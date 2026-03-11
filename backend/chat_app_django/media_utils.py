@@ -5,7 +5,7 @@ import hmac
 import posixpath
 import time
 from ipaddress import ip_address
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import quote, unquote, urlencode, urlparse
 
 from django.conf import settings
 
@@ -114,12 +114,21 @@ def normalize_media_path(image_name: str | None) -> str | None:
     if not image_name:
         return None
 
-    media_url = settings.MEDIA_URL or "/media/"
+    # Accept plain, encoded and double-encoded paths from legacy clients/cache.
     raw = image_name.strip()
+    if not raw:
+        return None
+    for _ in range(2):
+        decoded = unquote(raw)
+        if decoded == raw:
+            break
+        raw = decoded
+
+    media_url = settings.MEDIA_URL or "/media/"
     if raw.startswith(media_url):
         raw = raw[len(media_url):]
 
-    raw = raw.lstrip("/")
+    raw = raw.lstrip("/").replace("\\", "/")
     normalized = posixpath.normpath(raw)
     if normalized in {"", ".", ".."}:
         return None

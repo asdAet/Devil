@@ -22,15 +22,17 @@ type Props = {
 function ShellLayout({ user, onNavigate, onLogout, banner, error, isAuthRoute, children }: Props) {
   const { isOpen } = useInfoPanel()
   const location = useLocation()
-  const isChatOpen = /^\/(rooms|direct\/[@])/.test(location.pathname)
+  const isMainActive = location.pathname !== '/'
 
   return (
     <div className={[
       styles.shell,
       isOpen ? styles.withInfoPanel : '',
-      isChatOpen ? styles.chatActive : '',
+      isMainActive ? styles.chatActive : '',
     ].filter(Boolean).join(' ')}>
-      <Sidebar user={user} onNavigate={onNavigate} onLogout={onLogout} />
+      <div className={styles.sidebarPane}>
+        <Sidebar user={user} onNavigate={onNavigate} onLogout={onLogout} />
+      </div>
       <div className={styles.main}>
         {(banner || (error && !isAuthRoute)) && (
           <div className={styles.banners}>

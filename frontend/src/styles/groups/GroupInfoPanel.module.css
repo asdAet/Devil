@@ -594,3 +594,92 @@
 .hiddenInput {
   display: none;
 }
+
+@media (max-width: 1024px) {
+  .quickActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .memberRow,
+  .inviteRow,
+  .requestRow {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .root {
+    gap: 10px;
+  }
+
+  .top {
+    gap: 6px;
+  }
+
+  .tabs {
+    padding-bottom: 4px;
+  }
+
+  .tab {
+    min-height: var(--touch-target-min, 44px);
+    padding: 8px 10px;
+  }
+
+  .avatarEditor {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .avatarButtons {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .avatarButtons button {
+    flex: 1;
+    min-width: 140px;
+    min-height: var(--touch-target-min, 44px);
+    text-align: center;
+  }
+
+  .memberRow,
+  .inviteRow,
+  .requestRow,
+  .fileRow,
+  .roleRow,
+  .overrideRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .memberActions,
+  .inviteActions,
+  .requestActions {
+    flex-wrap: wrap;
+  }
+
+  .memberActions button,
+  .inviteActions button,
+  .requestActions button,
+  .primaryBtn {
+    min-height: var(--touch-target-min, 44px);
+  }
+}
+
+@media (max-width: 480px) {
+  .quickActions {
+    grid-template-columns: 1fr;
+  }
+
+  .mediaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    font-size: 16px;
+  }
+}

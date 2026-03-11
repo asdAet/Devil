@@ -13,6 +13,7 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  padding: 'max(8px, var(--safe-top, 0px)) max(8px, var(--safe-right, 0px)) max(8px, var(--safe-bottom, 0px)) max(8px, var(--safe-left, 0px))',
   zIndex: 100,
 }
 
@@ -25,11 +26,11 @@ const backdropStyle: React.CSSProperties = {
 const cardStyle: React.CSSProperties = {
   position: 'relative',
   background: '#242424',
-  borderRadius: 12,
-  padding: 24,
-  width: 400,
-  maxWidth: '90vw',
-  maxHeight: '80vh',
+  borderRadius: 14,
+  padding: 20,
+  width: 'min(460px, calc(100vw - 16px))',
+  maxWidth: '100%',
+  maxHeight: 'calc(var(--app-height, 100vh) - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 16px)',
   overflow: 'auto',
   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
 }

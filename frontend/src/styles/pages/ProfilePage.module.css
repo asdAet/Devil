@@ -156,7 +156,7 @@
   color: #ffb4b4;
 }
 
-@media (max-width: 881px) {
+@media (max-width: 768px) {
   .profileAvatarWrapper {
     width: 140px;
     height: 140px;
@@ -165,5 +165,16 @@
   .actions {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (max-width: 480px) {
+  .profileAvatarWrapper {
+    width: 120px;
+    height: 120px;
+  }
+
+  .eyebrowProfile {
+    font-size: 18px;
   }
 }

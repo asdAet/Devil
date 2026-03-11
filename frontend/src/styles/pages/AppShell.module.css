@@ -14,10 +14,9 @@
   gap: 18px;
 }
 
-@media (max-width: 881px) {
+@media (max-width: 768px) {
   .appShell {
     padding: 20px 14px 48px;
     max-width: 100%;
   }
 }
-

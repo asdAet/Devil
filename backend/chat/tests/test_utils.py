@@ -43,6 +43,16 @@ class UtilityHelpersTests(SimpleTestCase):
     def test_normalize_media_path_and_signed_path(self):
         """Проверяет нормализацию media пути и сборку подписанного URL."""
         self.assertEqual(utils.normalize_media_path("/media/profile_pics/a.jpg"), "profile_pics/a.jpg")
+        self.assertEqual(
+            utils.normalize_media_path("chat_attachments/2026/03/%D0%A6%D0%B2%D0%B5%D1%82%D0%BE%D0%BA.mp3"),
+            "chat_attachments/2026/03/Цветок.mp3",
+        )
+        self.assertEqual(
+            utils.normalize_media_path(
+                "chat_attachments/2026/03/%25D0%25A6%25D0%25B2%25D0%25B5%25D1%2582%25D0%25BE%25D0%25BA.mp3"
+            ),
+            "chat_attachments/2026/03/Цветок.mp3",
+        )
         self.assertIsNone(utils.normalize_media_path("../secret.txt"))
 
         signed = utils._signed_media_url_path("profile_pics/a.jpg", expires_at=12345)
@@ -58,6 +68,14 @@ class UtilityHelpersTests(SimpleTestCase):
                 query["sig"][0],
             )
         )
+
+        signed_cyr = utils._signed_media_url_path(
+            "chat_attachments/2026/03/%D0%A6%D0%B2%D0%B5%D1%82%D0%BE%D0%BA.mp3",
+            expires_at=12345,
+        )
+        self.assertIsNotNone(signed_cyr)
+        parsed_cyr = urlparse(signed_cyr or "")
+        self.assertNotIn("%25D0", parsed_cyr.path)
 
     @override_settings(MEDIA_SIGNING_KEY="test-key")
     def test_media_signature_validation_rejects_bad_signature(self):
