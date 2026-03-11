@@ -24,6 +24,31 @@ export const getChatMessageMaxLength = () => getRuntimeConfig().chatMessageMaxLe
 export const useChatMessageMaxLength = () => useRuntimeConfig().config.chatMessageMaxLength
 
 /**
+ * Возвращает максимальный размер одного вложения в МБ из runtime policy.
+ */
+export const getChatAttachmentMaxSizeMb = () => getRuntimeConfig().chatAttachmentMaxSizeMb
+
+/**
+ * Возвращает максимальный размер одного вложения в байтах из runtime policy.
+ */
+export const getChatAttachmentMaxSizeBytes = () => getChatAttachmentMaxSizeMb() * 1024 * 1024
+
+/**
+ * Хук доступа к лимиту размера одного вложения (в МБ).
+ */
+export const useChatAttachmentMaxSizeMb = () => useRuntimeConfig().config.chatAttachmentMaxSizeMb
+
+/**
+ * Хук доступа к лимиту количества вложений на сообщение.
+ */
+export const useChatAttachmentMaxPerMessage = () => useRuntimeConfig().config.chatAttachmentMaxPerMessage
+
+/**
+ * Хук доступа к списку разрешенных MIME-типов вложений.
+ */
+export const useChatAttachmentAllowedTypes = () => useRuntimeConfig().config.chatAttachmentAllowedTypes
+
+/**
  * Возвращает строковое regex-правило для slug комнаты.
  */
 export const getChatRoomSlugRegex = () => {

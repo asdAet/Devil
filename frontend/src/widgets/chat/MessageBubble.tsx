@@ -2,7 +2,7 @@ import { useCallback, useState, type MouseEvent as ReactMouseEvent } from 'react
 
 import type { Message, ReactionSummary, ReplyTo } from '../../entities/message/types'
 import { formatTimestamp } from '../../shared/lib/format'
-import { Avatar, ContextMenu, ImageLightbox } from '../../shared/ui'
+import { AudioAttachmentPlayer, Avatar, ContextMenu, ImageLightbox } from '../../shared/ui'
 import type { ContextMenuItem } from '../../shared/ui'
 import styles from '../../styles/chat/MessageBubble.module.css'
 
@@ -250,20 +250,14 @@ export function MessageBubble({
                   }
                   if (isAudioType(att.contentType) && att.url) {
                     return (
-                      <div key={att.id} className={styles.audioPlayer}>
-                        <div className={styles.audioIcon}>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M9 18V5l12-2v13" />
-                            <circle cx="6" cy="18" r="3" />
-                            <circle cx="18" cy="16" r="3" />
-                          </svg>
-                        </div>
-                        <div className={styles.audioMeta}>
-                          <span className={styles.audioName}>{att.originalFilename}</span>
-                          <span className={styles.audioSize}>{formatFileSize(att.fileSize)}</span>
-                        </div>
-                        <audio src={att.url} controls preload="metadata" className={styles.audioElement} />
-                      </div>
+                      <AudioAttachmentPlayer
+                        key={att.id}
+                        src={att.url}
+                        title={att.originalFilename}
+                        subtitle={formatFileSize(att.fileSize)}
+                        downloadName={att.originalFilename}
+                        compact
+                      />
                     )
                   }
                   return (

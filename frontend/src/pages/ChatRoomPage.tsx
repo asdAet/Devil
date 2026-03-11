@@ -13,7 +13,12 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useReconnectingWebSocket } from '../hooks/useReconnectingWebSocket'
 import { useRoomPermissions } from '../hooks/useRoomPermissions'
 import { useTypingIndicator } from '../hooks/useTypingIndicator'
-import { useChatMessageMaxLength } from '../shared/config/limits'
+import {
+  useChatAttachmentAllowedTypes,
+  useChatAttachmentMaxPerMessage,
+  useChatAttachmentMaxSizeMb,
+  useChatMessageMaxLength,
+} from '../shared/config/limits'
 import { invalidateDirectChats, invalidateRoomMessages } from '../shared/cache/cacheManager'
 import { useDirectInbox } from '../shared/directInbox'
 import { useInfoPanel } from '../shared/layout/useInfoPanel'
@@ -52,12 +57,57 @@ const extractApiErrorMessage = (error: unknown, fallback: string) => {
   if (!error || typeof error !== 'object') return fallback
   const candidate = error as {
     message?: string
-    data?: { error?: string; detail?: string }
+    data?: {
+      error?: string
+      detail?: string
+      code?: string
+      details?: {
+        maxPerMessage?: number
+        maxSize?: number
+        allowedTypes?: string[]
+      }
+    }
+  }
+  const code = candidate.data?.code
+  const details = candidate.data?.details
+  if (code === 'no_files') {
+    return 'Файлы не переданы. Выберите вложение и повторите отправку.'
+  }
+  if (code === 'too_many_files') {
+    const maxPerMessage = details?.maxPerMessage
+    return typeof maxPerMessage === 'number'
+      ? `Слишком много файлов. Максимум ${maxPerMessage} на сообщение.`
+      : 'Слишком много файлов в одном сообщении.'
+  }
+  if (code === 'file_too_large') {
+    const maxSize = details?.maxSize
+    if (typeof maxSize === 'number' && maxSize > 0) {
+      const maxMb = Math.ceil(maxSize / (1024 * 1024))
+      return `Файл превышает лимит размера (${maxMb} МБ).`
+    }
+    return 'Файл превышает максимально допустимый размер.'
+  }
+  if (code === 'unsupported_type') {
+    if (Array.isArray(details?.allowedTypes) && details.allowedTypes.length > 0) {
+      return `Тип файла не поддерживается. Разрешены: ${details.allowedTypes.join(', ')}.`
+    }
+    return 'Тип файла не поддерживается.'
+  }
+  if (code === 'invalid_reply_to') {
+    return 'Сообщение для ответа недоступно. Обновите чат и попробуйте снова.'
   }
   if (candidate.data?.error) return candidate.data.error
   if (candidate.data?.detail) return candidate.data.detail
   if (candidate.message && !candidate.message.includes('status code')) return candidate.message
   return fallback
+}
+
+const normalizeAttachmentType = (contentType: string) => {
+  const normalized = contentType.trim().toLowerCase()
+  if (normalized === 'audio/mp3' || normalized === 'audio/x-mp3' || normalized === 'audio/x-mpeg') {
+    return 'audio/mpeg'
+  }
+  return normalized
 }
 
 const sameAvatarCrop = (left: Message['avatarCrop'], right: Message['avatarCrop']) => {
@@ -82,6 +132,9 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const { setActiveRoom, markRead } = useDirectInbox()
   const { online: presenceOnline, status: presenceStatus } = usePresence()
   const maxMessageLength = useChatMessageMaxLength()
+  const maxAttachmentSizeMb = useChatAttachmentMaxSizeMb()
+  const maxAttachmentPerMessage = useChatAttachmentMaxPerMessage()
+  const allowedAttachmentTypes = useChatAttachmentAllowedTypes()
   const roomPermissions = useRoomPermissions(user ? slug : null)
   const {
     loading: permissionsLoading,
@@ -118,6 +171,12 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
   const [unreadDividerId, setUnreadDividerId] = useState<number | null>(null)
   const initialUnreadScrollDoneRef = useRef(false)
+
+  const normalizedAllowedAttachmentTypes = useMemo(
+    () => new Set(allowedAttachmentTypes.map((item) => normalizeAttachmentType(item))),
+    [allowedAttachmentTypes],
+  )
+  const maxAttachmentSizeBytes = useMemo(() => maxAttachmentSizeMb * 1024 * 1024, [maxAttachmentSizeMb])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
@@ -774,8 +833,56 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   }, [messages, slug])
 
   const handleAttach = useCallback((files: File[]) => {
-    setQueuedFiles((prev) => [...prev, ...files])
-  }, [])
+    if (!files.length) return
+
+    const accepted: File[] = []
+    const rejectedMessages: string[] = []
+    const capacityLeft = Math.max(0, maxAttachmentPerMessage - queuedFiles.length)
+
+    if (capacityLeft <= 0) {
+      setRoomError(`Можно прикрепить не более ${maxAttachmentPerMessage} файлов к сообщению.`)
+      return
+    }
+
+    for (const file of files) {
+      if (accepted.length >= capacityLeft) {
+        rejectedMessages.push(`Превышен лимит вложений (${maxAttachmentPerMessage}).`)
+        break
+      }
+
+      if (file.size > maxAttachmentSizeBytes) {
+        rejectedMessages.push(`Файл "${file.name}" больше ${maxAttachmentSizeMb} МБ.`)
+        continue
+      }
+
+      const normalizedType = normalizeAttachmentType(file.type || '')
+      if (
+        normalizedType
+        && normalizedAllowedAttachmentTypes.size > 0
+        && !normalizedAllowedAttachmentTypes.has(normalizedType)
+      ) {
+        rejectedMessages.push(`Файл "${file.name}" имеет неподдерживаемый тип "${normalizedType}".`)
+        continue
+      }
+
+      accepted.push(file)
+    }
+
+    if (accepted.length > 0) {
+      setQueuedFiles((prev) => [...prev, ...accepted])
+    }
+    if (rejectedMessages.length > 0) {
+      setRoomError(rejectedMessages.join(' '))
+      return
+    }
+    setRoomError(null)
+  }, [
+    maxAttachmentPerMessage,
+    maxAttachmentSizeBytes,
+    maxAttachmentSizeMb,
+    normalizedAllowedAttachmentTypes,
+    queuedFiles.length,
+  ])
 
   const handleRemoveQueuedFile = useCallback((index: number) => {
     setQueuedFiles((prev) => prev.filter((_, i) => i !== index))

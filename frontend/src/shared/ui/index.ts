@@ -12,4 +12,4 @@ export { Dropdown } from './Dropdown'
 export { ImageLightbox } from './ImageLightbox'
 export { ContextMenu } from './ContextMenu'
 export type { ContextMenuItem } from './ContextMenu'
-
+export { AudioAttachmentPlayer } from './AudioAttachmentPlayer'

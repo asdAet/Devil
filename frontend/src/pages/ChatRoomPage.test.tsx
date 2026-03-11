@@ -115,6 +115,18 @@ vi.mock('../shared/directInbox', () => ({
 
 vi.mock('../shared/config/limits', () => ({
   useChatMessageMaxLength: () => 2000,
+  useChatAttachmentMaxSizeMb: () => 10,
+  useChatAttachmentMaxPerMessage: () => 5,
+  useChatAttachmentAllowedTypes: () => [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'text/plain',
+    'video/mp4',
+    'audio/mpeg',
+    'audio/webm',
+  ],
 }))
 
 vi.mock('../shared/layout/useInfoPanel', () => ({
@@ -381,5 +393,52 @@ describe('ChatRoomPage', () => {
     })
     expect(chatControllerMock.markRead).toHaveBeenCalledWith('dm_1', 3)
     expect(chatControllerMock.markRead).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects unsupported attachment type on client before upload request', () => {
+    const { container } = render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />)
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement
+    const invalidFile = new File(['payload'], 'virus.exe', { type: 'application/x-msdownload' })
+    fireEvent.change(fileInput, { target: { files: [invalidFile] } })
+
+    expect(screen.getByText(/имеет неподдерживаемый тип/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Отправить сообщение' })).toBeDisabled()
+    expect(chatControllerMock.uploadAttachments).not.toHaveBeenCalled()
+  })
+
+  it('uploads only valid attachments from mixed selection and maps backend error by code', async () => {
+    chatControllerMock.uploadAttachments.mockRejectedValueOnce({
+      data: {
+        code: 'unsupported_type',
+        details: { allowedTypes: ['text/plain'] },
+      },
+      message: 'Request failed',
+    })
+
+    const { container } = render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />)
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement
+    const invalidFile = new File(['payload'], 'bad.exe', { type: 'application/x-msdownload' })
+    const validFile = new File(['hello'], 'ok.txt', { type: 'text/plain' })
+    fireEvent.change(fileInput, { target: { files: [invalidFile, validFile] } })
+
+    expect(screen.getByText(/имеет неподдерживаемый тип/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Отправить сообщение' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить сообщение' }))
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(chatControllerMock.uploadAttachments).toHaveBeenCalledTimes(1)
+    const filesArg = chatControllerMock.uploadAttachments.mock.calls[0][1] as File[]
+    expect(filesArg).toHaveLength(1)
+    expect(filesArg[0].name).toBe('ok.txt')
+
+    expect(
+      screen.getByText('Тип файла не поддерживается. Разрешены: text/plain.'),
+    ).toBeInTheDocument()
   })
 })

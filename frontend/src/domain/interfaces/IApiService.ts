@@ -61,6 +61,9 @@ export type ClientRuntimeConfig = {
   usernameMaxLength: number;
   chatMessageMaxLength: number;
   chatRoomSlugRegex: string;
+  chatAttachmentMaxSizeMb: number;
+  chatAttachmentMaxPerMessage: number;
+  chatAttachmentAllowedTypes: string[];
   mediaUrlTtlSeconds: number;
   mediaMode: "signed_only";
 };

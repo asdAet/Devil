@@ -17,6 +17,13 @@ def client_config_view(_request):
             "chatRoomSlugRegex": str(
                 getattr(settings, "CHAT_ROOM_SLUG_REGEX", r"^[A-Za-z0-9_-]{3,50}$")
             ),
+            "chatAttachmentMaxSizeMb": int(getattr(settings, "CHAT_ATTACHMENT_MAX_SIZE_MB", 10)),
+            "chatAttachmentMaxPerMessage": int(getattr(settings, "CHAT_ATTACHMENT_MAX_PER_MESSAGE", 5)),
+            "chatAttachmentAllowedTypes": [
+                str(item)
+                for item in getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [])
+                if str(item).strip()
+            ],
             "mediaUrlTtlSeconds": int(getattr(settings, "MEDIA_URL_TTL_SECONDS", 300)),
             "mediaMode": "signed_only",
         }

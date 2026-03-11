@@ -2,7 +2,6 @@
 """Содержит тесты модуля `test_consumers_helpers` подсистемы `chat`."""
 
 
-import asyncio
 import json
 import time
 from datetime import timedelta
@@ -24,7 +23,7 @@ from chat.consumers import (
 from chat.utils import is_valid_room_slug as _is_valid_room_slug
 from direct_inbox.consumers import DirectInboxConsumer
 from presence.constants import PRESENCE_CLOSE_IDLE_CODE
-from presence.consumers import PresenceConsumer
+from presence.consumers import PresenceConsumer, _ws_connect_rate_limited as _presence_ws_connect_rate_limited
 from rooms.services import ensure_membership
 from rooms.models import Room
 from users.models import SecurityRateLimitBucket
@@ -55,6 +54,31 @@ class WsConnectRateLimitTests(TestCase):
         bucket.reset_at = timezone.now() - timedelta(seconds=1)
         bucket.save(update_fields=["reset_at", "updated_at"])
         self.assertFalse(_ws_connect_rate_limited(scope, "chat"))
+
+
+class PresenceWsConnectRateLimitTests(TestCase):
+    """Проверяет endpoint-specific настройки rate limit для presence websocket."""
+
+    def setUp(self):
+        cache.clear()
+
+    @override_settings(
+        WS_CONNECT_RATE_LIMIT=1,
+        WS_CONNECT_RATE_WINDOW=60,
+        WS_CONNECT_RATE_LIMIT_PRESENCE=3,
+        WS_CONNECT_RATE_WINDOW_PRESENCE=60,
+    )
+    def test_presence_uses_dedicated_limits_without_changing_chat_limit(self):
+        scope = {"client": ("127.0.0.1", 50501), "headers": []}
+
+        self.assertFalse(_presence_ws_connect_rate_limited(scope, "presence"))
+        self.assertFalse(_presence_ws_connect_rate_limited(scope, "presence"))
+        self.assertFalse(_presence_ws_connect_rate_limited(scope, "presence"))
+        self.assertTrue(_presence_ws_connect_rate_limited(scope, "presence"))
+
+        # Chat endpoint should still follow global stricter limit.
+        self.assertFalse(_ws_connect_rate_limited(scope, "chat"))
+        self.assertTrue(_ws_connect_rate_limited(scope, "chat"))
 
 
 class ChatConsumerInternalTests(TestCase):
@@ -656,6 +680,4 @@ class DirectInboxConsumerInternalTests(TestCase):
 
         consumer.close.assert_awaited_once_with(code=4429)
         consumer.accept.assert_not_awaited()
-
-
 

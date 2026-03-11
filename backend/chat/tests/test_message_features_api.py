@@ -6,7 +6,7 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 
 from messages.models import Message, Reaction
 from rooms.models import Room
@@ -209,7 +209,8 @@ class ChatMessageFeatureApiTests(TestCase):
         items = get_response.json()["items"]
         self.assertTrue(any(item["messageId"] == created_id for item in items))
 
-    def test_attachment_upload_accepts_unknown_content_type(self):
+    @override_settings(CHAT_ATTACHMENT_ALLOWED_TYPES=["text/plain"])
+    def test_attachment_upload_rejects_unsupported_content_type_with_code(self):
         self.client.force_login(self.owner)
         upload_file = SimpleUploadedFile(
             "archive.bin",
@@ -221,10 +222,112 @@ class ChatMessageFeatureApiTests(TestCase):
             data={"files": [upload_file]},
         )
 
-        self.assertEqual(post_response.status_code, 201)
+        self.assertEqual(post_response.status_code, 400)
         payload = post_response.json()
-        self.assertTrue(payload["attachments"])
-        self.assertEqual(
-            payload["attachments"][0]["contentType"],
-            "application/x-custom-binary",
+        self.assertEqual(payload["code"], "unsupported_type")
+        self.assertIn("allowedTypes", payload["details"])
+
+    def test_attachment_upload_accepts_file_key_compat(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "note.txt",
+            b"legacy key file",
+            content_type="text/plain",
         )
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"file": upload_file},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.json()["attachments"]), 1)
+
+    def test_attachment_upload_accepts_attachments_array_key_compat(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "note-array.txt",
+            b"legacy array key file",
+            content_type="text/plain",
+        )
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"attachments[]": [upload_file]},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.json()["attachments"]), 1)
+
+    def test_attachment_upload_accepts_attachments_key_compat(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "note-compat.txt",
+            b"legacy attachments key file",
+            content_type="text/plain",
+        )
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"attachments": [upload_file]},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.json()["attachments"]), 1)
+
+    def test_attachment_upload_returns_code_when_files_missing(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], "no_files")
+
+    @override_settings(CHAT_ATTACHMENT_MAX_PER_MESSAGE=1)
+    def test_attachment_upload_returns_code_when_too_many_files(self):
+        self.client.force_login(self.owner)
+        file_one = SimpleUploadedFile("one.txt", b"1", content_type="text/plain")
+        file_two = SimpleUploadedFile("two.txt", b"2", content_type="text/plain")
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"files": [file_one, file_two]},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], "too_many_files")
+
+    def test_attachment_upload_returns_code_for_invalid_reply(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile("reply.txt", b"file", content_type="text/plain")
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"files": [upload_file], "replyTo": "999999"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], "invalid_reply_to")
+
+    @override_settings(CHAT_ATTACHMENT_MAX_SIZE_MB=1)
+    def test_attachment_upload_returns_code_when_file_too_large(self):
+        self.client.force_login(self.owner)
+        large_payload = b"x" * (2 * 1024 * 1024)
+        upload_file = SimpleUploadedFile(
+            "large.txt",
+            large_payload,
+            content_type="text/plain",
+        )
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"files": [upload_file]},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], "file_too_large")
+
+    @override_settings(CHAT_ATTACHMENT_ALLOWED_TYPES=["audio/mpeg"])
+    def test_attachment_upload_normalizes_audio_mp3_alias(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "voice.mp3",
+            b"ID3\x03\x00\x00\x00\x00\x00\x00",
+            content_type="audio/mp3",
+        )
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.slug}/attachments/",
+            data={"files": [upload_file]},
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["attachments"][0]["contentType"], "audio/mpeg")

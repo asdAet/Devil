@@ -4,7 +4,7 @@ import { chatController } from '../../controllers/ChatController'
 import type { RoomAttachmentItem } from '../../domain/interfaces/IApiService'
 import type { RoomDetails } from '../../entities/room/types'
 import { formatLastSeen, formatTimestamp } from '../../shared/lib/format'
-import { Avatar, Spinner } from '../../shared/ui'
+import { AudioAttachmentPlayer, Avatar, Spinner } from '../../shared/ui'
 import styles from '../../styles/chat/DirectInfoPanel.module.css'
 
 type Props = {
@@ -40,8 +40,13 @@ function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
 
       {isAudio(item.contentType) && item.url && (
         <div className={styles.fileCard}>
-          <span className={styles.fileName}>{item.originalFilename}</span>
-          <audio className={styles.audio} src={item.url} controls preload="metadata" />
+          <AudioAttachmentPlayer
+            src={item.url}
+            title={item.originalFilename}
+            subtitle={formatFileSize(item.fileSize)}
+            downloadName={item.originalFilename}
+            className={styles.audioPlayer}
+          />
         </div>
       )}
 
@@ -66,6 +71,9 @@ function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
   )
 
   const canOpenAsLink = Boolean(item.url && !isAudio(item.contentType))
+  const cardClassName = [styles.card, isAudio(item.contentType) ? styles.cardAudio : '']
+    .filter(Boolean)
+    .join(' ')
 
   if (canOpenAsLink) {
     return (
@@ -73,14 +81,14 @@ function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
         href={item.url as string}
         target="_blank"
         rel="noopener noreferrer"
-        className={styles.card}
+        className={cardClassName}
       >
         {preview}
       </a>
     )
   }
 
-  return <div className={styles.card}>{preview}</div>
+  return <div className={cardClassName}>{preview}</div>
 }
 
 export function DirectInfoPanel({ slug }: Props) {

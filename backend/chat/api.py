@@ -1,4 +1,4 @@
-"""API endpoints for the chat subsystem."""
+﻿"""API endpoints for the chat subsystem."""
 
 import mimetypes
 
@@ -687,36 +687,113 @@ def upload_attachments(request, room_slug):
     if not has_permission(room, request.user, Perm.ATTACH_FILES):
         return Response({"error": "Отсутствует разрешение ATTACH_FILES"}, status=http_status.HTTP_403_FORBIDDEN)
 
-    files = request.FILES.getlist("files")
+    def _error_response(
+        message: str,
+        *,
+        code: str,
+        details: dict[str, object] | None = None,
+        status_code: int = http_status.HTTP_400_BAD_REQUEST,
+    ) -> Response:
+        payload: dict[str, object] = {"error": message, "code": code}
+        if details:
+            payload["details"] = details
+        return Response(payload, status=status_code)
+
+    def _collect_uploaded_files() -> list:
+        keys = ("files", "file", "attachments", "attachments[]")
+        collected: list = []
+        seen_ids: set[int] = set()
+
+        for key in keys:
+            for uploaded in request.FILES.getlist(key):
+                marker = id(uploaded)
+                if marker in seen_ids:
+                    continue
+                seen_ids.add(marker)
+                collected.append(uploaded)
+
+        if collected or not request.FILES:
+            return collected
+
+        # Fallback for legacy/custom clients that send unknown multipart keys.
+        for key in request.FILES.keys():
+            for uploaded in request.FILES.getlist(key):
+                marker = id(uploaded)
+                if marker in seen_ids:
+                    continue
+                seen_ids.add(marker)
+                collected.append(uploaded)
+        return collected
+
+    files = _collect_uploaded_files()
     if not files:
-        return Response({"error": "Файлы не переданы"}, status=http_status.HTTP_400_BAD_REQUEST)
+        return _error_response(
+            "Файлы не переданы",
+            code="no_files",
+            details={"expectedKeys": ["files", "file", "attachments", "attachments[]"]},
+        )
 
     max_per_msg = int(getattr(settings, "CHAT_ATTACHMENT_MAX_PER_MESSAGE", 5))
     if len(files) > max_per_msg:
-        return Response(
-            {"error": f"Максимум {max_per_msg} файлов на сообщение"},
-            status=http_status.HTTP_400_BAD_REQUEST,
+        return _error_response(
+            f"Максимум {max_per_msg} файлов на сообщение",
+            code="too_many_files",
+            details={"maxPerMessage": max_per_msg, "received": len(files)},
         )
 
     max_size = int(getattr(settings, "CHAT_ATTACHMENT_MAX_SIZE_MB", 10)) * 1024 * 1024
+    allowed_types = {
+        str(item).strip().lower()
+        for item in getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [])
+        if str(item).strip()
+    }
+    alias_map = {
+        "audio/mp3": "audio/mpeg",
+        "audio/x-mp3": "audio/mpeg",
+        "audio/x-mpeg": "audio/mpeg",
+    }
+
+    def _canonical_content_type(content_type: str) -> str:
+        normalized = content_type.strip().lower()
+        return alias_map.get(normalized, normalized)
 
     for f in files:
         if f.size > max_size:
-            return Response(
-                {"error": f"Файл '{f.name}' превышает максимальный размер"},
-                status=http_status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                f"Файл '{f.name}' превышает максимальный размер",
+                code="file_too_large",
+                details={
+                    "fileName": f.name,
+                    "fileSize": f.size,
+                    "maxSize": max_size,
+                },
             )
 
     def _resolve_content_type(uploaded_file) -> str:
         raw_content_type = (getattr(uploaded_file, "content_type", "") or "").strip().lower()
         guessed_content_type, _ = mimetypes.guess_type(getattr(uploaded_file, "name", "") or "")
         if raw_content_type and raw_content_type != "application/octet-stream":
-            return raw_content_type
+            return _canonical_content_type(raw_content_type)
         if guessed_content_type:
-            return guessed_content_type.lower()
+            return _canonical_content_type(guessed_content_type.lower())
         if raw_content_type:
-            return raw_content_type
+            return _canonical_content_type(raw_content_type)
         return "application/octet-stream"
+
+    resolved_files = []
+    for f in files:
+        resolved_content_type = _resolve_content_type(f)
+        if allowed_types and resolved_content_type not in allowed_types:
+            return _error_response(
+                f"Тип файла '{resolved_content_type}' не поддерживается",
+                code="unsupported_type",
+                details={
+                    "fileName": getattr(f, "name", "file"),
+                    "contentType": resolved_content_type,
+                    "allowedTypes": sorted(allowed_types),
+                },
+            )
+        resolved_files.append((f, resolved_content_type))
 
     message_content = request.data.get("messageContent", "")
     if not isinstance(message_content, str):
@@ -728,9 +805,17 @@ def upload_attachments(request, room_slug):
         try:
             reply_to_id = _parse_positive_int(str(reply_to_raw), "replyTo")
         except ValueError as exc:
-            return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+            return _error_response(
+                str(exc),
+                code="invalid_reply_to",
+                details={"replyTo": reply_to_raw},
+            )
         if not Message.objects.filter(pk=reply_to_id, room=room, is_deleted=False).exists():
-            return Response({"error": "Сообщение для ответа не найдено"}, status=http_status.HTTP_400_BAD_REQUEST)
+            return _error_response(
+                "Сообщение для ответа не найдено",
+                code="invalid_reply_to",
+                details={"replyTo": reply_to_id},
+            )
 
     user = request.user
     profile = getattr(user, "profile", None)
@@ -751,12 +836,12 @@ def upload_attachments(request, room_slug):
     from messages.thumbnail import generate_thumbnail
 
     attachments_data = []
-    for f in files:
+    for f, resolved_content_type in resolved_files:
         attachment = MessageAttachment.objects.create(
             message=msg,
             file=f,
             original_filename=f.name or "file",
-            content_type=_resolve_content_type(f),
+            content_type=resolved_content_type,
             file_size=f.size,
         )
 
@@ -790,8 +875,6 @@ def upload_attachments(request, room_slug):
         "content": message_content,
         "attachments": attachments_data,
     }, status=http_status.HTTP_201_CREATED)
-
-
 # ── Message Search ────────────────────────────────────────────────────
 
 @api_view(["GET"])
@@ -1071,3 +1154,4 @@ def mark_read_view(request, room_slug):
 def unread_counts(request):
     items = get_unread_counts(request.user)
     return Response({"items": items})
+
