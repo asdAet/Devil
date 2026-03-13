@@ -36,8 +36,15 @@ function AppInner() {
   useEffect(() => {
     const root = document.documentElement;
     const updateViewportVars = () => {
-      root.style.setProperty("--app-height", `${window.innerHeight}px`);
-      root.style.setProperty("--app-width", `${window.innerWidth}px`);
+      const visualViewport = window.visualViewport;
+      const viewportHeight = Math.round(
+        visualViewport?.height ?? window.innerHeight,
+      );
+      const viewportWidth = Math.round(
+        visualViewport?.width ?? window.innerWidth,
+      );
+      root.style.setProperty("--app-height", `${viewportHeight}px`);
+      root.style.setProperty("--app-width", `${viewportWidth}px`);
     };
 
     updateViewportVars();
@@ -46,11 +53,13 @@ function AppInner() {
       passive: true,
     });
     window.visualViewport?.addEventListener("resize", updateViewportVars);
+    window.visualViewport?.addEventListener("scroll", updateViewportVars);
 
     return () => {
       window.removeEventListener("resize", updateViewportVars);
       window.removeEventListener("orientationchange", updateViewportVars);
       window.visualViewport?.removeEventListener("resize", updateViewportVars);
+      window.visualViewport?.removeEventListener("scroll", updateViewportVars);
     };
   }, []);
 

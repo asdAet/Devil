@@ -69,11 +69,12 @@ def _serialize_user(request, user):
 
     last_seen = getattr(profile, "last_seen", None)
     public_username = normalize_public_username(getattr(profile, "username", None)) or None
+    effective_username = user_public_username(user)
 
     return {
         "id": user.pk,
         "name": (getattr(profile, "name", "") or "").strip(),
-        "username": public_username,
+        "username": effective_username,
         "publicUsername": public_username,
         "email": _resolve_email(user),
         "profileImage": profile_image,

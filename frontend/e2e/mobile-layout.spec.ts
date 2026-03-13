@@ -1,4 +1,4 @@
-﻿import { expect, test, type Page } from "@playwright/test";
+﻿import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const hasNoHorizontalOverflow = async (page: Page) =>
   page.evaluate(() => {
@@ -6,23 +6,41 @@ const hasNoHorizontalOverflow = async (page: Page) =>
     return doc.scrollWidth <= window.innerWidth + 1;
   });
 
+const isElementInViewport = async (locator: Locator) =>
+  locator.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.bottom <= window.innerHeight && rect.top >= 0;
+  });
+
 async function register(page: Page, username: string, password: string) {
   const email = `${username}@e2e.local`;
-  await page.goto("/register");
-  await page.getByTestId("auth-email-input").fill(email);
-  await page.getByTestId("auth-password-input").fill(password);
-  await page.getByTestId("auth-confirm-input").fill(password);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await page.goto("/register");
+    await page.getByTestId("auth-email-input").fill(email);
+    await page.getByTestId("auth-password-input").fill(password);
+    await page.getByTestId("auth-confirm-input").fill(password);
 
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes("/api/auth/register/") &&
-        response.request().method() === "POST",
-    ),
-    page.getByTestId("auth-submit-button").click(),
-  ]);
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes("/api/auth/register/") &&
+          res.request().method() === "POST",
+      ),
+      page.getByTestId("auth-submit-button").click(),
+    ]);
 
-  await expect(page).toHaveURL("/");
+    if (response.status() === 201) {
+      await expect(page).toHaveURL("/");
+      return;
+    }
+
+    if (response.status() === 429 && attempt < 3) {
+      await page.waitForTimeout(1_500 * (attempt + 1));
+      continue;
+    }
+
+    throw new Error(`Registration failed with status ${response.status()}`);
+  }
 }
 
 test("core routes have no horizontal overflow", async ({ page }) => {
@@ -64,7 +82,14 @@ test("mobile shell switches between list and chat without clipping", async ({
   const searchInput = page.locator("aside input[aria-label]").first();
   if (isNarrowViewport) {
     await expect(searchInput).toBeHidden();
-    await page.getByRole("button", { name: /Назад|Back/i }).click();
+    const backButton = page
+      .locator('button[aria-label]')
+      .filter({
+        has: page.locator('polyline[points="15 18 9 12 15 6"]'),
+      })
+      .first();
+    await expect(backButton).toBeVisible();
+    await backButton.click();
     await expect(page).toHaveURL("/");
     await expect(searchInput).toBeVisible();
   } else {
@@ -73,4 +98,60 @@ test("mobile shell switches between list and chat without clipping", async ({
   }
 
   await expect.poll(async () => hasNoHorizontalOverflow(page)).toBeTruthy();
+});
+
+test("mobile chat keeps input visible and opens own message actions on tap", async ({
+  page,
+}) => {
+  const username = `k${Math.random().toString(36).slice(2, 9)}`;
+  const password = "pass12345";
+
+  await register(page, username, password);
+  await page.goto("/rooms/public");
+  await page.waitForLoadState("networkidle");
+
+  const chatInput = page.getByTestId("chat-message-input");
+  const sendButton = page.getByTestId("chat-send-button");
+  const chatLog = page.locator('[aria-live="polite"]').first();
+
+  await expect(chatInput).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => isElementInViewport(chatInput)).toBeTruthy();
+
+  const ownMessageText = `mobile viewport stability ${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  await chatInput.fill(ownMessageText);
+  await expect(sendButton).toBeEnabled({ timeout: 15_000 });
+  await sendButton.click();
+  await expect.poll(async () => chatInput.inputValue()).toBe("");
+
+  const ownMessage = page
+    .locator("article")
+    .filter({ has: page.getByText(ownMessageText) })
+    .last();
+  await expect(ownMessage).toBeVisible({ timeout: 20_000 });
+
+  await chatLog.evaluate((el) => {
+    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+  });
+  await expect.poll(async () => isElementInViewport(chatInput)).toBeTruthy();
+
+  await chatInput.fill("keyboard visible draft");
+  const originalViewport = page.viewportSize();
+  await chatInput.focus();
+  if (originalViewport) {
+    await page.setViewportSize({
+      width: originalViewport.width,
+      height: Math.max(420, originalViewport.height - 220),
+    });
+    await expect.poll(async () => isElementInViewport(chatInput)).toBeTruthy();
+    await expect(chatInput).toHaveValue("keyboard visible draft");
+    await page.setViewportSize(originalViewport);
+  }
+  await expect.poll(async () => isElementInViewport(chatInput)).toBeTruthy();
+
+  await ownMessage.tap();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveCount(5);
 });
