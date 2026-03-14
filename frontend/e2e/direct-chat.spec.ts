@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const RETRYABLE_AUTH_STATUSES = new Set([429, 500, 502, 503, 504]);
+import { registerWithRetry } from "./helpers/auth";
 
 function randomLetters(length: number): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz";
@@ -11,60 +11,33 @@ function randomLetters(length: number): string {
   return result;
 }
 
-async function submitAuthRequestWithRetry(
+async function registerAndSetUsername(
   page: Page,
-  endpointPath: string,
-  action: string,
+  username: string,
+  password: string,
 ) {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const responsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(endpointPath) &&
-        response.request().method() === "POST",
-    );
-    await page.getByTestId("auth-submit-button").click();
-    const response = await responsePromise;
-
-    if (response.ok()) {
-      return response;
-    }
-
-    if (
-      !RETRYABLE_AUTH_STATUSES.has(response.status()) ||
-      attempt === 3
-    ) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`${action} failed: ${response.status()} ${body}`);
-    }
-
-    await page.waitForTimeout(250 * attempt);
-  }
-}
-
-async function registerAndSetUsername(page: Page, username: string, password: string) {
   const email = `${username}@e2e.local`;
 
-  await page.goto("/register");
-  await page.getByTestId("auth-email-input").fill(email);
-  await page.getByTestId("auth-password-input").fill(password);
-  await page.getByTestId("auth-confirm-input").fill(password);
-  await submitAuthRequestWithRetry(page, "/api/auth/register/", "register");
-
-  await expect(page).toHaveURL("/");
+  await registerWithRetry(page, email, password);
 
   await page.goto("/profile");
-  await expect(page.getByTestId("profile-username-input")).toBeVisible();
+  await expect(page.getByTestId("profile-username-input")).toBeVisible({
+    timeout: 15_000,
+  });
   await page.getByTestId("profile-username-input").fill(username);
   const profileUpdateResponsePromise = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/auth/profile/") &&
-      response.request().method() === "POST",
+      (response.url().includes("/api/profile/handle/") ||
+        response.url().includes("/api/profile/")) &&
+      response.request().method() === "PATCH",
   );
   await page.getByTestId("profile-save-button").click();
   const profileUpdateResponse = await profileUpdateResponsePromise;
   if (!profileUpdateResponse.ok()) {
     const body = await profileUpdateResponse.text().catch(() => "");
-    throw new Error(`profile update failed: ${profileUpdateResponse.status()} ${body}`);
+    throw new Error(
+      `profile update failed: ${profileUpdateResponse.status()} ${body}`,
+    );
   }
   await expect(page).toHaveURL(`/users/${encodeURIComponent(username)}`);
 }
@@ -84,8 +57,8 @@ test("direct chat by username opens and delivers messages between users", async 
   const bobPage = await bobContext.newPage();
   await registerAndSetUsername(bobPage, bob, password);
 
-  await bobPage.goto(`/@${encodeURIComponent(alice)}`);
-  await expect(bobPage).toHaveURL(`/@${encodeURIComponent(alice)}`);
+  await bobPage.goto(`/direct/${encodeURIComponent(alice)}`);
+  await expect(bobPage).toHaveURL(`/direct/${encodeURIComponent(alice)}`);
 
   const input = bobPage.getByTestId("chat-message-input");
   await expect(input).toBeVisible({ timeout: 30_000 });
@@ -95,7 +68,7 @@ test("direct chat by username opens and delivers messages between users", async 
     bobPage.getByRole("article").filter({ hasText: text }).first(),
   ).toBeVisible({ timeout: 15_000 });
 
-  await page.goto(`/@${encodeURIComponent(bob)}`);
+  await page.goto(`/direct/${encodeURIComponent(bob)}`);
   await expect(page.getByTestId("chat-message-input")).toBeVisible({
     timeout: 30_000,
   });

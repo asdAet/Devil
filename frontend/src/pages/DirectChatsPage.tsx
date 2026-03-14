@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo } from "react";
 
 import type { UserProfile } from "../entities/user/types";
+import { buildDirectPath } from "../shared/lib/publicRef";
 import { formatTimestamp } from "../shared/lib/format";
 import { useDirectInbox } from "../shared/directInbox";
 import { usePresence } from "../shared/presence";
@@ -93,13 +94,11 @@ export function DirectChatsList({
                   .filter(Boolean)
                   .join(" ")}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() =>
-                  onNavigate(`/@${encodeURIComponent(item.peer.username)}`)
-                }
+                onClick={() => onNavigate(buildDirectPath(item.peer.username))}
                 type="button"
               >
                 <Avatar
-                  username={item.peer.username}
+                  username={item.peer.displayName ?? item.peer.username}
                   profileImage={item.peer.profileImage}
                   avatarCrop={item.peer.avatarCrop}
                   size="tiny"
@@ -109,9 +108,9 @@ export function DirectChatsList({
                   <div className={styles.itemHead}>
                     <strong
                       className={styles.itemName}
-                      title={item.peer.username}
+                      title={item.peer.displayName ?? item.peer.username}
                     >
-                      {item.peer.username}
+                      {item.peer.displayName ?? item.peer.username}
                     </strong>
                     <div className={styles.itemMeta}>
                       <span className={styles.time}>

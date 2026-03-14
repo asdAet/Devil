@@ -2,6 +2,8 @@
 
 from rest_framework import serializers
 
+from users.identity import user_public_username
+
 
 # ── Group ──────────────────────────────────────────────────────────────
 
@@ -27,11 +29,13 @@ class GroupUpdateInputSerializer(serializers.Serializer):
 
 
 class GroupOutputSerializer(serializers.Serializer):
-    slug = serializers.CharField()
+    roomId = serializers.IntegerField()
     name = serializers.CharField()
     description = serializers.CharField()
     isPublic = serializers.BooleanField()
     username = serializers.CharField(allow_null=True)
+    publicId = serializers.CharField()
+    publicRef = serializers.CharField()
     memberCount = serializers.IntegerField()
     slowModeSeconds = serializers.IntegerField()
     joinApprovalRequired = serializers.BooleanField()
@@ -41,10 +45,12 @@ class GroupOutputSerializer(serializers.Serializer):
 
 
 class GroupListItemSerializer(serializers.Serializer):
-    slug = serializers.CharField()
+    roomId = serializers.IntegerField()
     name = serializers.CharField()
     description = serializers.CharField()
     username = serializers.CharField(allow_null=True)
+    publicId = serializers.CharField()
+    publicRef = serializers.CharField()
     memberCount = serializers.IntegerField()
     avatarUrl = serializers.CharField(allow_null=True)
     avatarCrop = serializers.DictField(allow_null=True)
@@ -70,12 +76,13 @@ class InviteOutputSerializer(serializers.Serializer):
     createdAt = serializers.DateTimeField(source="created_at")
 
     def get_createdBy(self, obj):
-        return obj.created_by.username if obj.created_by else None
+        return user_public_username(obj.created_by) if obj.created_by else None
 
 
 class InvitePreviewSerializer(serializers.Serializer):
     code = serializers.CharField()
-    groupSlug = serializers.CharField()
+    groupId = serializers.IntegerField(required=False)
+    groupPublicRef = serializers.CharField(required=False)
     groupName = serializers.CharField()
     groupDescription = serializers.CharField()
     memberCount = serializers.IntegerField()

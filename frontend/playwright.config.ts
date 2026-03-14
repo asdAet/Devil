@@ -19,10 +19,14 @@ export default defineConfig({
       cwd: '../backend',
       env: {
         ...process.env,
-        AUTH_RATE_LIMIT: '200',
-        WS_CONNECT_RATE_LIMIT: '1000',
+        AUTH_RATE_LIMIT: '10000',
+        AUTH_RATE_WINDOW: '60',
+        WS_CONNECT_RATE_LIMIT: '10000',
+        WS_CONNECT_RATE_LIMIT_PRESENCE: '10000',
+        WS_CONNECT_RATE_LIMIT_DISABLED: '1',
       },
-      reuseExistingServer: !process.env.CI,
+      // Always restart backend for e2e to guarantee deterministic env/rate-limit settings.
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {

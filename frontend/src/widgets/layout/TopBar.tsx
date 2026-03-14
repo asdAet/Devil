@@ -1,6 +1,7 @@
-import type { UserProfile } from "../../entities/user/types";
+﻿import type { UserProfile } from "../../entities/user/types";
 import { useDirectInbox } from "../../shared/directInbox";
 import { usePresence } from "../../shared/presence";
+import { buildUserProfilePath } from "../../shared/lib/publicRef";
 import { Avatar, Button } from "../../shared/ui";
 import styles from "./TopBar.module.css";
 
@@ -10,18 +11,15 @@ type Props = {
   onLogout: () => void;
 };
 
-/**
- * Верхняя панель навигации приложения.
- * @param props Текущий пользователь и обработчики навигации.
- * @returns JSX-разметка верхней панели.
- */
 export function TopBar({ user, onNavigate }: Props) {
   const { unreadDialogsCount } = useDirectInbox();
   const { online: presenceOnline, status: presenceStatus } = usePresence();
+  const profileRef = (user?.publicRef || user?.username || "").trim();
   const isCurrentUserOnline =
     Boolean(user) &&
+    Boolean(profileRef) &&
     presenceStatus === "online" &&
-    presenceOnline.some((entry) => entry.username === user?.username);
+    presenceOnline.some((entry) => entry.username === profileRef);
 
   return (
     <header className={styles.root} data-testid="topbar">
@@ -63,13 +61,11 @@ export function TopBar({ user, onNavigate }: Props) {
           </Button>
         )}
 
-        {user && (
+        {user && profileRef && (
           <Button
             variant="link"
             className={styles.navLink}
-            onClick={() =>
-              onNavigate(`/users/${encodeURIComponent(user.username)}`)
-            }
+            onClick={() => onNavigate(buildUserProfilePath(profileRef))}
           >
             Профиль
           </Button>
@@ -82,12 +78,12 @@ export function TopBar({ user, onNavigate }: Props) {
             className={styles.avatarLink}
             aria-label="Открыть профиль"
             onClick={() =>
-              onNavigate(`/users/${encodeURIComponent(user.username)}`)
+              onNavigate(profileRef ? buildUserProfilePath(profileRef) : "/profile")
             }
             type="button"
           >
             <Avatar
-              username={user.username}
+              username={user.name || profileRef || "user"}
               profileImage={user.profileImage}
               avatarCrop={user.avatarCrop}
               size="tiny"

@@ -87,14 +87,18 @@ function ReplyQuote({
         className={[styles.replyQuote, styles.replyQuoteClickable].join(" ")}
         onClick={onClick}
       >
-        <span className={styles.replyUser}>{replyTo.username ?? "?"}</span>
+        <span className={styles.replyUser}>
+          {replyTo.displayName ?? replyTo.username ?? "?"}
+        </span>
         <span className={styles.replyText}>{replyTo.content}</span>
       </button>
     );
   }
   return (
     <div className={styles.replyQuote}>
-      <span className={styles.replyUser}>{replyTo.username ?? "?"}</span>
+      <span className={styles.replyUser}>
+        {replyTo.displayName ?? replyTo.username ?? "?"}
+      </span>
       <span className={styles.replyText}>{replyTo.content}</span>
     </div>
   );
@@ -318,27 +322,29 @@ export function MessageBubble({
 
   const contextMenuItems: ContextMenuItem[] = [];
   if (!message.isDeleted) {
-    if (onReply) {
-      contextMenuItems.push({
-        label: "Ответить",
-        icon: (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <polyline points="9 17 4 12 9 7" />
-            <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-          </svg>
-        ),
-        onClick: () => onReply(message),
-      });
-    }
-    if (message.content) {
+    const messageText = message.content.trim();
+
+    contextMenuItems.push({
+      label: "Ответить",
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <polyline points="9 17 4 12 9 7" />
+          <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+        </svg>
+      ),
+      disabled: !onReply,
+      onClick: () => onReply?.(message),
+    });
+
+    if (messageText.length > 0) {
       contextMenuItems.push({
         label: "Копировать текст",
         icon: (
@@ -355,17 +361,21 @@ export function MessageBubble({
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
         ),
-        onClick: () => void navigator.clipboard.writeText(message.content),
+        onClick: () => void navigator.clipboard.writeText(messageText),
       });
     }
-    if (onReact) {
-      contextMenuItems.push({
-        label: "Реакция",
-        icon: <span style={{ fontSize: 14 }}>{"\u{1F44D}"}</span>,
-        onClick: () => setEmojiPickerOpen(true),
-      });
-    }
-    if (!isOwn && onAvatarClick) {
+
+    contextMenuItems.push({
+      label: "Реакция",
+      icon: <span style={{ fontSize: 14 }}>{"\u{1F44D}"}</span>,
+      disabled: !onReact,
+      onClick: () => {
+        if (!onReact) return;
+        setEmojiPickerOpen(true);
+      },
+    });
+
+    if (!isOwn) {
       contextMenuItems.push({
         label: "Профиль",
         icon: (
@@ -382,10 +392,12 @@ export function MessageBubble({
             <circle cx="12" cy="7" r="4" />
           </svg>
         ),
-        onClick: () => onAvatarClick(message.username),
+        disabled: !onAvatarClick,
+        onClick: () => onAvatarClick?.(message.username),
       });
     }
-    if (isOwn && onEdit) {
+
+    if (isOwn) {
       contextMenuItems.push({
         label: "Редактировать",
         icon: (
@@ -402,10 +414,10 @@ export function MessageBubble({
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         ),
-        onClick: () => onEdit(message),
+        disabled: !onEdit,
+        onClick: () => onEdit?.(message),
       });
-    }
-    if (isOwn && onDelete) {
+
       contextMenuItems.push({
         label: "Удалить",
         icon: (
@@ -423,11 +435,11 @@ export function MessageBubble({
           </svg>
         ),
         danger: true,
-        onClick: () => onDelete(message),
+        disabled: !onDelete,
+        onClick: () => onDelete?.(message),
       });
     }
   }
-
   const isDeleted = message.isDeleted;
 
   return (
@@ -453,10 +465,10 @@ export function MessageBubble({
           type="button"
           className={styles.avatarBtn}
           onClick={() => onAvatarClick?.(message.username)}
-          aria-label={`Профиль ${message.username}`}
+          aria-label={`Профиль ${message.displayName ?? message.username}`}
         >
           <Avatar
-            username={message.username}
+            username={message.displayName ?? message.username}
             profileImage={message.profilePic}
             avatarCrop={message.avatarCrop}
             size="small"
@@ -478,7 +490,9 @@ export function MessageBubble({
 
           <div className={styles.bubble}>
             <div className={styles.meta}>
-              <span className={styles.username}>{message.username}</span>
+              <span className={styles.username}>
+                {message.displayName ?? message.username}
+              </span>
             </div>
 
             {isDeleted ? (
@@ -531,14 +545,52 @@ export function MessageBubble({
                       />
                     );
                   }
+                  const contentTypeLabel =
+                    att.contentType && att.contentType !== "application/octet-stream"
+                      ? att.contentType
+                      : "неизвестный тип";
+                  const fileMeta = `${formatFileSize(att.fileSize)} • ${contentTypeLabel}`;
+
+                  if (att.url) {
+                    return (
+                      <a
+                        key={att.id}
+                        href={att.url}
+                        className={styles.attachFile}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={att.originalFilename}
+                      >
+                        <span className={styles.attachFileIcon}>
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        </span>
+                        <span className={styles.attachFileInfo}>
+                          <span className={styles.attachFileName}>
+                            {att.originalFilename}
+                          </span>
+                          <span className={styles.attachFileSize}>{fileMeta}</span>
+                        </span>
+                      </a>
+                    );
+                  }
+
                   return (
-                    <a
+                    <div
                       key={att.id}
-                      href={att.url ?? "#"}
                       className={styles.attachFile}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download={att.originalFilename}
+                      data-message-menu-ignore="true"
                     >
                       <span className={styles.attachFileIcon}>
                         <svg
@@ -559,11 +611,9 @@ export function MessageBubble({
                         <span className={styles.attachFileName}>
                           {att.originalFilename}
                         </span>
-                        <span className={styles.attachFileSize}>
-                          {formatFileSize(att.fileSize)}
-                        </span>
+                        <span className={styles.attachFileSize}>{fileMeta}</span>
                       </span>
-                    </a>
+                    </div>
                   );
                 })}
               </div>
@@ -616,3 +666,4 @@ export function MessageBubble({
     </>
   );
 }
+

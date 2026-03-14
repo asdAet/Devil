@@ -108,13 +108,19 @@ export const useAuth = () => {
     return session;
   }, []);
 
-  const loginWithGoogle = useCallback(async (accessToken: string) => {
-    await authController.ensureCsrf();
-    const session = await authController.oauthGoogle(accessToken);
-    setAuth({ user: session.user, loading: false });
-    clearAllUserCaches();
-    return session;
-  }, []);
+  const loginWithGoogle = useCallback(
+    async (
+      token: string,
+      tokenType: "idToken" | "accessToken" = "idToken",
+    ) => {
+      await authController.ensureCsrf();
+      const session = await authController.oauthGoogle(token, tokenType);
+      setAuth({ user: session.user, loading: false });
+      clearAllUserCaches();
+      return session;
+    },
+    [],
+  );
 
   const register = useCallback(async (dto: RegisterDto) => {
     await authController.ensureCsrf();
@@ -210,3 +216,4 @@ export const useAuth = () => {
     updateProfile,
   };
 };
+

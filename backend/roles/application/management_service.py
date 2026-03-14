@@ -25,6 +25,7 @@ from roles.infrastructure import repositories
 from roles.models import Membership, PermissionOverride, Role
 from roles.permissions import Perm
 from rooms.models import Room
+from users.identity import user_public_username
 
 
 @dataclass(frozen=True)
@@ -38,15 +39,15 @@ def _audit_role_denied(room: Room | None, actor, reason: str) -> None:
         "role.manage.denied",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=bool(getattr(actor, "is_authenticated", False)),
-        room_slug=getattr(room, "slug", None),
+        room_id=getattr(room, "pk", None),
         reason=reason,
     )
 
 
-def _load_room_or_raise(room_slug: str) -> Room:
-    room = repositories.get_room_by_slug(room_slug)
+def _load_room_or_raise(room_id: int) -> Room:
+    room = repositories.get_room_by_id(room_id)
     if not room:
         raise RoleNotFoundError("Комната не найдена")
     return room
@@ -140,28 +141,28 @@ def _ensure_manage_member(actor_context: ActorContext, membership: Membership) -
     _ensure_manage_target_position(actor_context, target_position=target_top_position)
 
 
-def actor_can_manage_roles(room_slug: str, actor) -> bool:
-    room = repositories.get_room_by_slug(room_slug)
+def actor_can_manage_roles(room_id: int, actor) -> bool:
+    room = repositories.get_room_by_id(room_id)
     if not room or room.kind == Room.Kind.DIRECT:
         return False
     return can_manage_roles(room, actor)
 
 
-def _room_actor_context_or_raise(room_slug: str, actor) -> RoomActorContext:
+def _room_actor_context_or_raise(room_id: int, actor) -> RoomActorContext:
     _ensure_authenticated(actor)
-    room = _load_room_or_raise(room_slug)
+    room = _load_room_or_raise(room_id)
     _ensure_not_direct(room)
     actor_context = _ensure_manage_roles(room, actor)
     return RoomActorContext(room=room, actor_context=actor_context)
 
 
-def list_room_roles(room_slug: str, actor):
-    context = _room_actor_context_or_raise(room_slug, actor)
+def list_room_roles(room_id: int, actor):
+    context = _room_actor_context_or_raise(room_id, actor)
     return list(repositories.list_roles(context.room))
 
 
 def create_room_role(
-    room_slug: str,
+    room_id: int,
     actor,
     *,
     name: str,
@@ -169,7 +170,7 @@ def create_room_role(
     position: int,
     permissions: int,
 ) -> Role:
-    context = _room_actor_context_or_raise(room_slug, actor)
+    context = _room_actor_context_or_raise(room_id, actor)
     _ensure_manage_target_position(context.actor_context, target_position=int(position))
     _ensure_permissions_subset(context.actor_context, candidate_permissions=int(permissions))
 
@@ -190,9 +191,9 @@ def create_room_role(
         "role.manage.created",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=context.room.slug,
+        room_id=context.room.pk,
         role_id=_obj_pk(role, field_name="role"),
         role_name=role.name,
         position=role.position,
@@ -202,7 +203,7 @@ def create_room_role(
 
 
 def update_room_role(
-    room_slug: str,
+    room_id: int,
     role_id: int,
     actor,
     *,
@@ -211,7 +212,7 @@ def update_room_role(
     position: int | None = None,
     permissions: int | None = None,
 ) -> Role:
-    context = _room_actor_context_or_raise(room_slug, actor)
+    context = _room_actor_context_or_raise(room_id, actor)
     role = repositories.get_role(context.room, int(role_id))
     if not role:
         raise RoleNotFoundError("Роль не найдена")
@@ -250,17 +251,17 @@ def update_room_role(
             "role.manage.updated",
             actor_user=actor,
             actor_user_id=getattr(actor, "pk", None),
-            actor_username=getattr(actor, "username", None),
+            actor_username=user_public_username(actor),
             is_authenticated=True,
-            room_slug=context.room.slug,
+            room_id=context.room.pk,
             role_id=_obj_pk(role, field_name="role"),
             changed_fields=changed_fields,
         )
     return role
 
 
-def delete_room_role(room_slug: str, role_id: int, actor) -> None:
-    context = _room_actor_context_or_raise(room_slug, actor)
+def delete_room_role(room_id: int, role_id: int, actor) -> None:
+    context = _room_actor_context_or_raise(room_id, actor)
     role = repositories.get_role(context.room, int(role_id))
     if not role:
         raise RoleNotFoundError("Роль не найдена")
@@ -277,16 +278,16 @@ def delete_room_role(room_slug: str, role_id: int, actor) -> None:
         "role.manage.deleted",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=context.room.slug,
+        room_id=context.room.pk,
         role_id=role_id_value,
         role_name=role_name_value,
     )
 
 
-def get_member_roles(room_slug: str, user_id: int, actor) -> Membership:
-    context = _room_actor_context_or_raise(room_slug, actor)
+def get_member_roles(room_id: int, user_id: int, actor) -> Membership:
+    context = _room_actor_context_or_raise(room_id, actor)
     membership = repositories.get_membership_by_user_id(context.room, int(user_id))
     if not membership:
         raise RoleNotFoundError("Запись участия не найдена")
@@ -294,8 +295,8 @@ def get_member_roles(room_slug: str, user_id: int, actor) -> Membership:
     return membership
 
 
-def set_member_roles(room_slug: str, user_id: int, actor, role_ids: list[int]) -> Membership:
-    context = _room_actor_context_or_raise(room_slug, actor)
+def set_member_roles(room_id: int, user_id: int, actor, role_ids: list[int]) -> Membership:
+    context = _room_actor_context_or_raise(room_id, actor)
     membership = repositories.get_membership_by_user_id(context.room, int(user_id))
     if not membership:
         raise RoleNotFoundError("Запись участия не найдена")
@@ -325,17 +326,17 @@ def set_member_roles(room_slug: str, user_id: int, actor, role_ids: list[int]) -
         "membership.roles.updated",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=context.room.slug,
+        room_id=context.room.pk,
         target_user_id=_membership_user_id(membership),
         role_ids=normalized_role_ids,
     )
     return membership
 
 
-def list_room_overrides(room_slug: str, actor):
-    context = _room_actor_context_or_raise(room_slug, actor)
+def list_room_overrides(room_id: int, actor):
+    context = _room_actor_context_or_raise(room_id, actor)
     return list(repositories.list_overrides(context.room).select_related("target_role", "target_user"))
 
 
@@ -367,7 +368,7 @@ def _resolve_override_target(
 
 
 def create_room_override(
-    room_slug: str,
+    room_id: int,
     actor,
     *,
     target_role_id: int | None,
@@ -375,7 +376,7 @@ def create_room_override(
     allow: int,
     deny: int,
 ) -> PermissionOverride:
-    context = _room_actor_context_or_raise(room_slug, actor)
+    context = _room_actor_context_or_raise(room_id, actor)
     target_role, target_membership = _resolve_override_target(
         room=context.room,
         actor_context=context.actor_context,
@@ -401,9 +402,9 @@ def create_room_override(
         "override.created",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=context.room.slug,
+        room_id=context.room.pk,
         override_id=_obj_pk(override, field_name="override"),
         target_role_id=override_target_role_id,
         target_user_id=override_target_user_id,
@@ -414,14 +415,14 @@ def create_room_override(
 
 
 def update_room_override(
-    room_slug: str,
+    room_id: int,
     override_id: int,
     actor,
     *,
     allow: int | None = None,
     deny: int | None = None,
 ) -> PermissionOverride:
-    context = _room_actor_context_or_raise(room_slug, actor)
+    context = _room_actor_context_or_raise(room_id, actor)
     override = repositories.get_override(context.room, int(override_id))
     if not override:
         raise RoleNotFoundError("Переопределение не найдено")
@@ -456,17 +457,17 @@ def update_room_override(
             "override.updated",
             actor_user=actor,
             actor_user_id=getattr(actor, "pk", None),
-            actor_username=getattr(actor, "username", None),
+            actor_username=user_public_username(actor),
             is_authenticated=True,
-            room_slug=context.room.slug,
+            room_id=context.room.pk,
             override_id=_obj_pk(override, field_name="override"),
             changed_fields=changed_fields,
         )
     return override
 
 
-def delete_room_override(room_slug: str, override_id: int, actor) -> None:
-    context = _room_actor_context_or_raise(room_slug, actor)
+def delete_room_override(room_id: int, override_id: int, actor) -> None:
+    context = _room_actor_context_or_raise(room_id, actor)
     override = repositories.get_override(context.room, int(override_id))
     if not override:
         raise RoleNotFoundError("Переопределение не найдено")
@@ -490,16 +491,16 @@ def delete_room_override(room_slug: str, override_id: int, actor) -> None:
         "override.deleted",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=context.room.slug,
+        room_id=context.room.pk,
         override_id=override_id_value,
     )
 
 
-def permissions_for_me(room_slug: str, actor) -> dict[str, object]:
+def permissions_for_me(room_id: int, actor) -> dict[str, object]:
     _ensure_authenticated(actor)
-    room = _load_room_or_raise(room_slug)
+    room = _load_room_or_raise(room_id)
     if room.kind in {Room.Kind.PRIVATE, Room.Kind.DIRECT} and not can_read(room, actor):
         raise RoleNotFoundError("Комната не найдена")
 
@@ -516,7 +517,7 @@ def permissions_for_me(room_slug: str, actor) -> dict[str, object]:
     effective = compute_permissions(room, actor)
     granted_flags = [perm.name for perm in Perm if perm and (effective & perm)]
     return {
-        "roomSlug": room.slug,
+        "roomId": room.pk,
         "kind": room.kind,
         "permissions": int(effective),
         "isMember": is_member,
@@ -529,3 +530,6 @@ def permissions_for_me(room_slug: str, actor) -> dict[str, object]:
             "manageRoles": bool(effective & Perm.MANAGE_ROLES),
         },
     }
+
+
+

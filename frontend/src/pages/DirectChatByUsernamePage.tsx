@@ -10,34 +10,25 @@ import { ChatRoomPage } from "./ChatRoomPage";
 
 type Props = {
   user: UserProfile | null;
-  username: string;
+  publicRef: string;
   onNavigate: (path: string) => void;
 };
 
 type DirectChatState = {
   key: string;
-  slug: string | null;
+  roomRef: string | null;
   error: string | null;
 };
 
-/**
- * Страница открытия direct-чата по username.
- * @param props Данные текущего пользователя, собеседника и навигации.
- * @returns JSX-контент direct-чата или состояния загрузки/ошибки.
- */
-export function DirectChatByUsernamePage({
-  user,
-  username,
-  onNavigate,
-}: Props) {
+export function DirectChatByUsernamePage({ user, publicRef, onNavigate }: Props) {
   const requestKey = useMemo(
-    () => (user ? `${user.username}:${username}` : "guest"),
-    [user, username],
+    () => (user ? `${user.username}:${publicRef}` : "guest"),
+    [publicRef, user],
   );
 
   const [state, setState] = useState<DirectChatState>(() => ({
     key: "guest",
-    slug: null,
+    roomRef: null,
     error: null,
   }));
 
@@ -46,19 +37,24 @@ export function DirectChatByUsernamePage({
     let active = true;
 
     chatController
-      .startDirectChat(username)
+      .startDirectChat(publicRef)
       .then((payload) => {
         if (!active) return;
-        setState({ key: requestKey, slug: payload.slug, error: null });
+        setState({
+          key: requestKey,
+          roomRef: String(payload.roomId),
+          error: null,
+        });
       })
       .catch((err) => {
         if (!active) return;
         debugLog("Direct start failed", err);
         const apiErr = err as ApiError;
+
         if (apiErr.status === 404) {
           setState({
             key: requestKey,
-            slug: null,
+            roomRef: null,
             error: "Пользователь не найден",
           });
           return;
@@ -66,18 +62,23 @@ export function DirectChatByUsernamePage({
         if (apiErr.status === 400) {
           setState({
             key: requestKey,
-            slug: null,
+            roomRef: null,
             error: "Нельзя открыть диалог с этим пользователем",
           });
           return;
         }
         if (apiErr.status === 401) {
-          setState({ key: requestKey, slug: null, error: "Нужна авторизация" });
+          setState({
+            key: requestKey,
+            roomRef: null,
+            error: "Нужна авторизация",
+          });
           return;
         }
+
         setState({
           key: requestKey,
-          slug: null,
+          roomRef: null,
           error: "Не удалось открыть личный чат",
         });
       });
@@ -85,7 +86,7 @@ export function DirectChatByUsernamePage({
     return () => {
       active = false;
     };
-  }, [requestKey, user, username]);
+  }, [publicRef, requestKey, user]);
 
   if (!user) {
     return (
@@ -106,7 +107,7 @@ export function DirectChatByUsernamePage({
   const isCurrent = state.key === requestKey;
   const loading = !isCurrent;
   const error = isCurrent ? state.error : null;
-  const slug = isCurrent ? state.slug : null;
+  const roomRef = isCurrent ? state.roomRef : null;
 
   if (loading) {
     return (
@@ -129,7 +130,7 @@ export function DirectChatByUsernamePage({
     );
   }
 
-  if (!slug) {
+  if (!roomRef) {
     return (
       <Panel>
         <p>Диалог недоступен.</p>
@@ -137,5 +138,5 @@ export function DirectChatByUsernamePage({
     );
   }
 
-  return <ChatRoomPage slug={slug} user={user} onNavigate={onNavigate} />;
+  return <ChatRoomPage slug={roomRef} user={user} onNavigate={onNavigate} />;
 }

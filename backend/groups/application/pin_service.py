@@ -1,4 +1,4 @@
-"""Pinned message management for groups."""
+﻿"""Pinned message management for groups."""
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ from rooms.models import Room
 from users.identity import user_public_username
 
 
-def pin_message(actor, room_slug: str, message_id: int) -> PinnedMessage:
+def pin_message(actor, room_id: int, message_id: int) -> PinnedMessage:
     """Pin a message in a group. Requires PIN_MESSAGES or MANAGE_MESSAGES."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     effective = compute_permissions(room, actor)
     if not (effective & (Perm.PIN_MESSAGES | Perm.MANAGE_MESSAGES | Perm.ADMINISTRATOR)):
@@ -51,16 +51,16 @@ def pin_message(actor, room_slug: str, message_id: int) -> PinnedMessage:
             actor_user_id=getattr(actor, "pk", None),
             actor_username=user_public_username(actor),
             is_authenticated=True,
-            room_slug=room.slug,
+            room_id=room.pk,
             message_id=message_id,
         )
     return pin
 
 
-def unpin_message(actor, room_slug: str, message_id: int) -> None:
+def unpin_message(actor, room_id: int, message_id: int) -> None:
     """Unpin a message from a group."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     effective = compute_permissions(room, actor)
     if not (effective & (Perm.PIN_MESSAGES | Perm.MANAGE_MESSAGES | Perm.ADMINISTRATOR)):
@@ -80,14 +80,14 @@ def unpin_message(actor, room_slug: str, message_id: int) -> None:
         actor_user_id=getattr(actor, "pk", None),
         actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         message_id=message_id,
     )
 
 
-def list_pinned(room_slug: str, actor) -> list[dict]:
+def list_pinned(room_id: int, actor) -> list[dict]:
     """List pinned messages for a group."""
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     # Public groups: anyone can see pins; private groups: need READ_MESSAGES
     if not room.is_public:
@@ -113,3 +113,5 @@ def list_pinned(room_slug: str, actor) -> list[dict]:
         }
         for p in pins
     ]
+
+

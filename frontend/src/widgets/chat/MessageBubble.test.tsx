@@ -132,6 +132,35 @@ describe("MessageBubble", () => {
     expect(screen.getByText("voice.mp3")).toBeInTheDocument();
   });
 
+  it("renders fallback for unknown attachment type without URL", () => {
+    const message: Message = {
+      ...baseMessage,
+      attachments: [
+        {
+          id: 11,
+          originalFilename: "archive.custom",
+          contentType: "application/octet-stream",
+          fileSize: 2048,
+          url: null,
+          thumbnailUrl: null,
+          width: null,
+          height: null,
+        },
+      ],
+    };
+
+    render(
+      <MessageBubble
+        message={message}
+        isOwn={false}
+        onlineUsernames={new Set<string>()}
+      />,
+    );
+
+    expect(screen.getByText("archive.custom")).toBeInTheDocument();
+    expect(screen.getByText(/неизвестный тип/i)).toBeInTheDocument();
+  });
+
   it("opens full own-message action menu on tap for touch devices", () => {
     const restoreMatchMedia = installTouchMatchMedia();
     try {
@@ -259,10 +288,10 @@ describe("MessageBubble", () => {
 
     expect(screen.queryByRole("button", { name: "Like" })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ" }),
+      screen.queryByRole("button", { name: "Редактировать" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "РЈРґР°Р»РёС‚СЊ" }),
+      screen.queryByRole("button", { name: "Удалить" }),
     ).not.toBeInTheDocument();
   });
 

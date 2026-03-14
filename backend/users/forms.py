@@ -13,12 +13,18 @@ from django.utils.html import strip_tags
 from PIL import Image
 
 from .identity import normalize_email
-from .models import EmailIdentity, MAX_PROFILE_IMAGE_PIXELS, MAX_PROFILE_IMAGE_SIDE, Profile
+from .models import (
+    EmailIdentity,
+    MAX_PROFILE_IMAGE_PIXELS,
+    MAX_PROFILE_IMAGE_SIDE,
+    Profile,
+    PublicHandle,
+)
 
 
 USERNAME_MAX_LENGTH = max(1, min(int(getattr(settings, "USERNAME_MAX_LENGTH", 30)), 150))
-USERNAME_ALLOWED_RE = re.compile(r"^[A-Za-z]+$")
-USERNAME_ALLOWED_HINT = "Используйте только латинские буквы (A-Z, a-z)."
+USERNAME_ALLOWED_RE = re.compile(r"^[a-z][a-z0-9_]{2,29}$")
+USERNAME_ALLOWED_HINT = "Username: a-z, 0-9, _, длина 3-30, начинается с буквы."
 
 
 def _validate_username_symbols(username: str) -> None:
@@ -108,14 +114,14 @@ class ProfileIdentityUpdateForm(forms.Form):
         raw = self.cleaned_data.get("username")
         if raw is None:
             return None
-        username = str(raw).strip()
+        username = str(raw).strip().lower()
         if not username:
             return None
         if len(username) > USERNAME_MAX_LENGTH:
             raise forms.ValidationError(f"Максимум {USERNAME_MAX_LENGTH} символов.")
         _validate_username_symbols(username)
 
-        qs = Profile.objects.filter(username=username)
+        qs = PublicHandle.objects.filter(handle=username.lower())
         user_id = getattr(self.user, "pk", None)
         if user_id is not None:
             qs = qs.exclude(user_id=user_id)
@@ -127,9 +133,7 @@ class ProfileIdentityUpdateForm(forms.Form):
         cleaned = self.cleaned_data
         if "name" in cleaned:
             profile.name = cleaned.get("name") or ""
-        if "username" in cleaned:
-            profile.username = cleaned.get("username")
-        profile.save(update_fields=["name", "username"])
+        profile.save(update_fields=["name"])
         return profile
 
 
@@ -234,6 +238,8 @@ class ProfileUpdateForm(forms.ModelForm):
         if crop_update is not None:
             for field, value in crop_update.items():
                 setattr(instance, field, value)
+        if "image" in self.changed_data and getattr(instance, "image", None):
+            instance.avatar_url = ""
 
         if commit:
             instance.save()

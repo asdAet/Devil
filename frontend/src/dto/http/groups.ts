@@ -23,7 +23,7 @@ const avatarCropSchema = z
 
 const groupSchema = z
   .object({
-    slug: z.string(),
+    roomId: z.union([z.number(), z.string()]),
     name: z.string(),
     description: z.string().optional(),
     isPublic: z.boolean().optional(),
@@ -39,7 +39,7 @@ const groupSchema = z
 
 const groupListItemSchema = z
   .object({
-    slug: z.string(),
+    roomId: z.union([z.number(), z.string()]),
     name: z.string(),
     description: z.string().optional(),
     username: z.string().nullable().optional(),
@@ -115,13 +115,19 @@ const inviteListSchema = z
 const invitePreviewSchema = z
   .object({
     code: z.string(),
-    groupSlug: z.string(),
+    groupId: z.union([z.number(), z.string()]),
     groupName: z.string(),
     groupDescription: z.string().optional(),
     memberCount: z.number().optional(),
     isPublic: z.boolean().optional(),
   })
   .passthrough();
+
+const toRoomId = (value: number | string): number => {
+  const parsed =
+    typeof value === "number" ? value : Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+};
 
 const joinRequestSchema = z
   .object({
@@ -169,7 +175,8 @@ const bannedListSchema = z
   .passthrough();
 
 const mapGroup = (dto: z.infer<typeof groupSchema>): Group => ({
-  slug: dto.slug,
+  roomId: toRoomId(dto.roomId),
+  slug: String(toRoomId(dto.roomId)),
   name: dto.name,
   description: dto.description ?? "",
   isPublic: dto.isPublic ?? false,
@@ -196,7 +203,8 @@ export const decodeGroupListResponse = (
   const parsed = decodeOrThrow(groupListSchema, input, "groups/list");
   return {
     items: parsed.items.map((i) => ({
-      slug: i.slug,
+      roomId: toRoomId(i.roomId),
+      slug: String(toRoomId(i.roomId)),
       name: i.name,
       description: i.description ?? "",
       username: i.username ?? null,
@@ -272,7 +280,7 @@ export const decodeInvitePreviewResponse = (input: unknown): InvitePreview => {
   );
   return {
     code: parsed.code,
-    groupSlug: parsed.groupSlug,
+    groupId: toRoomId(parsed.groupId),
     groupName: parsed.groupName,
     groupDescription: parsed.groupDescription ?? "",
     memberCount: parsed.memberCount ?? 0,

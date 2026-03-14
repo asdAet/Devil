@@ -7,12 +7,12 @@ describe("service worker message DTO", () => {
     const encoded = encodeSwCacheMessage({
       type: "invalidate",
       key: "roomMessages",
-      slug: "public",
+      roomRef: "public",
     });
     expect(encoded).toEqual({
       type: "invalidate",
       key: "roomMessages",
-      slug: "public",
+      roomRef: "public",
     });
   });
 

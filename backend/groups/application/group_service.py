@@ -1,10 +1,9 @@
-"""Group CRUD operations."""
+﻿"""Group CRUD operations."""
 
 from __future__ import annotations
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db import transaction
 
 from chat_app_django.media_utils import build_profile_url_from_request, serialize_avatar_crop
 from chat_app_django.security.audit import audit_security_event
@@ -13,6 +12,15 @@ from roles.application.permission_service import compute_permissions, has_permis
 from roles.models import Membership, Role
 from roles.permissions import Perm
 from rooms.models import Room
+from users.identity import (
+    ensure_group_public_id,
+    room_public_handle,
+    room_public_id,
+    room_public_ref,
+    set_room_public_handle,
+    user_public_username,
+)
+from users.models import PublicHandle
 
 
 class _UnsetType:
@@ -45,7 +53,7 @@ class GroupConflictError(GroupError):
     pass
 
 
-_GROUP_USERNAME_CONFLICT_MSG = "Это имя пользователя уже занято"
+_GROUP_USERNAME_CONFLICT_MSG = "Этот username уже занят"
 
 
 def _append_changed(changed_fields: list[str], field_name: str) -> None:
@@ -123,8 +131,8 @@ def _ensure_authenticated(actor) -> None:
         raise GroupForbiddenError("Требуется аутентификация")
 
 
-def _load_group_or_raise(room_slug: str) -> Room:
-    room = Room.objects.filter(slug=room_slug, kind=Room.Kind.GROUP).first()
+def _load_group_or_raise(room_id: int) -> Room:
+    room = Room.objects.filter(pk=int(room_id), kind=Room.Kind.GROUP).first()
     if not room:
         raise GroupNotFoundError("Группа не найдена")
     return room
@@ -136,12 +144,21 @@ def _ensure_group_permission(room: Room, actor, perm: Perm) -> None:
             "group.permission.denied",
             actor_user=actor,
             actor_user_id=getattr(actor, "pk", None),
-            actor_username=getattr(actor, "username", None),
+            actor_username=user_public_username(actor),
             is_authenticated=True,
-            room_slug=room.slug,
+            room_id=room.pk,
             required_permission=perm.name,
         )
         raise GroupForbiddenError(f"Отсутствует разрешение {perm.name}")
+
+
+def _normalize_group_handle(username: str | None) -> str | None:
+    if username is None:
+        return None
+    value = str(username).strip()
+    if not value:
+        return None
+    return group_rules.validate_group_username(value)
 
 
 def create_group(
@@ -152,47 +169,51 @@ def create_group(
     is_public: bool = False,
     username: str | None = None,
 ) -> Room:
-    """Create a new group and assign the creator as Owner."""
     _ensure_authenticated(actor)
 
     name = group_rules.validate_group_name(name)
     description = group_rules.validate_group_description(description)
-    username = group_rules.validate_group_username(username)
+    normalized_handle = _normalize_group_handle(username)
 
-    if username and Room.objects.filter(username=username).exists():
+    if normalized_handle and PublicHandle.objects.filter(handle=normalized_handle).exists():
         raise GroupConflictError(_GROUP_USERNAME_CONFLICT_MSG)
+
+    if is_public and not normalized_handle:
+        raise GroupError("Для публичной группы требуется username")
 
     slug = group_rules.generate_group_slug(name)
 
-    try:
-        with transaction.atomic():
-            room = Room.objects.create(
-                name=name,
-                slug=slug,
-                kind=Room.Kind.GROUP,
-                description=description,
-                is_public=is_public,
-                username=username,
-                created_by=actor,
-                member_count=1,
-            )
-            roles = Role.create_defaults_for_room(room)
-            membership = Membership.objects.create(room=room, user=actor)
-            owner_role = roles.get(Role.OWNER)
-            if owner_role:
-                membership.roles.add(owner_role)
-    except IntegrityError as exc:
-        if username and Room.objects.filter(username=username).exists():
-            raise GroupConflictError(_GROUP_USERNAME_CONFLICT_MSG) from exc
-        raise GroupConflictError("Не удалось создать группу") from exc
+    with transaction.atomic():
+        room = Room.objects.create(
+            name=name,
+            slug=slug,
+            kind=Room.Kind.GROUP,
+            description=description,
+            is_public=is_public,
+            created_by=actor,
+            member_count=1,
+        )
+        ensure_group_public_id(room)
+
+        if normalized_handle:
+            try:
+                set_room_public_handle(room, normalized_handle)
+            except ValueError as exc:
+                raise GroupConflictError(str(exc)) from exc
+
+        roles = Role.create_defaults_for_room(room)
+        membership = Membership.objects.create(room=room, user=actor)
+        owner_role = roles.get(Role.OWNER)
+        if owner_role:
+            membership.roles.add(owner_role)
 
     audit_security_event(
         "group.created",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         group_name=name,
         is_public=is_public,
     )
@@ -201,7 +222,7 @@ def create_group(
 
 def update_group(
     actor,
-    room_slug: str,
+    room_id: int,
     *,
     name: str | None = None,
     description: str | None = None,
@@ -213,15 +234,15 @@ def update_group(
     avatar_action: str | None = None,
     avatar_crop: dict[str, float] | _UnsetType = _UNSET,
 ) -> Room:
-    """Update group settings. Requires CHANGE_GROUP_INFO or MANAGE_ROOM."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     effective = compute_permissions(room, actor)
     if not (effective & (Perm.CHANGE_GROUP_INFO | Perm.MANAGE_ROOM | Perm.ADMINISTRATOR)):
         raise GroupForbiddenError("Отсутствует разрешение на редактирование информации о группе")
 
     changed_fields: list[str] = []
+    current_handle = room_public_handle(room)
 
     if name is not None:
         room.name = group_rules.validate_group_name(name)
@@ -234,10 +255,6 @@ def update_group(
     if is_public is not None:
         room.is_public = is_public
         changed_fields.append("is_public")
-
-    if not isinstance(username, _UnsetType):
-        room.username = group_rules.validate_group_username(username)
-        changed_fields.append("username")
 
     if slow_mode_seconds is not None:
         room.slow_mode_seconds = group_rules.validate_slow_mode(slow_mode_seconds)
@@ -257,7 +274,6 @@ def update_group(
     if avatar is not None:
         room.avatar = avatar
         _append_changed(changed_fields, "avatar")
-        # New avatar upload without explicit crop resets previous crop metadata.
         if isinstance(crop_update, _UnsetType):
             crop_update = None
     elif avatar_action == "remove":
@@ -272,40 +288,47 @@ def update_group(
     elif not isinstance(crop_update, _UnsetType):
         _apply_room_avatar_crop(room, crop_update, changed_fields)
 
-    if "username" in changed_fields and room.username:
-        conflict = Room.objects.filter(username=room.username).exclude(pk=room.pk).exists()
-        if conflict:
-            raise GroupConflictError(_GROUP_USERNAME_CONFLICT_MSG)
+    requested_handle: str | None | _UnsetType = _UNSET
+    if not isinstance(username, _UnsetType):
+        requested_handle = _normalize_group_handle(username)
 
-    if changed_fields:
-        try:
-            with transaction.atomic():
-                room.save(update_fields=changed_fields)
-        except IntegrityError as exc:
-            if room.username and Room.objects.filter(username=room.username).exclude(pk=room.pk).exists():
-                raise GroupConflictError(_GROUP_USERNAME_CONFLICT_MSG) from exc
-            raise GroupConflictError("Не удалось обновить группу") from exc
+    target_handle = current_handle if isinstance(requested_handle, _UnsetType) else requested_handle
+    if room.is_public and not target_handle:
+        raise GroupError("Для публичной группы требуется username")
 
+    with transaction.atomic():
+        if changed_fields:
+            room.save(update_fields=changed_fields)
+
+        if not isinstance(requested_handle, _UnsetType):
+            try:
+                set_room_public_handle(room, requested_handle)
+            except ValueError as exc:
+                raise GroupConflictError(str(exc)) from exc
+
+        if room.is_public and not room_public_handle(room):
+            raise GroupError("Для публичной группы требуется username")
+
+    if changed_fields or not isinstance(requested_handle, _UnsetType):
         audit_security_event(
             "group.updated",
             actor_user=actor,
             actor_user_id=getattr(actor, "pk", None),
-            actor_username=getattr(actor, "username", None),
+            actor_username=user_public_username(actor),
             is_authenticated=True,
-            room_slug=room.slug,
+            room_id=room.pk,
             changed_fields=changed_fields,
         )
     return room
 
 
-def delete_group(actor, room_slug: str) -> None:
-    """Delete a group. Only the owner (ADMINISTRATOR) can delete."""
+def delete_group(actor, room_id: int) -> None:
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_group_permission(room, actor, Perm.ADMINISTRATOR)
 
-    slug = room.slug
     room_name = room.name
+    room_id = room.pk
     with transaction.atomic():
         room.delete()
 
@@ -313,64 +336,80 @@ def delete_group(actor, room_slug: str) -> None:
         "group.deleted",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=slug,
+        room_id=room_id,
         group_name=room_name,
     )
 
 
-def get_group_info(room_slug: str, actor=None, request=None) -> dict:
-    """Get group info. Public groups are visible to all; private require membership."""
-    room = _load_group_or_raise(room_slug)
+def get_group_info(room_id: int, actor=None, request=None) -> dict:
+    room = _load_group_or_raise(room_id)
+    handle = room_public_handle(room)
+    public_access = bool(room.is_public and handle)
 
-    if not room.is_public:
+    if not public_access:
         if not actor or not getattr(actor, "is_authenticated", False):
             raise GroupNotFoundError("Группа не найдена")
         if not has_permission(room, actor, Perm.READ_MESSAGES):
             raise GroupNotFoundError("Группа не найдена")
 
+    ensure_group_public_id(room)
     avatar_url, avatar_crop = _serialize_group_avatar(request, room)
 
     return {
-        "slug": room.slug,
+        "roomId": room.pk,
         "name": room.name,
         "description": room.description,
-        "isPublic": room.is_public,
-        "username": room.username,
+        "isPublic": public_access,
+        "username": handle,
+        "publicId": room_public_id(room),
+        "publicRef": room_public_ref(room),
         "memberCount": room.member_count,
         "slowModeSeconds": room.slow_mode_seconds,
         "joinApprovalRequired": room.join_approval_required,
-        "createdBy": room.created_by.username if room.created_by else None,
+        "createdBy": user_public_username(room.created_by) if room.created_by else None,
         "avatarUrl": avatar_url,
         "avatarCrop": avatar_crop,
     }
 
 
+def _room_matches_handle(room: Room, search: str) -> bool:
+    handle = room_public_handle(room)
+    if not handle:
+        return False
+    return search in handle
+
+
 def list_public_groups(*, search: str | None = None, page: int = 1, page_size: int = 20, request=None) -> dict:
-    """List discoverable public groups with optional search."""
-    qs = Room.objects.filter(kind=Room.Kind.GROUP, is_public=True).order_by("-member_count", "name")
+    qs = (
+        Room.objects.filter(kind=Room.Kind.GROUP, is_public=True, public_handle__isnull=False)
+        .order_by("-member_count", "name")
+    )
+    items = list(qs)
 
     if search:
-        search = search.strip()
-        if search.startswith("@"):
-            qs = qs.filter(username__icontains=search[1:])
-        else:
-            qs = qs.filter(Q(name__icontains=search) | Q(username__icontains=search))
+        value = search.strip().lower()
+        if value.startswith("@"):
+            value = value[1:]
+        items = [room for room in items if _room_matches_handle(room, value)]
 
-    total = qs.count()
+    total = len(items)
     offset = (max(1, page) - 1) * page_size
-    items = list(qs[offset : offset + page_size])
+    items = items[offset : offset + page_size]
 
     payload_items = []
     for room in items:
+        ensure_group_public_id(room)
         avatar_url, avatar_crop = _serialize_group_avatar(request, room)
         payload_items.append(
             {
-                "slug": room.slug,
+                "roomId": room.pk,
                 "name": room.name,
                 "description": room.description[:200],
-                "username": room.username,
+                "username": room_public_handle(room),
+                "publicId": room_public_id(room),
+                "publicRef": room_public_ref(room),
                 "memberCount": room.member_count,
                 "avatarUrl": avatar_url,
                 "avatarCrop": avatar_crop,
@@ -386,7 +425,6 @@ def list_public_groups(*, search: str | None = None, page: int = 1, page_size: i
 
 
 def list_my_groups(actor, *, search: str | None = None, page: int = 1, page_size: int = 20, request=None) -> dict:
-    """List groups where the actor has an active membership."""
     _ensure_authenticated(actor)
 
     qs = (
@@ -399,26 +437,29 @@ def list_my_groups(actor, *, search: str | None = None, page: int = 1, page_size
         .order_by("-member_count", "name")
     )
 
+    items = list(qs)
     if search:
-        search = search.strip()
-        if search.startswith("@"):
-            qs = qs.filter(username__icontains=search[1:])
-        else:
-            qs = qs.filter(Q(name__icontains=search) | Q(username__icontains=search))
+        value = search.strip().lower()
+        if value.startswith("@"):
+            value = value[1:]
+        items = [room for room in items if _room_matches_handle(room, value)]
 
-    total = qs.count()
+    total = len(items)
     offset = (max(1, page) - 1) * page_size
-    items = list(qs[offset : offset + page_size])
+    items = items[offset : offset + page_size]
 
     payload_items = []
     for room in items:
+        ensure_group_public_id(room)
         avatar_url, avatar_crop = _serialize_group_avatar(request, room)
         payload_items.append(
             {
-                "slug": room.slug,
+                "roomId": room.pk,
                 "name": room.name,
                 "description": room.description[:200],
-                "username": room.username,
+                "username": room_public_handle(room),
+                "publicId": room_public_id(room),
+                "publicRef": room_public_ref(room),
                 "memberCount": room.member_count,
                 "avatarUrl": avatar_url,
                 "avatarCrop": avatar_crop,
@@ -431,3 +472,4 @@ def list_my_groups(actor, *, search: str | None = None, page: int = 1, page_size
         "page": page,
         "pageSize": page_size,
     }
+

@@ -15,17 +15,18 @@ const avatarCropSchema = z
 const unreadSchema = z
   .object({
     dialogs: z.number().optional(),
-    slugs: z.array(z.string()).optional(),
+    roomIds: z.array(z.number()).optional(),
     counts: z.record(z.string(), z.union([z.number(), z.string()])).optional(),
   })
   .passthrough();
 
 const itemSchema = z
   .object({
-    slug: z.string().min(1),
+    roomId: z.number(),
     peer: z
       .object({
         username: z.string().min(1),
+        displayName: z.string().optional(),
         profileImage: z.string().nullable().optional(),
         avatarCrop: avatarCropSchema.nullable().optional(),
       })
@@ -71,23 +72,23 @@ const normalizeUnread = (
 
   const counts: Record<string, number> = {};
   const rawCounts = value.counts ?? {};
-  for (const [slug, raw] of Object.entries(rawCounts)) {
-    const key = slug.trim();
+  for (const [roomRef, raw] of Object.entries(rawCounts)) {
+    const key = roomRef.trim();
     if (!key) continue;
+    const roomId = Number(key);
+    if (!Number.isFinite(roomId) || roomId <= 0) continue;
     const parsed = typeof raw === "string" ? Number(raw) : raw;
     if (!Number.isFinite(parsed) || parsed <= 0) continue;
-    counts[key] = Math.floor(parsed);
+    counts[String(Math.trunc(roomId))] = Math.floor(parsed);
   }
 
-  const slugsFromPayload = Array.isArray(value.slugs)
-    ? value.slugs.filter(
-        (slug) => typeof slug === "string" && slug.trim().length > 0,
-      )
+  const roomIdsFromPayload = Array.isArray(value.roomIds)
+    ? value.roomIds.filter((roomId) => Number.isFinite(roomId) && roomId > 0)
     : [];
 
   if (!Object.keys(counts).length) {
-    for (const slug of slugsFromPayload) {
-      counts[slug] = 1;
+    for (const roomId of roomIdsFromPayload) {
+      counts[String(Math.trunc(roomId))] = 1;
     }
   }
 
@@ -103,9 +104,10 @@ const normalizeUnread = (
 const normalizeItem = (
   value: z.infer<typeof itemSchema>,
 ): DirectChatListItem => ({
-  slug: value.slug,
+  slug: String(Math.trunc(value.roomId)),
   peer: {
     username: value.peer.username,
+    displayName: value.peer.displayName ?? value.peer.username,
     profileImage: value.peer.profileImage ?? null,
     avatarCrop: value.peer.avatarCrop ?? null,
   },

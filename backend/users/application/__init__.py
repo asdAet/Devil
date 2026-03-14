@@ -1,12 +1,12 @@
-﻿from .auth_service import (
+from .auth_service import (
     authenticate_or_signup_with_google,
-    get_user_by_username,
-    login_with_email,
-    login_with_google,
-    register_with_email,
+    get_security_settings,
+    get_user_by_ref,
+    login_user,
+    register_user,
     set_profile_name,
-    set_username,
-    signup_with_google,
+    set_public_handle,
+    update_security_settings,
 )
 from .errors import (
     IdentityConflictError,
@@ -17,13 +17,13 @@ from .errors import (
 
 __all__ = [
     "authenticate_or_signup_with_google",
-    "get_user_by_username",
-    "login_with_email",
-    "login_with_google",
-    "register_with_email",
+    "get_security_settings",
+    "get_user_by_ref",
+    "login_user",
+    "register_user",
     "set_profile_name",
-    "set_username",
-    "signup_with_google",
+    "set_public_handle",
+    "update_security_settings",
     "IdentityConflictError",
     "IdentityForbiddenError",
     "IdentityServiceError",

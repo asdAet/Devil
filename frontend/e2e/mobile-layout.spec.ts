@@ -1,5 +1,7 @@
 ﻿import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { loginWithRetry, registerWithRetry } from "./helpers/auth";
+
 const hasNoHorizontalOverflow = async (page: Page) =>
   page.evaluate(() => {
     const doc = document.documentElement;
@@ -14,33 +16,11 @@ const isElementInViewport = async (locator: Locator) =>
 
 async function register(page: Page, username: string, password: string) {
   const email = `${username}@e2e.local`;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await page.goto("/register");
-    await page.getByTestId("auth-email-input").fill(email);
-    await page.getByTestId("auth-password-input").fill(password);
-    await page.getByTestId("auth-confirm-input").fill(password);
+  await registerWithRetry(page, email, password);
+}
 
-    const [response] = await Promise.all([
-      page.waitForResponse(
-        (res) =>
-          res.url().includes("/api/auth/register/") &&
-          res.request().method() === "POST",
-      ),
-      page.getByTestId("auth-submit-button").click(),
-    ]);
-
-    if (response.status() === 201) {
-      await expect(page).toHaveURL("/");
-      return;
-    }
-
-    if (response.status() === 429 && attempt < 3) {
-      await page.waitForTimeout(1_500 * (attempt + 1));
-      continue;
-    }
-
-    throw new Error(`Registration failed with status ${response.status()}`);
-  }
+async function login(page: Page, identifier: string, password: string) {
+  await loginWithRetry(page, identifier, password);
 }
 
 test("core routes have no horizontal overflow", async ({ page }) => {
@@ -105,6 +85,7 @@ test("mobile chat keeps input visible and opens own message actions on tap", asy
 }) => {
   const username = `k${Math.random().toString(36).slice(2, 9)}`;
   const password = "pass12345";
+  const email = `${username}@e2e.local`;
 
   await register(page, username, password);
   await page.goto("/rooms/public");
@@ -113,7 +94,33 @@ test("mobile chat keeps input visible and opens own message actions on tap", asy
   const chatInput = page.getByTestId("chat-message-input");
   const sendButton = page.getByTestId("chat-send-button");
   const chatLog = page.locator('[aria-live="polite"]').first();
+  const joinCallout = page.getByTestId("group-join-callout");
+  const authCallout = page.getByTestId("chat-auth-callout");
+  const readOnlyCallout = page.getByTestId("group-readonly-callout");
 
+  await expect
+    .poll(
+      async () =>
+        (await chatInput.isVisible()) ||
+        (await joinCallout.isVisible()) ||
+        (await authCallout.isVisible()) ||
+        (await readOnlyCallout.isVisible()),
+      { timeout: 15_000 },
+    )
+    .toBeTruthy();
+
+  if (await authCallout.isVisible()) {
+    await login(page, email, password);
+    await page.goto("/rooms/public");
+    await page.waitForLoadState("networkidle");
+  }
+
+  await expect(readOnlyCallout).toBeHidden();
+  if (await joinCallout.isVisible()) {
+    await joinCallout
+      .getByRole("button", { name: /Присоединиться|Join/i })
+      .click();
+  }
   await expect(chatInput).toBeVisible({ timeout: 15_000 });
   await expect.poll(async () => isElementInViewport(chatInput)).toBeTruthy();
 
@@ -150,7 +157,17 @@ test("mobile chat keeps input visible and opens own message actions on tap", asy
   }
   await expect.poll(async () => isElementInViewport(chatInput)).toBeTruthy();
 
-  await ownMessage.tap();
+  const supportsTouchInput = await page.evaluate(
+    () =>
+      "ontouchstart" in window ||
+      navigator.maxTouchPoints > 0 ||
+      window.matchMedia?.("(pointer: coarse)").matches === true,
+  );
+  if (supportsTouchInput) {
+    await ownMessage.tap();
+  } else {
+    await ownMessage.click({ button: "right" });
+  }
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveCount(5);

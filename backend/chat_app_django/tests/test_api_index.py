@@ -20,7 +20,7 @@ class ApiIndexTests(TestCase):
         self.assertIn("/api/auth/session/", payload["endpoints"]["auth"]["session"])
         self.assertIn("chatRoomRoles", payload["templates"])
         self.assertIn(
-            "/api/chat/rooms/<room_slug>/roles/",
+            "/api/chat/rooms/{room_id}/roles/",
             unquote(payload["templates"]["chatRoomRoles"]),
         )
         self.assertIn("sessionAuth", payload["endpoints"])
@@ -46,3 +46,4 @@ class RendererSettingsTests(TestCase):
     def test_build_rest_renderer_classes_debug_false(self):
         classes = app_settings.build_rest_renderer_classes(False)
         self.assertEqual(classes, ["rest_framework.renderers.JSONRenderer"])
+

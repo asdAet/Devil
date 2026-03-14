@@ -19,6 +19,7 @@ from rooms.services import ensure_membership
 from rooms.models import Room
 from chat.routing import websocket_urlpatterns as chat_ws
 from direct_inbox.routing import websocket_urlpatterns as di_ws
+from users.identity import user_public_username
 
 User = get_user_model()
 application = URLRouter(chat_ws + di_ws)
@@ -51,6 +52,12 @@ class ChatConsumerTests(TransactionTestCase):
         )
         ensure_membership(self.direct_room, self.owner)
         ensure_membership(self.direct_room, self.member)
+        self.public_room = Room.objects.create(
+            slug='public',
+            name='public',
+            kind=Room.Kind.PUBLIC,
+            created_by=self.owner,
+        )
 
     async def _connect(self, path: str, user=None):
         """Проверяет сценарий `_connect`."""
@@ -68,7 +75,7 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_public_connect`."""
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/public/')
+            communicator, connected, _ = await self._connect(f'/ws/chat/{self.public_room.pk}/')
             self.assertTrue(connected)
             await communicator.disconnect()
 
@@ -79,10 +86,10 @@ class ChatConsumerTests(TransactionTestCase):
         """Отклоняет второе подключение с того же IP при жестком лимите."""
         async def run():
             """Проверяет сценарий `run`."""
-            first, connected, _ = await self._connect('/ws/chat/public/')
+            first, connected, _ = await self._connect(f'/ws/chat/{self.public_room.pk}/')
             self.assertTrue(connected)
 
-            _second, second_connected, close_code = await self._connect('/ws/chat/public/')
+            _second, second_connected, close_code = await self._connect(f'/ws/chat/{self.public_room.pk}/')
             self.assertFalse(second_connected)
             self.assertEqual(close_code, 4429)
 
@@ -94,7 +101,7 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_invalid_room_rejected`."""
         async def run():
             """Проверяет сценарий `run`."""
-            _communicator, connected, close_code = await self._connect('/ws/chat/public%2Fbad/')
+            _communicator, connected, close_code = await self._connect('/ws/chat/0/')
             self.assertFalse(connected)
             self.assertEqual(close_code, 4404)
 
@@ -104,7 +111,7 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_missing_room_rejected`."""
         async def run():
             """Проверяет сценарий `run`."""
-            _communicator, connected, close_code = await self._connect('/ws/chat/missing123/')
+            _communicator, connected, close_code = await self._connect('/ws/chat/999999/')
             self.assertFalse(connected)
             self.assertEqual(close_code, 4404)
 
@@ -114,7 +121,9 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_private_requires_role`."""
         async def run():
             """Проверяет сценарий `run`."""
-            _communicator, connected, close_code = await self._connect('/ws/chat/private123/')
+            _communicator, connected, close_code = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/'
+            )
             self.assertFalse(connected)
             self.assertEqual(close_code, 4403)
 
@@ -124,7 +133,10 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_private_denies_non_member`."""
         async def run():
             """Проверяет сценарий `run`."""
-            _communicator, connected, close_code = await self._connect('/ws/chat/private123/', user=self.other)
+            _communicator, connected, close_code = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.other,
+            )
             self.assertFalse(connected)
             self.assertEqual(close_code, 4403)
 
@@ -134,7 +146,10 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_private_allows_member`."""
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
             await communicator.disconnect()
 
@@ -144,7 +159,10 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_direct_denies_non_participant`."""
         async def run():
             """Проверяет сценарий `run`."""
-            _communicator, connected, close_code = await self._connect('/ws/chat/dm_abc123/', user=self.other)
+            _communicator, connected, close_code = await self._connect(
+                f'/ws/chat/{self.direct_room.pk}/',
+                user=self.other,
+            )
             self.assertFalse(connected)
             self.assertEqual(close_code, 4403)
 
@@ -154,7 +172,10 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_invalid_json_non_string_and_blank_messages_are_ignored`."""
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
 
             await communicator.send_to(text_data='not-json')
@@ -173,7 +194,10 @@ class ChatConsumerTests(TransactionTestCase):
     def test_typing_event_does_not_crash_socket_and_message_send_still_works(self):
         """Typing event should not close socket; message send must continue to work."""
         async def run():
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
 
             await communicator.send_to(text_data=json.dumps({'type': 'typing'}))
@@ -194,7 +218,7 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_unauthenticated_public_user_cannot_send_messages`."""
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/public/')
+            communicator, connected, _ = await self._connect(f'/ws/chat/{self.public_room.pk}/')
             self.assertTrue(connected)
 
             await communicator.send_to(text_data=json.dumps({'message': 'hello'}))
@@ -216,7 +240,10 @@ class ChatConsumerTests(TransactionTestCase):
 
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
             await communicator.send_to(text_data=json.dumps({'message': 'hello'}))
             payload = json.loads(await communicator.receive_from(timeout=2))
@@ -232,7 +259,10 @@ class ChatConsumerTests(TransactionTestCase):
             """Проверяет сценарий `inner`."""
             async def run():
                 """Проверяет сценарий `run`."""
-                communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+                communicator, connected, _ = await self._connect(
+                    f'/ws/chat/{self.private_room.pk}/',
+                    user=self.member,
+                )
                 self.assertTrue(connected)
                 await communicator.send_to(text_data=json.dumps({'message': 'x' * 20}))
                 payload = json.loads(await communicator.receive_from(timeout=2))
@@ -260,12 +290,15 @@ class ChatConsumerTests(TransactionTestCase):
 
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
             await communicator.send_to(text_data=json.dumps({'message': 'hello'}))
             event = json.loads(await communicator.receive_from(timeout=2))
             self.assertEqual(event.get('message'), 'hello')
-            self.assertEqual(event.get('username'), self.member.username)
+            self.assertEqual(event.get('username'), user_public_username(self.member))
             self.assertIsInstance(event.get('id'), int)
             self.assertTrue(event.get('createdAt'))
             self.assertIn('replyTo', event)
@@ -302,22 +335,28 @@ class ChatConsumerTests(TransactionTestCase):
             initial_payload = json.loads(await inbox_member.receive_from(timeout=2))
             self.assertEqual(initial_payload.get('type'), 'direct_unread_state')
 
-            chat_owner, chat_connected, _ = await self._connect('/ws/chat/dm_abc123/', user=self.owner)
+            chat_owner, chat_connected, _ = await self._connect(
+                f'/ws/chat/{self.direct_room.pk}/',
+                user=self.owner,
+            )
             self.assertTrue(chat_connected)
             await chat_owner.send_to(text_data=json.dumps({'message': 'hello dm'}))
             await chat_owner.receive_from(timeout=2)
 
             inbox_payload = json.loads(await inbox_member.receive_from(timeout=2))
             self.assertEqual(inbox_payload.get('type'), 'direct_inbox_item')
-            self.assertEqual(inbox_payload['item']['slug'], self.direct_room.slug)
-            self.assertEqual(inbox_payload['item']['peer']['username'], self.owner.username)
+            self.assertEqual(inbox_payload['item']['roomId'], self.direct_room.pk)
+            self.assertEqual(
+                inbox_payload['item']['peer']['username'],
+                user_public_username(self.owner),
+            )
             self.assertEqual(
                 inbox_payload['item']['peer']['avatarCrop'],
                 {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},
             )
             self.assertTrue(inbox_payload['unread']['isUnread'])
             self.assertEqual(inbox_payload['unread']['dialogs'], 1)
-            self.assertEqual(inbox_payload['unread']['counts'].get(self.direct_room.slug), 1)
+            self.assertEqual(inbox_payload['unread']['counts'].get(str(self.direct_room.pk)), 1)
 
             await chat_owner.disconnect()
             await inbox_member.disconnect()
@@ -333,7 +372,10 @@ class ChatConsumerTests(TransactionTestCase):
             initial_payload = json.loads(await inbox_outsider.receive_from(timeout=2))
             self.assertEqual(initial_payload.get('type'), 'direct_unread_state')
 
-            chat_owner, chat_connected, _ = await self._connect('/ws/chat/dm_abc123/', user=self.owner)
+            chat_owner, chat_connected, _ = await self._connect(
+                f'/ws/chat/{self.direct_room.pk}/',
+                user=self.owner,
+            )
             self.assertTrue(chat_connected)
             await chat_owner.send_to(text_data=json.dumps({'message': 'hello private'}))
             await chat_owner.receive_from(timeout=2)
@@ -348,7 +390,10 @@ class ChatConsumerTests(TransactionTestCase):
     def test_membership_revoked_closes_target_socket(self):
         """Disconnect target user socket when membership is revoked in room."""
         async def run():
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
 
             channel_layer = get_channel_layer()
@@ -372,7 +417,10 @@ class ChatConsumerTests(TransactionTestCase):
         """Проверяет сценарий `test_rate_limit`."""
         async def run():
             """Проверяет сценарий `run`."""
-            communicator, connected, _ = await self._connect('/ws/chat/private123/', user=self.member)
+            communicator, connected, _ = await self._connect(
+                f'/ws/chat/{self.private_room.pk}/',
+                user=self.member,
+            )
             self.assertTrue(connected)
 
             await communicator.send_to(text_data=json.dumps({'message': 'first'}))
@@ -384,4 +432,5 @@ class ChatConsumerTests(TransactionTestCase):
             await communicator.disconnect()
 
         async_to_sync(run)()
+
 

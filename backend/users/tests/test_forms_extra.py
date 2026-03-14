@@ -1,4 +1,4 @@
-"""Additional coverage tests for users.forms."""
+﻿"""Additional coverage tests for users.forms."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from users.forms import (
     UserUpdateForm,
     _validate_username_symbols,
 )
-from users.identity import ensure_profile
+from users.identity import ensure_profile, set_user_public_handle
 from users.models import EmailIdentity
 
 User = get_user_model()
@@ -24,8 +24,8 @@ User = get_user_model()
 class UsersFormsExtraTests(TestCase):
     def test_validate_username_symbols_rejects_non_letters(self):
         with self.assertRaises(forms.ValidationError):
-            _validate_username_symbols("user_1")
-        _validate_username_symbols("OnlyLetters")
+            _validate_username_symbols("1user")
+        _validate_username_symbols("valid_name1")
 
     def test_email_register_form_detects_duplicate_email(self):
         user = User.objects.create_user(username="dup_mail_user", email="dup@example.com")
@@ -34,7 +34,7 @@ class UsersFormsExtraTests(TestCase):
         EmailIdentity.objects.create(
             user=user,
             email_normalized="dup@example.com",
-            password_hash="hashed",
+            email_verified=False,
         )
 
         form = EmailRegisterForm(
@@ -50,9 +50,7 @@ class UsersFormsExtraTests(TestCase):
             form.clean_email()
 
     def test_email_register_form_password_mismatch(self):
-        form = EmailRegisterForm(
-            data={"email": "new@example.com", "password1": "pass12345", "password2": "wrong"}
-        )
+        form = EmailRegisterForm(data={"email": "new@example.com", "password1": "pass12345", "password2": "wrong"})
         self.assertFalse(form.is_valid())
         self.assertIn("password2", form.errors)
 
@@ -82,18 +80,16 @@ class UsersFormsExtraTests(TestCase):
         profile = ensure_profile(user)
 
         duplicate_user = User.objects.create_user(username="duplicate_user", password="pass12345")
-        duplicate_profile = ensure_profile(duplicate_user)
-        duplicate_profile.username = "TakenName"
-        duplicate_profile.save(update_fields=["username"])
+        set_user_public_handle(duplicate_user, "takenname")
 
         duplicate = ProfileIdentityUpdateForm(
-            data={"name": "<b>New Name</b>", "username": "TakenName"},
+            data={"name": "<b>New Name</b>", "username": "takenname"},
             user=user,
         )
         self.assertFalse(duplicate.is_valid())
         self.assertIn("username", duplicate.errors)
 
-        invalid_symbols = ProfileIdentityUpdateForm(data={"username": "bad_name"}, user=user)
+        invalid_symbols = ProfileIdentityUpdateForm(data={"username": "1bad"}, user=user)
         self.assertFalse(invalid_symbols.is_valid())
         self.assertIn("username", invalid_symbols.errors)
 
@@ -101,7 +97,6 @@ class UsersFormsExtraTests(TestCase):
         self.assertTrue(valid.is_valid(), valid.errors)
         updated = valid.save(profile)
         self.assertEqual(updated.name, "Name")
-        self.assertEqual(updated.username, "ValidName")
 
     def test_profile_identity_update_form_handles_none_and_blank_username(self):
         user = User.objects.create_user(username="identity_none", password="pass12345")

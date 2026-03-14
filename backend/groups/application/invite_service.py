@@ -1,4 +1,4 @@
-"""Invite link management for groups."""
+﻿"""Invite link management for groups."""
 
 from __future__ import annotations
 
@@ -25,11 +25,12 @@ from roles.application.permission_service import compute_permissions
 from roles.models import Membership, Role
 from roles.permissions import Perm
 from rooms.models import Room
+from users.identity import ensure_group_public_id, room_public_ref, user_public_username
 
 
 def create_invite(
     actor,
-    room_slug: str,
+    room_id: int,
     *,
     name: str = "",
     expires_in_seconds: int | None = None,
@@ -37,7 +38,7 @@ def create_invite(
 ) -> InviteLink:
     """Create an invite link for a group."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     effective = compute_permissions(room, actor)
     if not (effective & (Perm.INVITE_USERS | Perm.MANAGE_INVITES | Perm.ADMINISTRATOR)):
@@ -67,26 +68,26 @@ def create_invite(
         "group.invite.created",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         invite_code=code,
     )
     return invite
 
 
-def list_invites(actor, room_slug: str) -> list[InviteLink]:
+def list_invites(actor, room_id: int) -> list[InviteLink]:
     """List all invite links for a group. Requires MANAGE_INVITES."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_group_permission(room, actor, Perm.MANAGE_INVITES)
     return list(InviteLink.objects.filter(room=room).select_related("created_by"))
 
 
-def revoke_invite(actor, room_slug: str, invite_code: str) -> None:
+def revoke_invite(actor, room_id: int, invite_code: str) -> None:
     """Revoke an invite link. Requires MANAGE_INVITES."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_group_permission(room, actor, Perm.MANAGE_INVITES)
 
     invite = InviteLink.objects.filter(room=room, code=invite_code).first()
@@ -100,9 +101,9 @@ def revoke_invite(actor, room_slug: str, invite_code: str) -> None:
         "group.invite.revoked",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         invite_code=invite_code,
     )
 
@@ -121,9 +122,11 @@ def get_invite_info(invite_code: str) -> dict:
         raise GroupError("Срок действия этой ссылки-приглашения истёк")
 
     room = invite.room
+    ensure_group_public_id(room)
     return {
         "code": invite.code,
-        "groupSlug": room.slug,
+        "groupId": room.pk,
+        "groupPublicRef": room_public_ref(room),
         "groupName": room.name,
         "groupDescription": room.description[:200],
         "memberCount": room.member_count,
@@ -161,7 +164,7 @@ def join_via_invite(actor, invite_code: str) -> dict:
         if existing:
             if existing.is_banned:
                 raise GroupForbiddenError("Вы заблокированы в этой группе")
-            return {"roomSlug": room.slug, "status": "already_member"}
+            return {"roomId": room.pk, "status": "already_member"}
 
         room = Room.objects.select_for_update().get(pk=room.pk)
         if room.member_count >= room.max_members:
@@ -191,10 +194,12 @@ def join_via_invite(actor, invite_code: str) -> dict:
         "group.invite.used",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         invite_code=invite_code,
         status=status,
     )
-    return {"roomSlug": room.slug, "status": status}
+    return {"roomId": room.pk, "status": status}
+
+

@@ -22,6 +22,7 @@ const avatarCropSchema = z
 const roomPeerSchema = z
   .object({
     username: z.string().min(1),
+    displayName: z.string().optional(),
     profileImage: z.string().nullable().optional(),
     avatarCrop: avatarCropSchema.nullable().optional(),
     lastSeen: z.string().nullable().optional(),
@@ -31,7 +32,7 @@ const roomPeerSchema = z
 
 const roomDetailsSchema = z
   .object({
-    slug: z.string().min(1),
+    roomRef: z.string().optional(),
     name: z.string(),
     kind: roomKindSchema,
     avatarUrl: z.string().nullable().optional(),
@@ -46,6 +47,7 @@ const replyToSchema = z
   .object({
     id: z.number(),
     username: z.string().nullable(),
+    displayName: z.string().nullable().optional(),
     content: z.string(),
   })
   .passthrough();
@@ -75,6 +77,7 @@ const messageSchema = z
   .object({
     id: z.number(),
     username: z.string().min(1),
+    displayName: z.string().optional(),
     content: z.string(),
     profilePic: z.string().nullable().optional(),
     avatarCrop: avatarCropSchema.nullable().optional(),
@@ -104,7 +107,7 @@ const roomMessagesSchema = z
 
 const directStartSchema = z
   .object({
-    slug: z.string().min(1),
+    roomId: z.union([z.number(), z.string()]),
     kind: roomKindSchema,
     peer: roomPeerSchema,
   })
@@ -115,10 +118,10 @@ const directChatsSchema = z
     items: z.array(
       z
         .object({
-          slug: z.string().min(1),
+          roomId: z.union([z.number(), z.string()]),
           peer: roomPeerSchema,
           lastMessage: z.string(),
-          lastMessageAt: z.string(),
+          lastMessageAt: z.string().nullable().optional(),
         })
         .passthrough(),
     ),
@@ -130,6 +133,7 @@ const mapPeer = (dto: z.infer<typeof roomPeerSchema>): RoomPeer => {
   return {
     userId: typeof raw.userId === "number" ? raw.userId : undefined,
     username: dto.username,
+    displayName: dto.displayName ?? dto.username,
     profileImage: dto.profileImage ?? null,
     avatarCrop: dto.avatarCrop ?? null,
     lastSeen: dto.lastSeen ?? null,
@@ -141,8 +145,16 @@ const mapRoomDetails = (
   dto: z.infer<typeof roomDetailsSchema>,
 ): RoomDetails => {
   const raw = dto as Record<string, unknown>;
+  const rawRoomId =
+    typeof raw.roomId === "number"
+      ? raw.roomId
+      : Number(raw.roomId ?? Number.NaN);
+  const roomRef =
+    (typeof dto.roomRef === "string" ? dto.roomRef : "").trim() ||
+    (Number.isFinite(rawRoomId) ? String(Math.trunc(rawRoomId)) : "");
   return {
-    slug: dto.slug,
+    roomId: Number.isFinite(rawRoomId) ? Math.trunc(rawRoomId) : undefined,
+    slug: roomRef,
     name: dto.name,
     kind: dto.kind,
     avatarUrl: dto.avatarUrl ?? null,
@@ -161,13 +173,19 @@ const mapRoomDetails = (
 const mapMessage = (dto: z.infer<typeof messageSchema>): Message => ({
   id: dto.id,
   username: dto.username,
+  displayName: dto.displayName ?? dto.username,
   content: dto.content,
   profilePic: dto.profilePic ?? null,
   avatarCrop: dto.avatarCrop ?? null,
   createdAt: dto.createdAt,
   editedAt: dto.editedAt ?? null,
   isDeleted: dto.isDeleted ?? false,
-  replyTo: dto.replyTo ?? null,
+  replyTo: dto.replyTo
+    ? {
+        ...dto.replyTo,
+        displayName: dto.replyTo.displayName ?? dto.replyTo.username,
+      }
+    : null,
   attachments: (dto.attachments ?? []).map((a) => ({
     id: a.id,
     originalFilename: a.originalFilename,
@@ -200,7 +218,7 @@ export type RoomMessagesParams = {
 };
 
 export type DirectStartResponseDto = {
-  slug: string;
+  roomId: number;
   kind: RoomDetails["kind"];
   peer: RoomPeer;
 };
@@ -218,7 +236,7 @@ export const decodePublicRoomResponse = (input: unknown): RoomDetails => {
 };
 
 /**
- * Декодирует payload /api/chat/rooms/:slug/.
+ * Декодирует payload /api/chat/rooms/{room_id}/.
  */
 export const decodeRoomDetailsResponse = (input: unknown): RoomDetails => {
   const parsed = decodeOrThrow(roomDetailsSchema, input, "chat/room-details");
@@ -226,7 +244,7 @@ export const decodeRoomDetailsResponse = (input: unknown): RoomDetails => {
 };
 
 /**
- * Декодирует payload /api/chat/rooms/:slug/messages/.
+ * Декодирует payload /api/chat/rooms/{room_id}/messages/.
  */
 export const decodeRoomMessagesResponse = (input: unknown): RoomMessagesDto => {
   const parsed = decodeOrThrow(roomMessagesSchema, input, "chat/room-messages");
@@ -244,7 +262,7 @@ export const decodeDirectStartResponse = (
 ): DirectStartResponseDto => {
   const parsed = decodeOrThrow(directStartSchema, input, "chat/direct-start");
   return {
-    slug: parsed.slug,
+    roomId: toRoomId(parsed.roomId),
     kind: parsed.kind,
     peer: mapPeer(parsed.peer),
   };
@@ -259,10 +277,10 @@ export const decodeDirectChatsResponse = (
   const parsed = decodeOrThrow(directChatsSchema, input, "chat/direct-chats");
   return {
     items: parsed.items.map((item) => ({
-      slug: item.slug,
+      slug: String(toRoomId(item.roomId)),
       peer: mapPeer(item.peer),
       lastMessage: item.lastMessage,
-      lastMessageAt: item.lastMessageAt,
+      lastMessageAt: item.lastMessageAt ?? "",
     })),
   };
 };
@@ -279,6 +297,7 @@ const reactionResponseSchema = z
     emoji: z.string(),
     userId: z.number(),
     username: z.string(),
+    displayName: z.string().optional(),
   })
   .passthrough();
 
@@ -286,6 +305,7 @@ const searchResultSchema = z
   .object({
     id: z.number(),
     username: z.string(),
+    displayName: z.string().optional(),
     content: z.string(),
     createdAt: z.string(),
     highlight: z.string().nullable().optional(),
@@ -312,6 +332,7 @@ const roomAttachmentItemSchema = attachmentSchema
     messageId: z.number(),
     createdAt: z.string(),
     username: z.string(),
+    displayName: z.string().optional(),
   })
   .passthrough();
 
@@ -323,11 +344,17 @@ const roomAttachmentsResponseSchema = z
   .passthrough();
 
 const readStateResponseSchema = z
-  .object({ roomSlug: z.string(), lastReadMessageId: z.number() })
+  .object({
+    roomId: z.union([z.number(), z.string()]),
+    lastReadMessageId: z.number().nullable(),
+  })
   .passthrough();
 
 const unreadCountItemSchema = z
-  .object({ roomSlug: z.string(), unreadCount: z.number() })
+  .object({
+    roomId: z.union([z.number(), z.string()]),
+    unreadCount: z.number(),
+  })
   .passthrough();
 
 const unreadCountsResponseSchema = z
@@ -337,10 +364,10 @@ const unreadCountsResponseSchema = z
 const globalSearchUserSchema = roomPeerSchema;
 const globalSearchGroupSchema = z
   .object({
-    slug: z.string(),
+    roomId: z.union([z.number(), z.string()]),
     name: z.string(),
     description: z.string().optional(),
-    username: z.string().nullable().optional(),
+    publicRef: z.string().optional(),
     memberCount: z.number().optional(),
     isPublic: z.boolean().optional(),
   })
@@ -350,9 +377,10 @@ const globalSearchMessageSchema = z
   .object({
     id: z.number(),
     username: z.string(),
+    displayName: z.string().optional(),
     content: z.string(),
     createdAt: z.string(),
-    roomSlug: z.string(),
+    roomId: z.union([z.number(), z.string()]),
     roomName: z.string().optional(),
     roomKind: roomKindSchema.optional(),
   })
@@ -366,6 +394,12 @@ const globalSearchResponseSchema = z
   })
   .passthrough();
 
+const toRoomId = (value: number | string): number => {
+  const parsed =
+    typeof value === "number" ? value : Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+};
+
 export type EditMessageResponse = {
   id: number;
   content: string;
@@ -376,10 +410,12 @@ export type ReactionResponse = {
   emoji: string;
   userId: number;
   username: string;
+  displayName?: string;
 };
 export type SearchResult = {
   id: number;
   username: string;
+  displayName?: string;
   content: string;
   createdAt: string;
   highlight: string | null;
@@ -393,8 +429,11 @@ export type UploadResponse = {
   content: string;
   attachments: import("../../entities/message/types").Attachment[];
 };
-export type ReadStateResponse = { roomSlug: string; lastReadMessageId: number };
-export type UnreadCountItem = { roomSlug: string; unreadCount: number };
+export type ReadStateResponse = {
+  roomId: number;
+  lastReadMessageId: number | null;
+};
+export type UnreadCountItem = { roomId: number; unreadCount: number };
 export type RoomAttachmentItem =
   import("../../domain/interfaces/IApiService").RoomAttachmentItem;
 export type RoomAttachmentsResponse = {
@@ -404,24 +443,26 @@ export type RoomAttachmentsResponse = {
 export type GlobalSearchResponse = {
   users: {
     username: string;
+    displayName?: string;
     profileImage: string | null;
     avatarCrop: { x: number; y: number; width: number; height: number } | null;
     lastSeen: string | null;
   }[];
   groups: {
-    slug: string;
+    roomId: number;
     name: string;
     description: string;
-    username: string | null;
+    publicRef: string;
     memberCount: number;
     isPublic: boolean;
   }[];
   messages: {
     id: number;
     username: string;
+    displayName?: string;
     content: string;
     createdAt: string;
-    roomSlug: string;
+    roomId: number;
     roomName: string;
     roomKind: RoomKind;
   }[];
@@ -443,6 +484,7 @@ export const decodeSearchResponse = (input: unknown): SearchResponse => {
     results: parsed.results.map((r) => ({
       id: r.id,
       username: r.username,
+      displayName: r.displayName ?? r.username,
       content: r.content,
       createdAt: r.createdAt,
       highlight: r.highlight ?? null,
@@ -470,7 +512,11 @@ export const decodeUploadResponse = (input: unknown): UploadResponse => {
 };
 
 export const decodeReadStateResponse = (input: unknown): ReadStateResponse => {
-  return decodeOrThrow(readStateResponseSchema, input, "chat/read-state");
+  const parsed = decodeOrThrow(readStateResponseSchema, input, "chat/read-state");
+  return {
+    roomId: toRoomId(parsed.roomId),
+    lastReadMessageId: parsed.lastReadMessageId,
+  };
 };
 
 export const decodeUnreadCountsResponse = (
@@ -481,7 +527,10 @@ export const decodeUnreadCountsResponse = (
     input,
     "chat/unread-counts",
   );
-  return parsed.items;
+  return parsed.items.map((item) => ({
+    roomId: toRoomId(item.roomId),
+    unreadCount: item.unreadCount,
+  }));
 };
 
 export const decodeRoomAttachmentsResponse = (
@@ -505,6 +554,7 @@ export const decodeRoomAttachmentsResponse = (
       messageId: a.messageId,
       createdAt: a.createdAt,
       username: a.username,
+      displayName: a.displayName ?? a.username,
     })),
     pagination: parsed.pagination,
   };
@@ -521,24 +571,26 @@ export const decodeGlobalSearchResponse = (
   return {
     users: parsed.users.map((u) => ({
       username: u.username,
+      displayName: u.displayName ?? u.username,
       profileImage: u.profileImage ?? null,
       avatarCrop: u.avatarCrop ?? null,
       lastSeen: u.lastSeen ?? null,
     })),
     groups: parsed.groups.map((g) => ({
-      slug: g.slug,
+      roomId: toRoomId(g.roomId),
       name: g.name,
       description: g.description ?? "",
-      username: g.username ?? null,
+      publicRef: g.publicRef ?? "",
       memberCount: g.memberCount ?? 0,
       isPublic: g.isPublic ?? false,
     })),
     messages: parsed.messages.map((m) => ({
       id: m.id,
       username: m.username,
+      displayName: m.displayName ?? m.username,
       content: m.content,
       createdAt: m.createdAt,
-      roomSlug: m.roomSlug,
+      roomId: toRoomId(m.roomId),
       roomName: m.roomName ?? "",
       roomKind: m.roomKind ?? "public",
     })),

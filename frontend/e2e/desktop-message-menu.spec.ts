@@ -1,35 +1,10 @@
 ﻿import { expect, test, type Page } from "@playwright/test";
 
+import { registerWithRetry } from "./helpers/auth";
+
 async function register(page: Page, username: string, password: string) {
   const email = `${username}@e2e.local`;
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await page.goto("/register");
-    await page.getByTestId("auth-email-input").fill(email);
-    await page.getByTestId("auth-password-input").fill(password);
-    await page.getByTestId("auth-confirm-input").fill(password);
-
-    const [response] = await Promise.all([
-      page.waitForResponse(
-        (res) =>
-          res.url().includes("/api/auth/register/") &&
-          res.request().method() === "POST",
-      ),
-      page.getByTestId("auth-submit-button").click(),
-    ]);
-
-    if (response.status() === 201) {
-      await expect(page).toHaveURL("/");
-      return;
-    }
-
-    if (response.status() === 429 && attempt < 3) {
-      await page.waitForTimeout(1_500 * (attempt + 1));
-      continue;
-    }
-
-    throw new Error(`Registration failed with status ${response.status()}`);
-  }
+  await registerWithRetry(page, email, password);
 }
 
 test("desktop opens message action menu with right click", async ({ page }) => {
@@ -52,7 +27,10 @@ test("desktop opens message action menu with right click", async ({ page }) => {
   await input.fill(text);
   await page.getByTestId("chat-send-button").click();
 
-  const ownMessage = page.locator("article").filter({ has: page.getByText(text) }).last();
+  const ownMessage = page
+    .locator("article")
+    .filter({ has: page.getByText(text) })
+    .last();
   await expect(ownMessage).toBeVisible({ timeout: 20_000 });
 
   await ownMessage.click({ button: "right" });

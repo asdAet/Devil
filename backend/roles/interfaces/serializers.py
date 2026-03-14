@@ -5,6 +5,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from roles.models import Membership, PermissionOverride, Role
+from users.identity import user_public_username
 
 
 class RoleOutputSerializer(serializers.ModelSerializer):
@@ -42,7 +43,7 @@ class RoleUpdateInputSerializer(serializers.Serializer):
 
 class MemberRolesOutputSerializer(serializers.ModelSerializer):
     userId = serializers.IntegerField(source="user_id")
-    username = serializers.CharField(source="user.username")
+    username = serializers.SerializerMethodField()
     roleIds = serializers.SerializerMethodField()
     roles = RoleOutputSerializer(many=True, read_only=True)
 
@@ -52,6 +53,9 @@ class MemberRolesOutputSerializer(serializers.ModelSerializer):
 
     def get_roleIds(self, obj: Membership) -> list[int]:
         return list(obj.roles.order_by("-position", "id").values_list("id", flat=True))
+
+    def get_username(self, obj: Membership) -> str:
+        return user_public_username(obj.user)
 
 
 class MemberRolesUpdateInputSerializer(serializers.Serializer):

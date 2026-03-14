@@ -9,6 +9,7 @@ import type {
 } from "../../entities/friend/types";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { formatFullName, formatLastSeen } from "../../shared/lib/format";
+import { buildDirectPath, formatPublicRef } from "../../shared/lib/publicRef";
 import { usePresence } from "../../shared/presence";
 import { Avatar, Spinner } from "../../shared/ui";
 import styles from "../../styles/chat/DirectInfoPanel.module.css";
@@ -305,7 +306,7 @@ export function UserProfilePanel({ username, currentUsername }: Props) {
   }, [relation.userId, runAction]);
 
   const handleStartDirect = useCallback(() => {
-    navigate(`/@${encodeURIComponent(username)}`);
+    navigate(buildDirectPath(username));
   }, [navigate, username]);
 
   const isUserOnline = useMemo(
@@ -356,7 +357,7 @@ export function UserProfilePanel({ username, currentUsername }: Props) {
         />
         <h4 className={styles.peerName}>{fullName}</h4>
         {publicUsername && (
-          <p className={styles.usernameHandle}>@{publicUsername}</p>
+          <p className={styles.usernameHandle}>{formatPublicRef(publicUsername)}</p>
         )}
         <p className={styles.meta}>{presenceLabel}</p>
 

@@ -20,12 +20,14 @@ export type ReactionSummary = {
 export type ReplyTo = {
   id: number;
   username: string | null;
+  displayName?: string | null;
   content: string;
 };
 
 export type Message = {
   id: number;
   username: string;
+  displayName?: string;
   content: string;
   profilePic: string | null;
   avatarCrop?: AvatarCrop | null;

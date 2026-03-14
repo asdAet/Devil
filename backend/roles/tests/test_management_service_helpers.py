@@ -25,7 +25,9 @@ class _RolesManager:
 
 
 def _room_stub(**kwargs) -> Room:
-    return cast(Room, SimpleNamespace(**kwargs))
+    defaults = {"pk": 1, "kind": Room.Kind.PRIVATE}
+    defaults.update(kwargs)
+    return cast(Room, SimpleNamespace(**defaults))
 
 
 def _membership_stub(**kwargs) -> Membership:
@@ -39,11 +41,11 @@ def _override_stub(**kwargs) -> PermissionOverride:
 class ManagementServiceHelperTests(SimpleTestCase):
     def test_load_room_and_authentication_guards(self):
         room = _room_stub(slug="r1")
-        with patch("roles.application.management_service.repositories.get_room_by_slug", return_value=room):
-            self.assertEqual(management_service._load_room_or_raise("r1"), room)
-        with patch("roles.application.management_service.repositories.get_room_by_slug", return_value=None):
+        with patch("roles.application.management_service.repositories.get_room_by_id", return_value=room):
+            self.assertEqual(management_service._load_room_or_raise(1), room)
+        with patch("roles.application.management_service.repositories.get_room_by_id", return_value=None):
             with self.assertRaises(RoleNotFoundError):
-                management_service._load_room_or_raise("missing")
+                management_service._load_room_or_raise(999_999)
 
         with self.assertRaises(RoleForbiddenError):
             management_service._ensure_authenticated(None)
@@ -123,15 +125,15 @@ class ManagementServiceHelperTests(SimpleTestCase):
 
         direct_room = _room_stub(kind=Room.Kind.DIRECT)
         private_room = _room_stub(kind=Room.Kind.PRIVATE)
-        with patch("roles.application.management_service.repositories.get_room_by_slug", return_value=None):
-            self.assertFalse(management_service.actor_can_manage_roles("missing", SimpleNamespace()))
-        with patch("roles.application.management_service.repositories.get_room_by_slug", return_value=direct_room):
-            self.assertFalse(management_service.actor_can_manage_roles("dm", SimpleNamespace()))
-        with patch("roles.application.management_service.repositories.get_room_by_slug", return_value=private_room), patch(
+        with patch("roles.application.management_service.repositories.get_room_by_id", return_value=None):
+            self.assertFalse(management_service.actor_can_manage_roles(999_999, SimpleNamespace()))
+        with patch("roles.application.management_service.repositories.get_room_by_id", return_value=direct_room):
+            self.assertFalse(management_service.actor_can_manage_roles(2, SimpleNamespace()))
+        with patch("roles.application.management_service.repositories.get_room_by_id", return_value=private_room), patch(
             "roles.application.management_service.can_manage_roles",
             return_value=True,
         ):
-            self.assertTrue(management_service.actor_can_manage_roles("room", SimpleNamespace()))
+            self.assertTrue(management_service.actor_can_manage_roles(3, SimpleNamespace()))
 
     def test_list_room_roles_and_member_not_found_paths(self):
         context = management_service.RoomActorContext(
@@ -145,7 +147,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             "roles.application.management_service.repositories.list_roles",
             return_value=[1, 2],
         ):
-            self.assertEqual(management_service.list_room_roles("room", SimpleNamespace()), [1, 2])
+            self.assertEqual(management_service.list_room_roles(1, SimpleNamespace()), [1, 2])
 
         with patch(
             "roles.application.management_service._room_actor_context_or_raise",
@@ -155,9 +157,9 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.get_member_roles("room", 1, SimpleNamespace())
+                management_service.get_member_roles(1, 1, SimpleNamespace())
             with self.assertRaises(RoleNotFoundError):
-                management_service.set_member_roles("room", 1, SimpleNamespace(), [1, 2])
+                management_service.set_member_roles(1, 1, SimpleNamespace(), [1, 2])
 
     def test_update_room_role_error_and_change_paths(self):
         actor = SimpleNamespace(pk=1, username="actor", is_authenticated=True)
@@ -174,7 +176,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.update_room_role("room", 5, actor, name="new")
+                management_service.update_room_role(1, 5, actor, name="new")
 
         protected = SimpleNamespace(position=1, is_default=True, name="@everyone")
         with patch(
@@ -185,7 +187,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=protected,
         ):
             with self.assertRaises(RoleForbiddenError):
-                management_service.update_room_role("room", 5, actor, name="new")
+                management_service.update_room_role(1, 5, actor, name="new")
 
         role = SimpleNamespace(
             pk=50,
@@ -212,7 +214,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             "roles.application.management_service.audit_security_event",
         ):
             updated = management_service.update_room_role(
-                "room",
+                1,
                 50,
                 actor,
                 name="new-name",
@@ -270,7 +272,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
         ):
             with self.assertRaises(RoleConflictError):
                 management_service.create_room_role(
-                    "room",
+                    1,
                     actor,
                     name="Owner",
                     color="#111111",
@@ -307,7 +309,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=nullcontext(),
         ):
             with self.assertRaises(RoleConflictError):
-                management_service.update_room_role("room", 50, actor, name="new")
+                management_service.update_room_role(1, 50, actor, name="new")
 
     def test_delete_room_role_not_found_and_protected(self):
         actor = SimpleNamespace(pk=1, username="actor", is_authenticated=True)
@@ -323,7 +325,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.delete_room_role("room", 1, actor)
+                management_service.delete_room_role(1, 1, actor)
 
         protected = SimpleNamespace(position=1, is_default=True, name="Owner")
         with patch(
@@ -334,7 +336,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=protected,
         ):
             with self.assertRaises(RoleForbiddenError):
-                management_service.delete_room_role("room", 1, actor)
+                management_service.delete_room_role(1, 1, actor)
 
     def test_update_room_override_error_paths_and_change_save(self):
         actor = SimpleNamespace(pk=1, username="actor", is_authenticated=True)
@@ -351,7 +353,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.update_room_override("room", 10, actor, allow=1)
+                management_service.update_room_override(1, 10, actor, allow=1)
 
         role_target_override = SimpleNamespace(
             pk=10,
@@ -372,7 +374,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.update_room_override("room", 10, actor, allow=1)
+                management_service.update_room_override(1, 10, actor, allow=1)
 
         user_target_override = SimpleNamespace(
             pk=11,
@@ -393,7 +395,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.update_room_override("room", 11, actor, allow=1)
+                management_service.update_room_override(1, 11, actor, allow=1)
 
         role_target_override.allow = 0
         role_target_override.deny = 0
@@ -412,7 +414,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
         ), patch(
             "roles.application.management_service.audit_security_event",
         ):
-            updated = management_service.update_room_override("room", 10, actor, allow=2, deny=4)
+            updated = management_service.update_room_override(1, 10, actor, allow=2, deny=4)
         self.assertEqual(updated.allow, 2)
         self.assertEqual(updated.deny, 4)
         role_target_override.save.assert_called()
@@ -432,7 +434,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
             return_value=None,
         ):
             with self.assertRaises(RoleNotFoundError):
-                management_service.delete_room_override("room", 1, actor)
+                management_service.delete_room_override(1, 1, actor)
 
         role_override = SimpleNamespace(
             pk=20,
@@ -455,7 +457,7 @@ class ManagementServiceHelperTests(SimpleTestCase):
         ), patch(
             "roles.application.management_service.audit_security_event",
         ):
-            management_service.delete_room_override("room", 20, actor)
+            management_service.delete_room_override(1, 20, actor)
 
         user_override = SimpleNamespace(
             pk=21,
@@ -478,4 +480,4 @@ class ManagementServiceHelperTests(SimpleTestCase):
         ), patch(
             "roles.application.management_service.audit_security_event",
         ):
-            management_service.delete_room_override("room", 21, actor)
+            management_service.delete_room_override(1, 21, actor)

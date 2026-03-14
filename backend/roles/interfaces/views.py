@@ -1,4 +1,4 @@
-"""DRF views for room-scoped roles, memberships and overrides."""
+﻿"""DRF views for room-scoped roles, memberships and overrides."""
 
 from __future__ import annotations
 
@@ -39,21 +39,21 @@ def _optional_int(value: Any) -> int | None:
 class RoomRolesApiView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, room_slug: str):
+    def get(self, request, room_id: int):
         try:
-            items = management_service.list_room_roles(room_slug, request.user)
+            items = management_service.list_room_roles(room_id, request.user)
         except RoleServiceError as exc:
             return _service_error_response(exc)
         serializer = RoleOutputSerializer(items, many=True)
         return Response({"items": serializer.data})
 
-    def post(self, request, room_slug: str):
+    def post(self, request, room_id: int):
         serializer = RoleCreateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = cast(dict[str, Any], serializer.validated_data)
         try:
             role = management_service.create_room_role(
-                room_slug=room_slug,
+                room_id=room_id,
                 actor=request.user,
                 name=str(payload["name"]),
                 color=str(payload.get("color", "#99AAB5")),
@@ -69,13 +69,13 @@ class RoomRolesApiView(APIView):
 class RoomRoleDetailApiView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, room_slug: str, role_id: int):
+    def patch(self, request, room_id: int, role_id: int):
         serializer = RoleUpdateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = cast(dict[str, Any], serializer.validated_data)
         try:
             role = management_service.update_room_role(
-                room_slug=room_slug,
+                room_id=room_id,
                 role_id=int(role_id),
                 actor=request.user,
                 name=cast(str | None, payload.get("name")),
@@ -88,10 +88,10 @@ class RoomRoleDetailApiView(APIView):
         output = RoleOutputSerializer(role)
         return Response({"item": output.data})
 
-    def delete(self, request, room_slug: str, role_id: int):
+    def delete(self, request, room_id: int, role_id: int):
         try:
             management_service.delete_room_role(
-                room_slug=room_slug,
+                room_id=room_id,
                 role_id=int(role_id),
                 actor=request.user,
             )
@@ -103,10 +103,10 @@ class RoomRoleDetailApiView(APIView):
 class RoomMemberRolesApiView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, room_slug: str, user_id: int):
+    def get(self, request, room_id: int, user_id: int):
         try:
             membership = management_service.get_member_roles(
-                room_slug=room_slug,
+                room_id=room_id,
                 user_id=int(user_id),
                 actor=request.user,
             )
@@ -115,7 +115,7 @@ class RoomMemberRolesApiView(APIView):
         serializer = MemberRolesOutputSerializer(membership)
         return Response({"item": serializer.data})
 
-    def patch(self, request, room_slug: str, user_id: int):
+    def patch(self, request, room_id: int, user_id: int):
         serializer = MemberRolesUpdateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = cast(dict[str, Any], serializer.validated_data)
@@ -123,7 +123,7 @@ class RoomMemberRolesApiView(APIView):
         role_ids = [int(item) for item in raw_role_ids] if isinstance(raw_role_ids, list) else []
         try:
             membership = management_service.set_member_roles(
-                room_slug=room_slug,
+                room_id=room_id,
                 user_id=int(user_id),
                 actor=request.user,
                 role_ids=role_ids,
@@ -137,21 +137,21 @@ class RoomMemberRolesApiView(APIView):
 class RoomOverridesApiView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, room_slug: str):
+    def get(self, request, room_id: int):
         try:
-            items = management_service.list_room_overrides(room_slug, request.user)
+            items = management_service.list_room_overrides(room_id, request.user)
         except RoleServiceError as exc:
             return _service_error_response(exc)
         serializer = OverrideOutputSerializer(items, many=True)
         return Response({"items": serializer.data})
 
-    def post(self, request, room_slug: str):
+    def post(self, request, room_id: int):
         serializer = OverrideCreateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = cast(dict[str, Any], serializer.validated_data)
         try:
             item = management_service.create_room_override(
-                room_slug=room_slug,
+                room_id=room_id,
                 actor=request.user,
                 target_role_id=_optional_int(payload.get("targetRoleId")),
                 target_user_id=_optional_int(payload.get("targetUserId")),
@@ -167,13 +167,13 @@ class RoomOverridesApiView(APIView):
 class RoomOverrideDetailApiView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, room_slug: str, override_id: int):
+    def patch(self, request, room_id: int, override_id: int):
         serializer = OverrideUpdateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = cast(dict[str, Any], serializer.validated_data)
         try:
             item = management_service.update_room_override(
-                room_slug=room_slug,
+                room_id=room_id,
                 override_id=int(override_id),
                 actor=request.user,
                 allow=_optional_int(payload.get("allow")),
@@ -184,10 +184,10 @@ class RoomOverrideDetailApiView(APIView):
         output = OverrideOutputSerializer(item)
         return Response({"item": output.data})
 
-    def delete(self, request, room_slug: str, override_id: int):
+    def delete(self, request, room_id: int, override_id: int):
         try:
             management_service.delete_room_override(
-                room_slug=room_slug,
+                room_id=room_id,
                 override_id=int(override_id),
                 actor=request.user,
             )
@@ -199,9 +199,10 @@ class RoomOverrideDetailApiView(APIView):
 class RoomMyPermissionsApiView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, room_slug: str):
+    def get(self, request, room_id: int):
         try:
-            payload = management_service.permissions_for_me(room_slug, request.user)
+            payload = management_service.permissions_for_me(room_id, request.user)
         except RoleServiceError as exc:
             return _service_error_response(exc)
         return Response(payload)
+

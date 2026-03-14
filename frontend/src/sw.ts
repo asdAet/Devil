@@ -41,8 +41,8 @@ const matchPublicRoom = (url: URL) => url.pathname === "/api/chat/public-room/";
 const matchDirectChats = (url: URL) =>
   url.pathname === "/api/chat/direct/chats/";
 const matchUserProfile = (url: URL) =>
-  url.pathname.startsWith("/api/auth/users/");
-const matchSelfProfile = (url: URL) => url.pathname === "/api/auth/profile/";
+  url.pathname.startsWith("/api/public/resolve/");
+const matchSelfProfile = (url: URL) => url.pathname === "/api/profile/";
 const matchAuthNoCache = (url: URL) =>
   url.pathname === "/api/auth/login/" ||
   url.pathname === "/api/auth/register/" ||
@@ -207,26 +207,26 @@ self.addEventListener("message", (event) => {
 
   switch (payload.key) {
     case "roomMessages": {
-      const slug = payload.slug?.trim();
-      if (!slug) return;
+      const roomRef = payload.roomRef?.trim();
+      if (!roomRef) return;
 
       event.waitUntil(
         deleteMatching(
           CACHE_NAMES.apiMessages,
-          (url) => url.pathname === `/api/chat/rooms/${slug}/messages/`,
+          (url) => url.pathname === `/api/chat/rooms/${roomRef}/messages/`,
         ),
       );
       return;
     }
 
     case "roomDetails": {
-      const slug = payload.slug?.trim();
-      if (!slug) return;
+      const roomRef = payload.roomRef?.trim();
+      if (!roomRef) return;
 
       event.waitUntil(
         deleteMatching(
           CACHE_NAMES.apiRooms,
-          (url) => url.pathname === `/api/chat/rooms/${slug}/`,
+          (url) => url.pathname === `/api/chat/rooms/${roomRef}/`,
         ),
       );
       return;
@@ -243,13 +243,16 @@ self.addEventListener("message", (event) => {
     }
 
     case "userProfile": {
-      const username = payload.username?.trim();
-      if (!username) return;
+      const ref = payload.publicRef?.trim();
+      if (!ref) return;
 
       event.waitUntil(
         deleteMatching(
           CACHE_NAMES.apiProfiles,
-          (url) => url.pathname === `/api/auth/users/${username}/`,
+          (url) => {
+            const base = `/api/public/resolve/${encodeURIComponent(ref)}`;
+            return url.pathname === base || url.pathname === `${base}/`;
+          },
         ),
       );
       return;
@@ -259,7 +262,7 @@ self.addEventListener("message", (event) => {
       event.waitUntil(
         deleteMatching(
           CACHE_NAMES.apiProfiles,
-          (url) => url.pathname === "/api/auth/profile/",
+          (url) => url.pathname === "/api/profile/",
         ),
       );
       return;

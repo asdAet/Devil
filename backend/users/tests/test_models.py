@@ -3,9 +3,11 @@
 
 
 import io
-import tempfile
+import shutil
+from pathlib import Path
 
 from PIL import Image
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -36,14 +38,17 @@ class ProfileImageProcessingTests(TestCase):
     """Группирует тестовые сценарии класса `ProfileImageProcessingTests`."""
     def setUp(self):
         """Проверяет сценарий `setUp`."""
-        self.temp_media = tempfile.TemporaryDirectory()
-        self.override_media = override_settings(MEDIA_ROOT=self.temp_media.name)
+        media_parent = Path(settings.BASE_DIR).parent / ".tmp_test_media"
+        self.temp_media_path = media_parent / "profile_models_media"
+        shutil.rmtree(self.temp_media_path, ignore_errors=True)
+        (self.temp_media_path / "profile_pics").mkdir(parents=True, exist_ok=True)
+        self.override_media = override_settings(MEDIA_ROOT=str(self.temp_media_path))
         self.override_media.enable()
 
     def tearDown(self):
         """Проверяет сценарий `tearDown`."""
         self.override_media.disable()
-        self.temp_media.cleanup()
+        shutil.rmtree(self.temp_media_path, ignore_errors=True)
 
     @staticmethod
     def _make_rgba_upload_with_jpg_name() -> SimpleUploadedFile:
@@ -114,4 +119,10 @@ class ProfileImageProcessingTests(TestCase):
         image.save(buff, format="PNG")
         buff.seek(0)
         return SimpleUploadedFile("large.png", buff.read(), content_type="image/png")
+
+
+
+
+
+
 

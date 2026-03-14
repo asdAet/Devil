@@ -178,8 +178,8 @@ class ChatServicesTests(TestCase):
         services.mark_read(self.owner, second_room, m2.pk)
 
         items = services.get_unread_counts(self.owner)
-        self.assertTrue(any(item["roomSlug"] == self.room.slug for item in items))
-        self.assertFalse(any(item["roomSlug"] == second_room.slug for item in items))
+        self.assertTrue(any(item["roomId"] == self.room.pk for item in items))
+        self.assertFalse(any(item["roomId"] == second_room.pk for item in items))
 
         # ensure read-state branch for deleted and own messages does not inflate unread
         Message.objects.filter(pk=m1.pk).update(is_deleted=True)

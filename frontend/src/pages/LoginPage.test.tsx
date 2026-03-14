@@ -8,19 +8,15 @@ describe("LoginPage", () => {
     const onSubmit = vi.fn();
     render(<LoginPage onSubmit={onSubmit} onNavigate={vi.fn()} />);
 
-    fireEvent.change(screen.getByTestId("auth-email-input"), {
-      target: { value: "demo@example.com" },
+    fireEvent.change(screen.getByTestId("auth-identifier-input"), {
+      target: { value: "demo_login" },
     });
     fireEvent.change(screen.getByTestId("auth-password-input"), {
       target: { value: "secret" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
-    expect(onSubmit).toHaveBeenCalledWith(
-      "demo@example.com",
-      "secret",
-      undefined,
-    );
+    expect(onSubmit).toHaveBeenCalledWith("demo_login", "secret");
   });
 
   it("renders google oauth button disabled when oauth is not provided", () => {

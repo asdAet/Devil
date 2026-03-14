@@ -1,5 +1,5 @@
 ﻿
-"""РЎРѕРґРµСЂР¶РёС‚ Р»РѕРіРёРєСѓ РјРѕРґСѓР»СЏ `settings` РїРѕРґСЃРёСЃС‚РµРјС‹ `chat_app_django`."""
+"""Содержит логику модуля `settings` подсистемы `chat_app_django`."""
 
 
 import os
@@ -65,7 +65,7 @@ if not IS_PYTEST_RUN:
 
 
 def env_bool(name: str, default: bool) -> bool:
-    """Р’С‹РїРѕР»РЅСЏРµС‚ Р»РѕРіРёРєСѓ `env_bool` СЃ РїР°СЂР°РјРµС‚СЂР°РјРё РёР· СЃРёРіРЅР°С‚СѓСЂС‹."""
+    """Выполняет логику `env_bool` с параметрами из сигнатуры."""
     value = os.getenv(name)
     if value is None:
         return default
@@ -73,15 +73,26 @@ def env_bool(name: str, default: bool) -> bool:
 
 
 def env_list(name: str, default: list[str]) -> list[str]:
-    """Р’С‹РїРѕР»РЅСЏРµС‚ Р»РѕРіРёРєСѓ `env_list` СЃ РїР°СЂР°РјРµС‚СЂР°РјРё РёР· СЃРёРіРЅР°С‚СѓСЂС‹."""
+    """Выполняет логику `env_list` с параметрами из сигнатуры."""
     value = os.getenv(name)
     if not value:
         return default
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _extend_unique(items: list[str], extra: list[str]) -> list[str]:
+    seen = {item for item in items if item}
+    result = [item for item in items if item]
+    for item in extra:
+        if not item or item in seen:
+            continue
+        result.append(item)
+        seen.add(item)
+    return result
+
+
 def env_int(name: str, default: int, minimum: int | None = None) -> int:
-    """РџСЂРµРѕР±СЂР°Р·СѓРµС‚ Р·РЅР°С‡РµРЅРёРµ РїРµСЂРµРјРµРЅРЅРѕР№ РѕРєСЂСѓР¶РµРЅРёСЏ РІ С†РµР»РѕРµ С‡РёСЃР»Рѕ."""
+    """Преобразует значение переменной окружения в целое число."""
     raw = os.getenv(name)
     if raw is None:
         value = default
@@ -89,9 +100,9 @@ def env_int(name: str, default: int, minimum: int | None = None) -> int:
         try:
             value = int(raw)
         except ValueError as exc:
-            raise ImproperlyConfigured(f"{name} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј.") from exc
+            raise ImproperlyConfigured(f"{name} должно быть целым числом.") from exc
     if minimum is not None and value < minimum:
-        raise ImproperlyConfigured(f"{name} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ >= {minimum}.")
+        raise ImproperlyConfigured(f"{name} должно быть >= {minimum}.")
     return value
 
 
@@ -103,14 +114,20 @@ if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = secrets.token_urlsafe(50)
     else:
-        raise ImproperlyConfigured("DJANGO_SECRET_KEY РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ Р·Р°РґР°РЅ РІ production.")
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY должен быть задан в production.")
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
     ["localhost", "127.0.0.1"] if DEBUG else [],
 )
+ALLOW_LOCALHOST_DEV_ORIGINS = env_bool("DJANGO_ALLOW_LOCALHOST_DEV_ORIGINS", True)
+if ALLOW_LOCALHOST_DEV_ORIGINS:
+    ALLOWED_HOSTS = _extend_unique(
+        ALLOWED_HOSTS,
+        ["localhost", "127.0.0.1", "[::1]", "host.docker.internal"],
+    )
 if not DEBUG and not ALLOWED_HOSTS:
-    raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ Р·Р°РґР°РЅ РІ production.")
+    raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS должен быть задан в production.")
 
 
 INSTALLED_APPS = [
@@ -205,7 +222,7 @@ REDIS_URL = os.getenv("REDIS_URL")
 REQUIRE_REDIS = env_bool("DJANGO_REQUIRE_REDIS", not DEBUG)
 ALLOW_INMEMORY_CHANNEL_LAYER = env_bool("DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER", DEBUG)
 if REQUIRE_REDIS and not REDIS_URL:
-    raise ImproperlyConfigured("REDIS_URL РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ Р·Р°РґР°РЅ РІ production.")
+    raise ImproperlyConfigured("REDIS_URL должен быть задан в production.")
 
 if REDIS_URL:
     CHANNEL_LAYERS = {
@@ -222,12 +239,12 @@ elif ALLOW_INMEMORY_CHANNEL_LAYER:
     }
 else:
     raise ImproperlyConfigured(
-        "РўСЂРµР±СѓРµС‚СЃСЏ REDIS_URL, РµСЃР»Рё DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER РЅРµ СЂР°РІРµРЅ 1."
+        "Требуется REDIS_URL, если DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER не равен 1."
     )
 
 
 def _database_from_url(url: str) -> dict:
-    """Р’С‹РїРѕР»РЅСЏРµС‚ Р»РѕРіРёРєСѓ `_database_from_url` СЃ РїР°СЂР°РјРµС‚СЂР°РјРё РёР· СЃРёРіРЅР°С‚СѓСЂС‹."""
+    """Выполняет логику `_database_from_url` с параметрами из сигнатуры."""
     parsed = urlparse(url)
     if parsed.scheme in {"postgres", "postgresql"}:
         return {
@@ -238,7 +255,7 @@ def _database_from_url(url: str) -> dict:
             "HOST": parsed.hostname or "",
             "PORT": str(parsed.port or ""),
         }
-    raise ImproperlyConfigured("РќРµРїРѕРґРґРµСЂР¶РёРІР°РµРјР°СЏ СЃС…РµРјР° DATABASE_URL.")
+    raise ImproperlyConfigured("Неподдерживаемая схема DATABASE_URL.")
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -275,12 +292,12 @@ if (
     and DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3"
     and not ALLOW_SQLITE_IN_PROD
 ):
-    raise ImproperlyConfigured("SQLite РЅРµ СЂР°Р·СЂРµС€РµРЅ РІ production.")
+    raise ImproperlyConfigured("SQLite не разрешен в production.")
 
 
 RELAX_PASSWORDS = env_bool("DJANGO_RELAX_PASSWORDS", DEBUG)
 if not DEBUG and RELAX_PASSWORDS:
-    raise ImproperlyConfigured("DJANGO_RELAX_PASSWORDS РЅРµР»СЊР·СЏ РІРєР»СЋС‡Р°С‚СЊ РІ production.")
+    raise ImproperlyConfigured("DJANGO_RELAX_PASSWORDS нельзя включать в production.")
 
 if RELAX_PASSWORDS:
     AUTH_PASSWORD_VALIDATORS = [
@@ -325,11 +342,15 @@ CSRF_TRUSTED_ORIGINS = env_list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     _DEV_ORIGINS if DEBUG else [],
 )
+if ALLOW_LOCALHOST_DEV_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = _extend_unique(CSRF_TRUSTED_ORIGINS, _DEV_ORIGINS)
 
 CORS_ALLOWED_ORIGINS = env_list(
     "DJANGO_CORS_ALLOWED_ORIGINS",
     _DEV_ORIGINS if DEBUG else [],
 )
+if ALLOW_LOCALHOST_DEV_ORIGINS:
+    CORS_ALLOWED_ORIGINS = _extend_unique(CORS_ALLOWED_ORIGINS, _DEV_ORIGINS)
 CORS_ALLOW_CREDENTIALS = env_bool("DJANGO_CORS_ALLOW_CREDENTIALS", True)
 CORS_URLS_REGEX = r"^/api/.*$"
 PUBLIC_BASE_URL = os.getenv("DJANGO_PUBLIC_BASE_URL", "").strip() or None
@@ -352,6 +373,10 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", not DEBUG)
 CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", not DEBUG)
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
+SECURE_CROSS_ORIGIN_OPENER_POLICY = (
+    os.getenv("DJANGO_SECURE_COOP", "same-origin-allow-popups").strip()
+    or "same-origin-allow-popups"
+)
 
 MAX_UPLOAD_SIZE_MB = int(os.getenv("DJANGO_UPLOAD_MAX_MB", "20"))
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
@@ -373,9 +398,10 @@ CHAT_MESSAGES_MAX_PAGE_SIZE = int(os.getenv("CHAT_MESSAGES_MAX_PAGE_SIZE", "200"
 CHAT_WS_IDLE_TIMEOUT = int(os.getenv("CHAT_WS_IDLE_TIMEOUT", "600"))
 CHAT_ROOM_SLUG_REGEX = os.getenv("CHAT_ROOM_SLUG_REGEX", r"^[A-Za-z0-9_-]{3,60}$")
 
-# в”Ђв”Ђ Attachments в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# -- Attachments --------------------------------------------------------
 CHAT_ATTACHMENT_MAX_SIZE_MB = env_int("CHAT_ATTACHMENT_MAX_SIZE_MB", 10, minimum=1)
 CHAT_ATTACHMENT_MAX_PER_MESSAGE = env_int("CHAT_ATTACHMENT_MAX_PER_MESSAGE", 5, minimum=1)
+CHAT_ATTACHMENT_ALLOW_ANY_TYPE = env_bool("CHAT_ATTACHMENT_ALLOW_ANY_TYPE", True)
 CHAT_ATTACHMENT_ALLOWED_TYPES = env_list("CHAT_ATTACHMENT_ALLOWED_TYPES", [
     "image/jpeg", "image/png", "image/gif", "image/webp",
     "application/pdf", "text/plain", "video/mp4", "audio/mpeg", "audio/webm",
@@ -386,6 +412,7 @@ WS_CONNECT_RATE_LIMIT = env_int("WS_CONNECT_RATE_LIMIT", 60, minimum=1)
 WS_CONNECT_RATE_WINDOW = env_int("WS_CONNECT_RATE_WINDOW", 60, minimum=1)
 WS_CONNECT_RATE_LIMIT_PRESENCE = env_int("WS_CONNECT_RATE_LIMIT_PRESENCE", 180, minimum=1)
 WS_CONNECT_RATE_WINDOW_PRESENCE = env_int("WS_CONNECT_RATE_WINDOW_PRESENCE", 60, minimum=1)
+WS_CONNECT_RATE_LIMIT_DISABLED = env_bool("WS_CONNECT_RATE_LIMIT_DISABLED", False)
 PRESENCE_TTL = int(os.getenv("PRESENCE_TTL", "40"))
 PRESENCE_GRACE = int(os.getenv("PRESENCE_GRACE", "5"))
 PRESENCE_HEARTBEAT = int(os.getenv("PRESENCE_HEARTBEAT", "20"))
@@ -397,7 +424,7 @@ DIRECT_INBOX_ACTIVE_TTL = int(os.getenv("DIRECT_INBOX_ACTIVE_TTL", "90"))
 DIRECT_INBOX_HEARTBEAT = int(os.getenv("DIRECT_INBOX_HEARTBEAT", "20"))
 DIRECT_INBOX_IDLE_TIMEOUT = int(os.getenv("DIRECT_INBOX_IDLE_TIMEOUT", "90"))
 
-# в”Ђв”Ђ Groups в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# -- Groups -------------------------------------------------------------
 GROUP_INVITE_CODE_LENGTH = env_int("GROUP_INVITE_CODE_LENGTH", 12, minimum=8)
 GROUP_MAX_INVITES_PER_ROOM = env_int("GROUP_MAX_INVITES_PER_ROOM", 50, minimum=1)
 GROUP_MAX_PINNED_MESSAGES = env_int("GROUP_MAX_PINNED_MESSAGES", 100, minimum=1)
@@ -425,7 +452,7 @@ else:
 LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO").upper()
 
 
-# в”Ђв”Ђ SQLite PRAGMAs via connection signal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# -- SQLite PRAGMAs via connection signal ------------------------------
 def _sqlite_pragmas(sender, connection, **kwargs):
     if connection.vendor == "sqlite":
         cursor = connection.cursor()

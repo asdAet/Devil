@@ -5,6 +5,7 @@ import type {
   UploadAttachmentsOptions,
   UploadResult,
 } from "../../domain/interfaces/IApiService";
+import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 export async function uploadAttachments(
   apiClient: AxiosInstance,
@@ -12,7 +13,8 @@ export async function uploadAttachments(
   files: File[],
   options?: UploadAttachmentsOptions,
 ): Promise<UploadResult> {
-  const encodedSlug = encodeURIComponent(slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const formData = new FormData();
   for (const file of files) {
     formData.append("files", file);
@@ -24,7 +26,7 @@ export async function uploadAttachments(
     formData.append("replyTo", String(options.replyTo));
   }
   const response = await apiClient.post<unknown>(
-    `/chat/rooms/${encodedSlug}/attachments/`,
+    `/chat/rooms/${encodedRoomRef}/attachments/`,
     formData,
     options?.onProgress
       ? {

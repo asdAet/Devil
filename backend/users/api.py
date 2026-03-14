@@ -1,4 +1,4 @@
-﻿"""Users API: session, auth, profile and signed media endpoints."""
+﻿"""Users API: session, auth, profile and public resolver endpoints."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ParseError, UnsupportedMediaType
 from rest_framework.response import Response
+from rooms.models import Room
 
 from chat_app_django.http_utils import error_response, parse_request_payload
 from chat_app_django.ip_utils import get_client_ip_from_request
@@ -34,7 +35,18 @@ from chat_app_django.security.rate_limit import DbRateLimiter, RateLimitPolicy
 from users.application import auth_service
 from users.application.errors import IdentityServiceError
 from users.forms import ProfileUpdateForm
-from users.identity import ensure_profile, normalize_public_username, user_public_username
+from users.identity import (
+    ensure_profile,
+    ensure_user_identity_core,
+    resolve_public_ref,
+    room_public_handle,
+    room_public_id,
+    room_public_ref,
+    user_public_handle,
+    user_public_id,
+    user_profile_avatar_source,
+    user_public_ref,
+)
 
 
 AUTH_BACKEND_PATH = "users.auth_backends.EmailIdentityBackend"
@@ -55,27 +67,29 @@ def _resolve_email(user) -> str:
     identity = getattr(user, "email_identity", None)
     if identity and getattr(identity, "email_normalized", None):
         return identity.email_normalized
-    email_value = getattr(user, "email", "")
-    return (email_value or "").strip().lower()
+    return ""
 
 
 def _serialize_user(request, user):
     profile = ensure_profile(user)
     profile_image = None
-    image = getattr(profile, "image", None)
-    image_name = getattr(image, "name", "") if image else ""
-    if image_name:
-        profile_image = build_profile_url_from_request(request, image_name)
+    avatar_source = user_profile_avatar_source(user)
+    if avatar_source:
+        if avatar_source.startswith("http://") or avatar_source.startswith("https://"):
+            profile_image = avatar_source
+        else:
+            profile_image = build_profile_url_from_request(request, avatar_source)
 
     last_seen = getattr(profile, "last_seen", None)
-    public_username = normalize_public_username(getattr(profile, "username", None)) or None
-    effective_username = user_public_username(user)
+    handle = user_public_handle(user)
+    public_id = user_public_id(user)
 
     return {
         "id": user.pk,
         "name": (getattr(profile, "name", "") or "").strip(),
-        "username": effective_username,
-        "publicUsername": public_username,
+        "handle": handle,
+        "publicId": public_id,
+        "publicRef": user_public_ref(user),
         "email": _resolve_email(user),
         "profileImage": profile_image,
         "avatarCrop": serialize_avatar_crop(profile),
@@ -106,8 +120,8 @@ def _rate_limited(request, action: str) -> bool:
 
 def _identity_error_response(exc: IdentityServiceError) -> Response:
     payload: dict[str, object] = {
-        "error": exc.message,
         "code": exc.code,
+        "message": exc.message,
     }
     if exc.errors:
         payload["errors"] = exc.errors
@@ -139,6 +153,12 @@ def presence_session_view(request):
     return Response({"ok": True})
 
 
+@api_view(["GET"])
+def password_rules_view(request):
+    rules = [str(rule) for rule in password_validation.password_validators_help_texts()]
+    return Response({"rules": rules})
+
+
 @csrf_protect
 @api_view(["POST"])
 def login_view(request):
@@ -147,25 +167,25 @@ def login_view(request):
         return error_response(status=429, error="Слишком много попыток")
 
     payload = _extract_payload(request)
-    email = str(payload.get("email") or "").strip()
+    identifier = str(payload.get("identifier") or "").strip()
     password = str(payload.get("password") or "")
 
-    if not email or not password:
+    if not identifier or not password:
         audit_http_event("auth.login.failed", request, reason="missing_credentials")
         return error_response(
             status=400,
-            error="Укажите email и пароль",
-            errors={"credentials": ["Укажите email и пароль"]},
+            error="Укажите identifier и пароль",
+            errors={"credentials": ["Укажите identifier и пароль"]},
         )
 
     try:
-        user = auth_service.login_with_email(email, password)
+        user = auth_service.login_user(identifier, password)
     except IdentityServiceError as exc:
         audit_http_event("auth.login.failed", request, reason=exc.code)
         return _identity_error_response(exc)
 
     login(request, user, backend=AUTH_BACKEND_PATH)
-    audit_http_event("auth.login.success", request, username=user_public_username(user))
+    audit_http_event("auth.login.success", request, public_ref=user_public_ref(user))
     return Response({"authenticated": True, "user": _serialize_user(request, user)})
 
 
@@ -194,18 +214,32 @@ def register_view(request):
         return error_response(status=429, error="Слишком много попыток")
 
     payload = _extract_payload(request)
-    email = str(payload.get("email") or "").strip()
-    password1 = str(payload.get("password1") or "")
-    password2 = str(payload.get("password2") or "")
+
+    login_value = str(payload.get("login") or "")
+    password = str(payload.get("password") or "")
+    password_confirm = str(payload.get("passwordConfirm") or "")
+    name = str(payload.get("name") or "")
+    username = payload.get("username")
+    email = payload.get("email")
+
+    username_value = username if isinstance(username, str) else None
+    email_value = email if isinstance(email, str) else None
 
     try:
-        user = auth_service.register_with_email(email, password1, password2)
+        user = auth_service.register_user(
+            login=login_value,
+            password=password,
+            password_confirm=password_confirm,
+            name=name,
+            username=username_value,
+            email=email_value,
+        )
     except IdentityServiceError as exc:
         audit_http_event("auth.register.failed", request, reason=exc.code)
         return _identity_error_response(exc)
 
     login(request, user, backend=AUTH_BACKEND_PATH)
-    audit_http_event("auth.register.success", request, username=user_public_username(user))
+    audit_http_event("auth.register.success", request, public_ref=user_public_ref(user))
     return Response({"authenticated": True, "user": _serialize_user(request, user)}, status=201)
 
 
@@ -213,25 +247,24 @@ def register_view(request):
 @api_view(["POST"])
 def oauth_google_view(request):
     payload = _extract_payload(request)
-    id_token = str(payload.get("idToken") or "")
-    access_token = str(payload.get("accessToken") or "")
+    id_token = str(payload.get("idToken") or "").strip() or None
+    access_token = str(payload.get("accessToken") or "").strip() or None
+    username = payload.get("username")
+    username_value = username if isinstance(username, str) else None
+
     try:
         user = auth_service.authenticate_or_signup_with_google(
             id_token=id_token,
             access_token=access_token,
+            username=username_value,
         )
     except IdentityServiceError as exc:
         audit_http_event("auth.oauth.google.failed", request, reason=exc.code)
         return _identity_error_response(exc)
 
     login(request, user, backend=AUTH_BACKEND_PATH)
-    audit_http_event("auth.oauth.google.success", request, username=user_public_username(user))
+    audit_http_event("auth.oauth.google.success", request, public_ref=user_public_ref(user))
     return Response({"authenticated": True, "user": _serialize_user(request, user)})
-
-
-@api_view(["GET"])
-def password_rules(request):
-    return Response({"rules": password_validation.password_validators_help_texts()})
 
 
 @api_view(["GET"])
@@ -271,21 +304,8 @@ def media_view(request, file_path: str):
     return response
 
 
-@api_view(["GET"])
-def public_profile_view(request, username: str):
-    normalized = normalize_public_username(username)
-    if not normalized:
-        return Response({"error": "Не найдено"}, status=404)
-
-    user = auth_service.get_user_by_username(normalized)
-    if user is None:
-        return Response({"error": "Не найдено"}, status=404)
-
-    return Response({"user": _serialize_public_user(request, user)})
-
-
 @csrf_protect
-@api_view(["GET", "POST", "PATCH"])
+@api_view(["GET", "PATCH"])
 def profile_view(request):
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
@@ -307,21 +327,6 @@ def profile_view(request):
         else:
             auth_service.set_profile_name(user, next_name)
 
-    if "username" in payload:
-        raw_username = payload.get("username")
-        username_value: str | None
-        if raw_username is None or isinstance(raw_username, str):
-            username_value = raw_username
-        else:
-            username_value = str(raw_username)
-        try:
-            auth_service.set_username(user, username_value)
-        except IdentityServiceError as exc:
-            for field, field_errors in exc.errors.items():
-                errors[field] = field_errors
-            if not exc.errors:
-                errors.setdefault("username", []).append(exc.message)
-
     media_form = ProfileUpdateForm(payload, request.FILES, instance=profile)
     if media_form.is_valid():
         media_form.save()
@@ -331,8 +336,102 @@ def profile_view(request):
             errors[field] = [str(error_item) for error_item in field_errors]
 
     if errors:
-        audit_http_event("auth.profile.update.failed", request, username=user_public_username(user), errors=errors)
+        audit_http_event("auth.profile.update.failed", request, public_ref=user_public_ref(user), errors=errors)
         return error_response(status=400, errors=errors)
 
-    audit_http_event("auth.profile.update.success", request, username=user_public_username(user))
+    audit_http_event("auth.profile.update.success", request, public_ref=user_public_ref(user))
     return Response({"user": _serialize_user(request, user)})
+
+
+@csrf_protect
+@api_view(["PATCH"])
+def profile_handle_view(request):
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return error_response(status=401, error="Требуется авторизация")
+
+    payload = _extract_payload(request)
+    username = payload.get("username")
+    username_value = username if isinstance(username, str) else None
+
+    try:
+        auth_service.set_public_handle(user, username_value)
+    except IdentityServiceError as exc:
+        return _identity_error_response(exc)
+
+    return Response({"user": _serialize_user(request, user)})
+
+
+@csrf_protect
+@api_view(["GET", "PATCH"])
+def security_settings_view(request):
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return error_response(status=401, error="Требуется авторизация")
+
+    if request.method == "GET":
+        return Response({"security": auth_service.get_security_settings(user)})
+
+    payload = _extract_payload(request)
+    raw_email = payload.get("email")
+    raw_password = payload.get("newPassword")
+    raw_verify_email = payload.get("verifyEmail")
+    raw_unlink_provider = payload.get("unlinkOAuthProvider")
+
+    email_value = raw_email if isinstance(raw_email, str) else None
+    password_value = raw_password if isinstance(raw_password, str) else None
+    verify_email_value = bool(raw_verify_email) if "verifyEmail" in payload else None
+    unlink_provider_value = raw_unlink_provider if isinstance(raw_unlink_provider, str) else None
+
+    try:
+        auth_service.update_security_settings(
+            user,
+            email=email_value if "email" in payload else None,
+            verify_email=verify_email_value,
+            new_password=password_value if "newPassword" in payload else None,
+            unlink_oauth_provider=unlink_provider_value if "unlinkOAuthProvider" in payload else None,
+        )
+    except IdentityServiceError as exc:
+        return _identity_error_response(exc)
+
+    return Response(
+        {
+            "ok": True,
+            "security": auth_service.get_security_settings(user),
+            "user": _serialize_user(request, user),
+        }
+    )
+
+
+@api_view(["GET"])
+def public_resolve_view(request, ref: str):
+    owner_type, owner = resolve_public_ref(ref)
+    if owner is None or owner_type is None:
+        return Response({"error": "Не найдено"}, status=404)
+
+    if owner_type == "user":
+        if isinstance(owner, Room):
+            return Response({"error": "Не найдено"}, status=404)
+        return Response(
+            {
+                "ownerType": "user",
+                "ownerId": owner.pk,
+                "publicRef": user_public_ref(owner),
+                "handle": user_public_handle(owner),
+                "publicId": ensure_user_identity_core(owner).public_id,
+                "user": _serialize_public_user(request, owner),
+            }
+        )
+
+    if not isinstance(owner, Room):
+        return Response({"error": "Не найдено"}, status=404)
+
+    return Response(
+        {
+            "ownerType": "group",
+            "ownerId": owner.pk,
+            "publicRef": room_public_ref(owner),
+            "handle": room_public_handle(owner),
+            "publicId": room_public_id(owner),
+        }
+    )

@@ -21,7 +21,6 @@ import { useReconnectingWebSocket } from "../hooks/useReconnectingWebSocket";
 import { useRoomPermissions } from "../hooks/useRoomPermissions";
 import { useTypingIndicator } from "../hooks/useTypingIndicator";
 import {
-  useChatAttachmentAllowedTypes,
   useChatAttachmentMaxPerMessage,
   useChatAttachmentMaxSizeMb,
   useChatMessageMaxLength,
@@ -56,6 +55,7 @@ import { TypingIndicator } from "../widgets/chat/TypingIndicator";
 type ReadReceipt = {
   userId: number;
   username: string;
+  displayName?: string;
   lastReadMessageId: number;
 };
 
@@ -75,10 +75,27 @@ const MARK_READ_DEBOUNCE_MS = 180;
 const PENDING_READ_STORAGE_PREFIX = "chat.pendingRead.";
 const CSRF_SESSION_STORAGE_KEY = "csrfToken";
 
+const normalizeActorRef = (value: string | null | undefined): string => {
+  if (!value) return "";
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return "";
+  return normalized.startsWith("@") ? normalized.slice(1) : normalized;
+};
+
+const resolveCurrentActorRef = (user: UserProfile | null): string => {
+  if (!user) return "";
+  return (
+    normalizeActorRef(user.publicRef) ||
+    normalizeActorRef(user.username) ||
+    normalizeActorRef(user.publicId) ||
+    ""
+  );
+};
+
 const isOwnMessage = (
   message: Message,
-  currentUsername: string | null | undefined,
-) => Boolean(currentUsername && message.username === currentUsername);
+  currentActorRef: string,
+) => Boolean(currentActorRef && normalizeActorRef(message.username) === currentActorRef);
 
 const normalizeReadMessageId = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value))
@@ -88,6 +105,19 @@ const normalizeReadMessageId = (value: unknown): number => {
     if (Number.isFinite(parsed)) return Math.max(0, Math.trunc(parsed));
   }
   return 0;
+};
+
+const parseRoomIdRef = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return Math.trunc(value);
+  }
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.trunc(parsed);
 };
 
 const pendingReadStorageKey = (roomSlug: string) =>
@@ -218,18 +248,6 @@ const extractApiErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-const normalizeAttachmentType = (contentType: string) => {
-  const normalized = contentType.trim().toLowerCase();
-  if (
-    normalized === "audio/mp3" ||
-    normalized === "audio/x-mp3" ||
-    normalized === "audio/x-mpeg"
-  ) {
-    return "audio/mpeg";
-  }
-  return normalized;
-};
-
 const sameAvatarCrop = (
   left: Message["avatarCrop"],
   right: Message["avatarCrop"],
@@ -260,6 +278,14 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   } = useChatRoom(slug, user);
   const location = useLocation();
   const isPublicRoom = slug === "public";
+  const parsedSlugRoomId = useMemo(() => parseRoomIdRef(slug), [slug]);
+  const resolvedRoomId = useMemo(() => {
+    const fromDetails = parseRoomIdRef(details?.roomId);
+    return fromDetails ?? parsedSlugRoomId;
+  }, [details?.roomId, parsedSlugRoomId]);
+  const roomApiRef = useMemo(() => {
+    return resolvedRoomId === null ? null : String(resolvedRoomId);
+  }, [resolvedRoomId]);
   const isOnline = useOnlineStatus();
   const { open: openInfoPanel } = useInfoPanel();
   const { setActiveRoom, markRead: markDirectRoomRead } = useDirectInbox();
@@ -267,7 +293,6 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const maxMessageLength = useChatMessageMaxLength();
   const maxAttachmentSizeMb = useChatAttachmentMaxSizeMb();
   const maxAttachmentPerMessage = useChatAttachmentMaxPerMessage();
-  const allowedAttachmentTypes = useChatAttachmentAllowedTypes();
   const roomPermissions = useRoomPermissions(user ? slug : null);
   const {
     loading: permissionsLoading,
@@ -294,6 +319,10 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const [typingUsers, setTypingUsers] = useState<Map<string, number>>(
     new Map(),
   );
+  const [typingDisplayNames, setTypingDisplayNames] = useState<
+    Map<string, string>
+  >(new Map());
+  const currentActorRef = useMemo(() => resolveCurrentActorRef(user), [user]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [readReceipts, setReadReceipts] = useState<Map<number, ReadReceipt>>(
@@ -315,13 +344,6 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     SearchResultItem[]
   >([]);
 
-  const normalizedAllowedAttachmentTypes = useMemo(
-    () =>
-      new Set(
-        allowedAttachmentTypes.map((item) => normalizeAttachmentType(item)),
-      ),
-    [allowedAttachmentTypes],
-  );
   const maxAttachmentSizeBytes = useMemo(
     () => maxAttachmentSizeMb * 1024 * 1024,
     [maxAttachmentSizeMb],
@@ -441,7 +463,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     applyViewportRead,
   } = useReadTracker({
     messages,
-    currentUsername: user?.username,
+    currentUsername: currentActorRef,
     serverLastReadMessageId: effectiveServerLastReadMessageId,
     enabled: Boolean(readStateEnabled && initialPositioningPhase === "settled"),
     resetKey: slug,
@@ -505,8 +527,9 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
   const wsUrl = useMemo(() => {
     if (!user && !isPublicRoom) return null;
-    return `${getWebSocketBase()}/ws/chat/${encodeURIComponent(slug)}/`;
-  }, [isPublicRoom, slug, user]);
+    if (!roomApiRef) return null;
+    return `${getWebSocketBase()}/ws/chat/${encodeURIComponent(roomApiRef)}/`;
+  }, [isPublicRoom, roomApiRef, user]);
 
   const applyRateLimit = useCallback((cooldownMs: number) => {
     const until = Date.now() + cooldownMs;
@@ -693,20 +716,36 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
         }
         return next.size === prev.size ? prev : next;
       });
+      setTypingDisplayNames((prev) => {
+        if (!prev.size) return prev;
+        const next = new Map<string, string>();
+        for (const [username, label] of prev) {
+          const ts = typingUsers.get(username);
+          if (typeof ts === "number" && ts > cutoff) {
+            next.set(username, label);
+          }
+        }
+        return next.size === prev.size ? prev : next;
+      });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [typingUsers.size]);
+  }, [typingUsers, typingUsers.size]);
 
   const sendMarkReadIfNeeded = useCallback(
     (lastReadMessageId: number | null | undefined) => {
-      if (!readStateEnabled || !lastReadMessageId || lastReadMessageId < 1) {
+      if (
+        !readStateEnabled ||
+        !lastReadMessageId ||
+        lastReadMessageId < 1 ||
+        !roomApiRef
+      ) {
         return;
       }
       persistPendingRead(lastReadMessageId);
       if (lastReadMessageId <= lastReadSentRef.current) return;
       lastReadSentRef.current = lastReadMessageId;
       void chatController
-        .markRead(slug, lastReadMessageId)
+        .markRead(roomApiRef, lastReadMessageId)
         .then(() => {
           clearPendingRead(lastReadMessageId);
         })
@@ -716,7 +755,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
           }
         });
     },
-    [clearPendingRead, persistPendingRead, readStateEnabled, slug],
+    [clearPendingRead, persistPendingRead, readStateEnabled, roomApiRef],
   );
 
   const scheduleMarkRead = useCallback(
@@ -731,17 +770,18 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       markReadTimerRef.current = window.setTimeout(() => {
         markReadTimerRef.current = null;
         sendMarkReadIfNeeded(lastReadMessageId);
-        if (user && slug.startsWith("dm_")) {
-          markDirectRoomRead(slug);
+        if (user && details?.kind === "direct" && resolvedRoomId !== null) {
+          markDirectRoomRead(resolvedRoomId);
         }
       }, MARK_READ_DEBOUNCE_MS);
     },
     [
+      details?.kind,
       markDirectRoomRead,
       persistPendingRead,
       readStateEnabled,
+      resolvedRoomId,
       sendMarkReadIfNeeded,
-      slug,
       user,
     ],
   );
@@ -754,11 +794,11 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       normalizeReadMessageId(localLastReadMessageId),
     );
     if (candidate < 1 || candidate <= baseline) return;
+    if (!roomApiRef) return;
 
     persistPendingRead(candidate);
-
-    const encodedSlug = encodeURIComponent(slug);
-    const url = `/api/chat/rooms/${encodedSlug}/read/`;
+    const encodedRoomRef = encodeURIComponent(roomApiRef);
+    const url = `/api/chat/rooms/${encodedRoomRef}/read/`;
     const csrfToken = resolveCsrfToken();
     let beaconSent = false;
 
@@ -794,7 +834,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     details?.lastReadMessageId,
     localLastReadMessageId,
     persistPendingRead,
-    slug,
+    roomApiRef,
     readStateEnabled,
   ]);
 
@@ -807,8 +847,20 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       viewportReadRafRef.current = null;
       const nextLastRead = applyViewportRead(listRef.current);
       persistPendingRead(nextLastRead);
+      const latestVisibleMessageId =
+        messagesRef.current.length > 0
+          ? (messagesRef.current[messagesRef.current.length - 1]?.id ?? 0)
+          : 0;
+      if (nextLastRead > 0 && nextLastRead <= latestVisibleMessageId) {
+        sendMarkReadIfNeeded(nextLastRead);
+      }
     });
-  }, [applyViewportRead, persistPendingRead, readStateEnabled]);
+  }, [
+    applyViewportRead,
+    persistPendingRead,
+    readStateEnabled,
+    sendMarkReadIfNeeded,
+  ]);
 
   useEffect(() => {
     if (!readStateEnabled) return;
@@ -847,12 +899,12 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   }, [details?.lastReadMessageId, readStateEnabled, sendMarkReadIfNeeded]);
 
   useEffect(() => {
-    if (!user || !slug.startsWith("dm_")) return;
-    setActiveRoom(slug);
+    if (!user || details?.kind !== "direct" || resolvedRoomId === null) return;
+    setActiveRoom(resolvedRoomId);
     return () => {
       setActiveRoom(null);
     };
-  }, [setActiveRoom, slug, user]);
+  }, [details?.kind, resolvedRoomId, setActiveRoom, user]);
 
   useEffect(() => {
     setUnreadOverride({ roomSlug: slug, unreadCount: localUnreadCount });
@@ -1034,6 +1086,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
               {
                 id: messageId,
                 username: decoded.message.username,
+                displayName:
+                  decoded.message.displayName ?? decoded.message.username,
                 content,
                 profilePic: decoded.message.profilePic || null,
                 avatarCrop: decoded.message.avatarCrop ?? null,
@@ -1050,7 +1104,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
           if (
             !isAtBottomRef.current &&
-            decoded.message.username !== user?.username
+            normalizeActorRef(decoded.message.username) !== currentActorRef
           ) {
             setNewMsgCount((count) => count + 1);
             if (readStateEnabled && unreadDividerAnchorRef.current === null) {
@@ -1064,13 +1118,24 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
             next.delete(decoded.message.username);
             return next;
           });
+          setTypingDisplayNames((prev) => {
+            if (!prev.has(decoded.message.username)) return prev;
+            const next = new Map(prev);
+            next.delete(decoded.message.username);
+            return next;
+          });
           break;
         }
         case "typing":
-          if (decoded.username !== user?.username) {
+          if (normalizeActorRef(decoded.username) !== currentActorRef) {
             setTypingUsers((prev) => {
               const next = new Map(prev);
               next.set(decoded.username, Date.now());
+              return next;
+            });
+            setTypingDisplayNames((prev) => {
+              const next = new Map(prev);
+              next.set(decoded.username, decoded.displayName);
               return next;
             });
           }
@@ -1104,7 +1169,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
               const existing = msg.reactions.find(
                 (r) => r.emoji === decoded.emoji,
               );
-              const isMe = decoded.username === user?.username;
+              const isMe =
+                normalizeActorRef(decoded.username) === currentActorRef;
               if (existing) {
                 return {
                   ...msg,
@@ -1129,7 +1195,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.id !== decoded.messageId) return msg;
-              const isMe = decoded.username === user?.username;
+              const isMe =
+                normalizeActorRef(decoded.username) === currentActorRef;
               return {
                 ...msg,
                 reactions: msg.reactions
@@ -1149,6 +1216,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
             next.set(decoded.userId, {
               userId: decoded.userId,
               username: decoded.username,
+              displayName: decoded.displayName,
               lastReadMessageId: decoded.lastReadMessageId,
             });
             return next;
@@ -1166,7 +1234,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       setMessages,
       slug,
       updateUnreadDividerAnchor,
-      user?.username,
+      currentActorRef,
     ],
   );
 
@@ -1195,25 +1263,31 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   }, [rateLimitUntil]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !currentActorRef) return;
     const nextProfile = user.profileImage || null;
     const nextAvatarCrop = user.avatarCrop ?? null;
-    const username = user.username;
+    const nextDisplayName = (user.name || "").trim() || currentActorRef;
     setMessages((prev) => {
       let changed = false;
       const updated = prev.map((msg) => {
-        if (msg.username !== username) return msg;
+        if (normalizeActorRef(msg.username) !== currentActorRef) return msg;
         if (
           msg.profilePic === nextProfile &&
-          sameAvatarCrop(msg.avatarCrop, nextAvatarCrop)
+          sameAvatarCrop(msg.avatarCrop, nextAvatarCrop) &&
+          (msg.displayName ?? msg.username) === nextDisplayName
         )
           return msg;
         changed = true;
-        return { ...msg, profilePic: nextProfile, avatarCrop: nextAvatarCrop };
+        return {
+          ...msg,
+          profilePic: nextProfile,
+          avatarCrop: nextAvatarCrop,
+          displayName: nextDisplayName,
+        };
       });
       return changed ? updated : prev;
     });
-  }, [setMessages, user]);
+  }, [currentActorRef, setMessages, user]);
 
   const handleScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
@@ -1423,7 +1497,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
     const payload: Record<string, unknown> = {
       message: cleaned,
-      username: user.username,
+      username: currentActorRef,
       profile_pic: user.profileImage,
       room: slug,
     };
@@ -1453,6 +1527,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     scrollToBottom,
     status,
     updateUnreadDividerAnchor,
+    currentActorRef,
     user,
   ]);
 
@@ -1546,18 +1621,6 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
           continue;
         }
 
-        const normalizedType = normalizeAttachmentType(file.type || "");
-        if (
-          normalizedType &&
-          normalizedAllowedAttachmentTypes.size > 0 &&
-          !normalizedAllowedAttachmentTypes.has(normalizedType)
-        ) {
-          rejectedMessages.push(
-            `Файл "${file.name}" имеет неподдерживаемый тип "${normalizedType}".`,
-          );
-          continue;
-        }
-
         accepted.push(file);
       }
 
@@ -1574,7 +1637,6 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       maxAttachmentPerMessage,
       maxAttachmentSizeBytes,
       maxAttachmentSizeMb,
-      normalizedAllowedAttachmentTypes,
       queuedFiles.length,
     ],
   );
@@ -1719,8 +1781,11 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   }, [messages, unreadDividerRenderTarget]);
 
   const activeTypingUsers = useMemo(
-    () => Array.from(typingUsers.keys()),
-    [typingUsers],
+    () =>
+      Array.from(typingUsers.keys()).map(
+        (username) => typingDisplayNames.get(username) ?? username,
+      ),
+    [typingDisplayNames, typingUsers],
   );
 
   const directPeerIsTyping = Boolean(
@@ -1731,7 +1796,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
   const roomTitle =
     details?.kind === "direct"
-      ? (details.peer?.username ?? details.name)
+      ? (details.peer?.displayName ?? details.peer?.username ?? details.name)
       : (details?.name ?? slug);
 
   const groupTypingLabel = useMemo(() => {
@@ -1775,14 +1840,14 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     let maxId = 0;
     for (const receipt of readReceipts.values()) {
       if (
-        receipt.username !== user?.username &&
+        normalizeActorRef(receipt.username) !== currentActorRef &&
         receipt.lastReadMessageId > maxId
       ) {
         maxId = receipt.lastReadMessageId;
       }
     }
     return maxId;
-  }, [readReceipts, user?.username]);
+  }, [currentActorRef, readReceipts]);
 
   if (!user && !isPublicRoom) {
     return (
@@ -1843,7 +1908,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
               aria-label={`Профиль ${details.peer.username}`}
             >
               <Avatar
-                username={details.peer.username}
+                username={details.peer.displayName ?? details.peer.username}
                 profileImage={details.peer.profileImage}
                 avatarCrop={details.peer.avatarCrop}
                 online={onlineUsernames.has(details.peer.username)}
@@ -2020,7 +2085,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                       onClick={() => onHeaderSearchResultClick(item.id)}
                     >
                       <span className={styles.headerSearchResultTop}>
-                        <strong>{item.username}</strong>
+                        <strong>{item.displayName ?? item.username}</strong>
                         <time>{formatTimestamp(item.createdAt)}</time>
                       </span>
                       <span className={styles.headerSearchResultText}>
@@ -2082,21 +2147,21 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 <MessageBubble
                   key={`${item.message.id}-${item.message.createdAt}`}
                   message={item.message}
-                  isOwn={isOwnMessage(item.message, user?.username)}
+                  isOwn={isOwnMessage(item.message, currentActorRef)}
                   isRead={
-                    isOwnMessage(item.message, user?.username) &&
+                    isOwnMessage(item.message, currentActorRef) &&
                     item.message.id <= maxReadMessageId
                   }
                   highlighted={item.message.id === highlightedMessageId}
                   onlineUsernames={onlineUsernames}
                   onReply={user ? handleReply : undefined}
                   onEdit={
-                    isOwnMessage(item.message, user?.username)
+                    isOwnMessage(item.message, currentActorRef)
                       ? handleEdit
                       : undefined
                   }
                   onDelete={
-                    isOwnMessage(item.message, user?.username)
+                    isOwnMessage(item.message, currentActorRef)
                       ? handleDelete
                       : undefined
                   }

@@ -186,6 +186,6 @@ def get_unread_counts(user) -> list[dict]:
             .count()
         )
         if unread > 0:
-            result.append({"roomSlug": room.slug, "unreadCount": unread})
+            result.append({"roomId": room.pk, "unreadCount": unread})
 
     return result

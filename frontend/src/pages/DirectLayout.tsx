@@ -5,7 +5,7 @@ import { DirectChatByUsernamePage } from "./DirectChatByUsernamePage";
 
 type Props = {
   user: UserProfile | null;
-  username?: string;
+  publicRef?: string;
   onNavigate: (path: string) => void;
 };
 
@@ -13,8 +13,8 @@ type Props = {
  * Direct chat layout: conversation list is shown in the global sidebar,
  * this page only renders the active DM thread.
  */
-export function DirectLayout({ user, username, onNavigate }: Props) {
-  const hasActive = Boolean(username);
+export function DirectLayout({ user, publicRef, onNavigate }: Props) {
+  const hasActive = Boolean(publicRef);
 
   return (
     <div
@@ -23,16 +23,16 @@ export function DirectLayout({ user, username, onNavigate }: Props) {
         .join(" ")}
     >
       <section className={styles.main}>
-        {hasActive && username ? (
+        {hasActive && publicRef ? (
           <DirectChatByUsernamePage
-            key={username}
+            key={publicRef}
             user={user}
-            username={username}
+            publicRef={publicRef}
             onNavigate={onNavigate}
           />
         ) : (
           <Panel muted>
-            �������� ������ � ������� ������, ����� ������� ���.
+            Выберите диалог в боковой панели, чтобы начать чат.
           </Panel>
         )}
       </section>

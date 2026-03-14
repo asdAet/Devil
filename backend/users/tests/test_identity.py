@@ -1,15 +1,16 @@
-"""Coverage tests for users.identity helpers."""
+﻿"""Coverage tests for users.identity helpers."""
 
 from __future__ import annotations
 
-from unittest.mock import patch
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.core.exceptions import ValidationError
+from django.test import TestCase
 
+from rooms.models import Room
 from users import identity
-from users.models import Profile
+from users.models import Profile, UserIdentityCore
 
 User = get_user_model()
 
@@ -18,18 +19,17 @@ class UsersIdentityTests(TestCase):
     def test_normalizers_handle_non_string_and_prefix(self):
         self.assertEqual(identity.normalize_email(None), "")
         self.assertEqual(identity.normalize_email("  A@B.C "), "a@b.c")
-        self.assertEqual(identity.normalize_public_username(None), "")
-        self.assertEqual(identity.normalize_public_username("  @Alice  "), "Alice")
+        self.assertEqual(identity.normalize_public_handle(None), "")
+        self.assertEqual(identity.normalize_public_handle("  @Alice  "), "alice")
 
-    @override_settings(USERNAME_MAX_LENGTH=5)
-    def test_validate_public_username_enforces_rules(self):
+    def test_validate_public_handle_enforces_rules(self):
         with self.assertRaises(ValueError):
-            identity.validate_public_username("")
+            identity.validate_public_handle("")
         with self.assertRaises(ValueError):
-            identity.validate_public_username("abcdef")
+            identity.validate_public_handle("ab")
         with self.assertRaises(ValueError):
-            identity.validate_public_username("bad name")
-        self.assertEqual(identity.validate_public_username("@Alice"), "Alice")
+            identity.validate_public_handle("bad name")
+        self.assertEqual(identity.validate_public_handle("@Alice"), "alice")
 
     def test_generate_technical_username_retries_on_collision(self):
         User.objects.create_user(username="seed_aaaaaa", password="pass12345")
@@ -51,33 +51,30 @@ class UsersIdentityTests(TestCase):
     def test_user_public_username_and_display_name_priority(self):
         user = User.objects.create_user(username="fallback_user", password="pass12345", first_name="First")
         profile = identity.ensure_profile(user)
-        profile.username = "publicname"
         profile.name = "Display Name"
-        profile.save(update_fields=["username", "name"])
+        profile.save(update_fields=["name"])
 
+        identity.set_user_public_handle(user, "publicname")
         self.assertEqual(identity.user_public_username(user), "publicname")
         self.assertEqual(identity.user_display_name(user), "Display Name")
 
+        identity.set_user_public_handle(user, None)
+        user.refresh_from_db()
         profile.name = ""
-        profile.username = None
-        profile.save(update_fields=["name", "username"])
-        self.assertEqual(identity.user_public_username(user), "fallback_user")
+        profile.save(update_fields=["name"])
+        self.assertEqual(identity.user_public_username(user), identity.user_public_id(user))
         self.assertEqual(identity.user_display_name(user), "First")
 
-    def test_get_user_by_public_username_supports_profile_and_legacy_fallback(self):
-        by_profile = User.objects.create_user(username="legacy_a", password="pass12345")
-        by_profile_profile = identity.ensure_profile(by_profile)
-        by_profile_profile.username = "profile_handle"
-        by_profile_profile.save(update_fields=["username"])
+    def test_get_user_by_public_handle_and_public_id(self):
+        by_handle = User.objects.create_user(username="legacy_a", password="pass12345")
+        identity.set_user_public_handle(by_handle, "profile_handle")
 
-        by_legacy = User.objects.create_user(username="legacy_handle", password="pass12345")
-        by_legacy_profile = identity.ensure_profile(by_legacy)
-        by_legacy_profile.username = None
-        by_legacy_profile.save(update_fields=["username"])
+        by_public_id = User.objects.create_user(username="legacy_handle", password="pass12345")
+        public_id = identity.user_public_id(by_public_id)
 
-        self.assertEqual(identity.get_user_by_public_username("profile_handle"), by_profile)
-        self.assertEqual(identity.get_user_by_public_username("legacy_handle"), by_legacy)
-        self.assertIsNone(identity.get_user_by_public_username(""))
+        self.assertEqual(identity.get_user_by_public_handle("profile_handle"), by_handle)
+        self.assertEqual(identity.get_user_by_public_id(public_id), by_public_id)
+        self.assertIsNone(identity.get_user_by_public_handle(""))
 
     def test_ensure_profile_returns_existing_or_creates_new(self):
         user = User.objects.create_user(username="profile_user", password="pass12345")
@@ -90,3 +87,45 @@ class UsersIdentityTests(TestCase):
         recreated = identity.ensure_profile(user)
         recreated_user = getattr(recreated, "user", None)
         self.assertEqual(getattr(recreated_user, "pk", None), user.pk)
+
+    def test_user_public_id_format_and_immutability(self):
+        user = User.objects.create_user(username="public_id_user", password="pass12345")
+        core = identity.ensure_user_identity_core(user)
+        self.assertRegex(core.public_id, r"^[1-9]\d{9}$")
+
+        core.public_id = "1234567891"
+        with self.assertRaises(ValidationError):
+            core.save(update_fields=["public_id"])
+
+    def test_group_public_id_format_and_immutability(self):
+        owner = User.objects.create_user(username="group_owner", password="pass12345")
+        room = Room.objects.create(
+            name="Group Room",
+            slug="group-room-public-id",
+            kind=Room.Kind.GROUP,
+            created_by=owner,
+        )
+        public_id = identity.ensure_group_public_id(room)
+        self.assertRegex(public_id, r"^-[1-9]\d{9}$")
+
+        room.public_id = "-1234567891"
+        with self.assertRaises(ValidationError):
+            room.save(update_fields=["public_id"])
+
+    def test_user_identity_core_created_automatically_on_user_create(self):
+        user = User.objects.create_user(username="auto_identity_user", password="pass12345")
+        core = UserIdentityCore.objects.filter(user=user).first()
+        self.assertIsNotNone(core)
+        assert core is not None
+        self.assertRegex(core.public_id, r"^[1-9]\d{9}$")
+
+    def test_group_public_id_created_automatically_on_group_create(self):
+        owner = User.objects.create_user(username="auto_group_owner", password="pass12345")
+        room = Room.objects.create(
+            name="Auto Public Id Group",
+            slug="auto-public-id-group",
+            kind=Room.Kind.GROUP,
+            created_by=owner,
+        )
+        room.refresh_from_db()
+        self.assertRegex(str(room.public_id or ""), r"^-[1-9]\d{9}$")

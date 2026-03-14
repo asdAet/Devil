@@ -36,11 +36,14 @@ class AuthController {
    */
 
   public async login(dto: LoginDto): Promise<SessionDto> {
-    return await apiService.login(dto.email, dto.password);
+    return await apiService.login(dto.identifier, dto.password);
   }
 
-  public async oauthGoogle(accessToken: string): Promise<SessionDto> {
-    return await apiService.oauthGoogle(accessToken);
+  public async oauthGoogle(
+    token: string,
+    tokenType: "idToken" | "accessToken" = "idToken",
+  ): Promise<SessionDto> {
+    return await apiService.oauthGoogle(token, tokenType);
   }
 
   /**
@@ -51,9 +54,12 @@ class AuthController {
 
   public async register(dto: RegisterDto): Promise<SessionDto> {
     return await apiService.register(
+      dto.login,
+      dto.password,
+      dto.passwordConfirm,
+      dto.name,
+      dto.username,
       dto.email,
-      dto.password1,
-      dto.password2,
     );
   }
 
@@ -89,3 +95,4 @@ class AuthController {
 }
 
 export const authController = new AuthController();
+

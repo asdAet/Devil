@@ -5,6 +5,7 @@ import {
   useConversationList,
   type FilterTab,
 } from "../../shared/conversationList/ConversationListProvider";
+import { buildDirectPath, buildUserProfilePath } from "../../shared/lib/publicRef";
 import { Spinner, EmptyState, Avatar } from "../../shared/ui";
 import styles from "../../styles/sidebar/ConversationList.module.css";
 import { ConversationListItem } from "./ConversationListItem";
@@ -33,9 +34,9 @@ export function ConversationList({ onNavigate }: Props) {
   const location = useLocation();
 
   const getItemPath = useCallback(
-    (item: { type: string; slug: string; name: string }) => {
+    (item: { type: string; slug: string; name: string; directRef?: string }) => {
       if (item.type === "direct") {
-        return `/@${encodeURIComponent(item.name)}`;
+        return buildDirectPath(item.directRef ?? item.name);
       }
       return `/rooms/${encodeURIComponent(item.slug)}`;
     },
@@ -43,7 +44,7 @@ export function ConversationList({ onNavigate }: Props) {
   );
 
   const isItemActive = useCallback(
-    (item: { type: string; slug: string; name: string }) => {
+    (item: { type: string; slug: string; name: string; directRef?: string }) => {
       const path = getItemPath(item);
       return (
         location.pathname === path || location.pathname.startsWith(path + "/")
@@ -103,17 +104,22 @@ export function ConversationList({ onNavigate }: Props) {
                   key={`u-${user.username}`}
                   type="button"
                   className={styles.globalItem}
-                  onClick={() =>
-                    onNavigate(`/users/${encodeURIComponent(user.username)}`)
-                  }
+                  onClick={() => onNavigate(buildUserProfilePath(user.username))}
                 >
                   <Avatar
-                    username={user.username}
+                    username={user.displayName ?? user.username}
                     profileImage={user.profileImage}
                     avatarCrop={user.avatarCrop}
                     size="tiny"
                   />
-                  <span className={styles.globalPrimary}>{user.username}</span>
+                  <div className={styles.globalMeta}>
+                    <span className={styles.globalPrimary}>
+                      {user.displayName ?? user.username}
+                    </span>
+                    <span className={styles.globalSecondary}>
+                      @{user.username}
+                    </span>
+                  </div>
                 </button>
               ))}
             </section>
@@ -124,19 +130,19 @@ export function ConversationList({ onNavigate }: Props) {
               <h4 className={styles.globalTitle}>Группы</h4>
               {globalResults.groups.map((group) => (
                 <button
-                  key={`g-${group.slug}`}
+                  key={`g-${group.roomId}`}
                   type="button"
                   className={styles.globalItem}
                   onClick={() =>
-                    onNavigate(`/rooms/${encodeURIComponent(group.slug)}`)
+                    onNavigate(`/rooms/${encodeURIComponent(String(group.roomId))}`)
                   }
                 >
                   <Avatar username={group.name} size="tiny" />
                   <div className={styles.globalMeta}>
                     <span className={styles.globalPrimary}>{group.name}</span>
-                    {group.username && (
+                    {group.publicRef && (
                       <span className={styles.globalSecondary}>
-                        @{group.username}
+                        {group.publicRef}
                       </span>
                     )}
                   </div>
@@ -155,15 +161,15 @@ export function ConversationList({ onNavigate }: Props) {
                   className={styles.globalItem}
                   onClick={() =>
                     onNavigate(
-                      `/rooms/${encodeURIComponent(message.roomSlug)}?message=${message.id}`,
+                      `/rooms/${encodeURIComponent(String(message.roomId))}?message=${message.id}`,
                     )
                   }
-                >
-                  <div className={styles.globalMeta}>
-                    <span className={styles.globalPrimary}>
-                      {message.username} •{" "}
-                      {message.roomName || message.roomSlug}
-                    </span>
+                  >
+                    <div className={styles.globalMeta}>
+                      <span className={styles.globalPrimary}>
+                        {(message.displayName ?? message.username)} •{" "}
+                        {message.roomName || String(message.roomId)}
+                      </span>
                     <span className={styles.globalSecondary}>
                       {message.content}
                     </span>

@@ -1,17 +1,19 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { decodeRoomSlugParam, decodeUsernameParam } from "./route";
+import { decodePublicRefParam, decodeRoomRefParam } from "./route";
 
 describe("route input decoders", () => {
-  it("validates room slug", () => {
-    expect(decodeRoomSlugParam("public_room")).toBe("public_room");
-    expect(decodeRoomSlugParam("bad slug")).toBeNull();
+  it("validates room ref", () => {
+    expect(decodeRoomRefParam("public")).toBe("public");
+    expect(decodeRoomRefParam("123")).toBe("123");
+    expect(decodeRoomRefParam("0")).toBeNull();
+    expect(decodeRoomRefParam("bad slug")).toBeNull();
   });
 
-  it("normalizes username", () => {
-    expect(decodeUsernameParam("@alice")).toBe("alice");
-    expect(decodeUsernameParam("@@alice")).toBe("@@alice");
-    expect(decodeUsernameParam("@@@@")).toBe("@@@@");
-    expect(decodeUsernameParam("   ")).toBeNull();
+  it("normalizes public refs", () => {
+    expect(decodePublicRefParam("@alice")).toBe("alice");
+    expect(decodePublicRefParam("@@alice")).toBe("@alice");
+    expect(decodePublicRefParam("@@@@")).toBe("@@@");
+    expect(decodePublicRefParam("   ")).toBeNull();
   });
 });

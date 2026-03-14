@@ -24,14 +24,15 @@ from messages.models import Message
 from roles.access import can_read, can_write
 from roles.models import Membership
 from rooms.models import Room
-from users.identity import user_public_username
+from users.identity import user_display_name, user_profile_avatar_source, user_public_username
 
-from .constants import CHAT_CLOSE_IDLE_CODE, PUBLIC_ROOM_NAME, PUBLIC_ROOM_SLUG
-from .utils import is_valid_room_slug as _is_valid_room_slug
+from .constants import CHAT_CLOSE_IDLE_CODE
 
 
 def _ws_connect_rate_limited(scope, endpoint: str) -> bool:
     """Checks websocket connect rate limit per endpoint and IP."""
+    if bool(getattr(settings, "WS_CONNECT_RATE_LIMIT_DISABLED", False)):
+        return False
     limit = int(getattr(settings, "WS_CONNECT_RATE_LIMIT", 60))
     window = int(getattr(settings, "WS_CONNECT_RATE_WINDOW", 60))
     ip = get_client_ip_from_scope(scope) or "unknown"
@@ -53,15 +54,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close(code=4401)
             return
 
-        room_slug = None
+        room_id_raw: object | None = None
         url_route = self.scope.get("url_route")
         if isinstance(url_route, dict):
             kwargs = url_route.get("kwargs")
             if isinstance(kwargs, dict):
-                room_slug = kwargs.get("room_name")
+                room_id_raw = kwargs.get("room_id")
 
-        if not isinstance(room_slug, str):
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="chat", reason="invalid_slug", code=4404)
+        room_id = 0
+        if isinstance(room_id_raw, int):
+            room_id = room_id_raw
+        elif isinstance(room_id_raw, str):
+            try:
+                room_id = int(room_id_raw)
+            except ValueError:
+                room_id = 0
+        if room_id < 1:
+            audit_ws_event("ws.connect.denied", self.scope, endpoint="chat", reason="invalid_room_id", code=4404)
             await self.close(code=4404)
             return
 
@@ -70,31 +79,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close(code=4429)
             return
 
-        if room_slug != PUBLIC_ROOM_SLUG and not _is_valid_room_slug(room_slug):
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="chat", reason="invalid_slug", code=4404, room_slug=room_slug)
-            await self.close(code=4404)
-            return
-
-        room = await self._load_room(room_slug)
+        room = await self._load_room(room_id)
         if not room:
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="chat", reason="room_not_found", code=4404, room_slug=room_slug)
+            audit_ws_event(
+                "ws.connect.denied",
+                self.scope,
+                endpoint="chat",
+                reason="room_not_found",
+                code=4404,
+                room_id=room_id,
+            )
             await self.close(code=4404)
             return
 
         if not await self._can_read(room, user):
-            audit_ws_event("ws.connect.denied", self.scope, endpoint="chat", reason="forbidden", code=4403, room_slug=room_slug)
+            audit_ws_event(
+                "ws.connect.denied",
+                self.scope,
+                endpoint="chat",
+                reason="forbidden",
+                code=4403,
+                room_id=room_id,
+            )
             await self.close(code=4403)
             return
 
         self.actor_username = await self._resolve_public_username(user)
+        self.actor_display_name = await self._resolve_display_name(user)
         self.room = room
-        self.room_name = room.slug
-        room_identifier = room.pk if getattr(room, "pk", None) else room.slug
-        self.room_group_name = f"chat_room_{room_identifier}"
+        self.room_id = int(room.pk)
+        self.room_name = str(self.room_id)
+        self.room_group_name = f"chat_room_{self.room_id}"
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-        audit_ws_event("ws.connect.accepted", self.scope, endpoint="chat", room_slug=self.room_name)
+        audit_ws_event("ws.connect.accepted", self.scope, endpoint="chat", room_id=self.room_id)
 
         self._last_activity = time.monotonic()
         self._last_typing_broadcast = 0.0
@@ -118,7 +137,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.scope,
             endpoint="chat",
             code=code,
-            room_slug=getattr(self, "room_name", None),
+            room_id=getattr(self, "room_id", None),
         )
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -163,7 +182,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.scope,
                 endpoint="chat",
                 reason="message_too_long",
-                room_slug=self.room.slug,
+                room_id=self.room.pk,
                 message_length=len(message),
             )
             await self.send(text_data=json.dumps({"error": "message_too_long"}))
@@ -184,13 +203,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.scope,
                 endpoint="chat",
                 reason="forbidden",
-                room_slug=self.room.slug,
+                room_id=self.room.pk,
             )
             await self.send(text_data=json.dumps({"error": "forbidden"}))
             return
 
         if await self._rate_limited(user):
-            audit_ws_event("ws.message.rate_limited", self.scope, endpoint="chat", room_slug=self.room.slug)
+            audit_ws_event("ws.message.rate_limited", self.scope, endpoint="chat", room_id=self.room.pk)
             await self.send(text_data=json.dumps({"error": "rate_limited"}))
             return
 
@@ -198,17 +217,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({"error": "slow_mode"}))
             return
 
-        username = (getattr(self, "actor_username", "") or "").strip()
-        if not username:
-            username = await self._resolve_public_username(user)
-            self.actor_username = username
+        username = (await self._resolve_public_username(user)).strip()
+        self.actor_username = username
         if not username:
             audit_ws_event("ws.message.rejected", self.scope, endpoint="chat", reason="invalid_user")
             return
-        room_slug = self.room.slug
+        room_id = int(self.room.pk)
 
-        profile_name, avatar_crop = await self._get_profile_avatar_state(user)
-        profile_url = build_profile_url(self.scope, profile_name)
+        avatar_source, avatar_crop = await self._get_profile_avatar_state(user)
+        profile_url = build_profile_url(self.scope, avatar_source)
+        display_name = (await self._resolve_display_name(user)).strip()
+        self.actor_display_name = display_name
 
         reply_to_id = text_data_json.get("replyTo")
         if reply_to_id is not None:
@@ -217,13 +236,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             except (TypeError, ValueError):
                 reply_to_id = None
 
-        saved_message = await self.save_message(message, user, username, profile_name, self.room, reply_to_id)
+        saved_message = await self.save_message(message, user, username, avatar_source, self.room, reply_to_id)
         created_at = saved_message.date_added.isoformat()
         audit_ws_event(
             "ws.message.sent",
             self.scope,
             endpoint="chat",
-            room_slug=self.room.slug,
+            room_id=self.room.pk,
             message_length=len(message),
         )
 
@@ -235,9 +254,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "type": "chat_message",
                 "message": message,
                 "username": username,
+                "displayName": display_name,
                 "profile_pic": profile_url,
                 "avatar_crop": avatar_crop,
-                "room": room_slug,
+                "roomId": room_id,
                 "id": saved_message.pk,
                 "createdAt": created_at,
                 "replyTo": reply_to_data,
@@ -270,9 +290,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "message": event["message"],
                     "username": event["username"],
+                    "displayName": event.get("displayName") or event["username"],
                     "profile_pic": event["profile_pic"],
                     "avatar_crop": event.get("avatar_crop"),
-                    "room": event["room"],
+                    "roomId": event.get("roomId"),
                     "id": event.get("id"),
                     "createdAt": event.get("createdAt") or event.get("date_added"),
                     "replyTo": event.get("replyTo"),
@@ -291,24 +312,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             break
 
     @sync_to_async
-    def _load_room(self, slug: str):
+    def _load_room(self, room_id: int):
         try:
-            if slug == PUBLIC_ROOM_SLUG:
-                room, _ = Room.objects.get_or_create(
-                    slug=PUBLIC_ROOM_SLUG,
-                    defaults={"name": PUBLIC_ROOM_NAME, "kind": Room.Kind.PUBLIC},
-                )
-                changed_fields = []
-                if room.kind != Room.Kind.PUBLIC:
-                    room.kind = Room.Kind.PUBLIC
-                    changed_fields.append("kind")
-                if room.direct_pair_key:
-                    room.direct_pair_key = None
-                    changed_fields.append("direct_pair_key")
-                if changed_fields:
-                    room.save(update_fields=changed_fields)
-                return room
-            return Room.objects.filter(slug=slug).first()
+            return Room.objects.filter(pk=room_id).first()
         except (OperationalError, ProgrammingError, IntegrityError):
             return None
 
@@ -325,12 +331,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return user_public_username(user)
 
     @sync_to_async
+    def _resolve_display_name(self, user) -> str:
+        return user_display_name(user)
+
+    @sync_to_async
     def save_message(self, message, user, username, profile_pic, room, reply_to_id=None):
+        normalized_profile_pic = str(profile_pic or "").strip()
+        if len(normalized_profile_pic) > 255:
+            normalized_profile_pic = ""
         kwargs = {
             "message_content": message,
             "username": username,
             "user": user,
-            "profile_pic": profile_pic,
+            "profile_pic": normalized_profile_pic,
             "room": room,
         }
         if reply_to_id is not None:
@@ -345,9 +358,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def _get_profile_avatar_state(self, user):
         try:
             profile = user.profile
-            image = getattr(profile, "image", None)
-            name = getattr(image, "name", "") or ""
-            return name, serialize_avatar_crop(profile)
+            avatar_source = user_profile_avatar_source(user) or ""
+            return avatar_source, serialize_avatar_crop(profile)
         except (AttributeError, ObjectDoesNotExist):
             return "", None
 
@@ -401,17 +413,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if now - self._last_typing_broadcast < 3.0:
             return
         self._last_typing_broadcast = now
-        username = (getattr(self, "actor_username", "") or "").strip()
-        if not username:
-            username = await self._resolve_public_username(user)
-            self.actor_username = username
+        username = (await self._resolve_public_username(user)).strip()
+        self.actor_username = username
         if not username:
             return
+        display_name = (await self._resolve_display_name(user)).strip()
+        self.actor_display_name = display_name
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "chat_typing",
                 "username": username,
+                "displayName": display_name or username,
                 "userId": user.pk,
                 "sender_channel": self.channel_name,
             },
@@ -423,6 +436,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             "type": "typing",
             "username": event["username"],
+            "displayName": event.get("displayName") or event["username"],
             "userId": event["userId"],
         }))
 
@@ -434,10 +448,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not reply:
             return None
         if reply.is_deleted:
-            return {"id": reply.pk, "username": None, "content": "[deleted]"}
+            return {"id": reply.pk, "username": None, "displayName": None, "content": "[deleted]"}
         return {
             "id": reply.pk,
             "username": user_public_username(reply.user) if reply.user else reply.username,
+            "displayName": user_display_name(reply.user) if reply.user else (reply.username or ""),
             "content": reply.message_content[:150],
         }
 
@@ -469,6 +484,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "emoji": event["emoji"],
             "userId": event["userId"],
             "username": event["username"],
+            "displayName": event.get("displayName") or event["username"],
         }))
 
     async def chat_reaction_remove(self, event):
@@ -479,6 +495,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "emoji": event["emoji"],
             "userId": event["userId"],
             "username": event["username"],
+            "displayName": event.get("displayName") or event["username"],
         }))
 
     async def chat_read_receipt(self, event):
@@ -487,8 +504,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "type": "read_receipt",
             "userId": event["userId"],
             "username": event["username"],
+            "displayName": event.get("displayName") or event["username"],
             "lastReadMessageId": event["lastReadMessageId"],
-            "roomSlug": event["roomSlug"],
+            "roomId": event["roomId"],
         }))
 
     # ── Mark read via WS ──────────────────────────────────────────────
@@ -529,14 +547,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         channel_layer = get_channel_layer()
         if channel_layer is None:
             return
-        room_identifier = room.pk if getattr(room, "pk", None) else room.slug
-        group_name = f"chat_room_{room_identifier}"
+        if getattr(room, "pk", None) is None:
+            return
+        group_name = f"chat_room_{room.pk}"
         async_to_sync(channel_layer.group_send)(group_name, {
             "type": "chat_read_receipt",
             "userId": user.pk,
             "username": user_public_username(user),
+            "displayName": user_display_name(user),
             "lastReadMessageId": state.last_read_message_id,
-            "roomSlug": room.slug,
+            "roomId": room.pk,
         })
 
     @sync_to_async
@@ -583,42 +603,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
         targets = []
         for participant in participants:
             peer = next((candidate for candidate in participants if candidate.pk != participant.pk), None)
-            peer_image_name = ""
+            peer_avatar_source = ""
             peer_avatar_crop = None
             if peer:
                 peer_profile = getattr(peer, "profile", None)
-                peer_image = getattr(peer_profile, "image", None) if peer_profile else None
-                peer_image_name = getattr(peer_image, "name", "") or ""
+                peer_avatar_source = user_profile_avatar_source(peer) or ""
                 peer_avatar_crop = serialize_avatar_crop(peer_profile)
 
             if participant.pk == sender_id:
-                unread_state = mark_read(participant.pk, room.slug, self.direct_inbox_unread_ttl)
+                unread_state = mark_read(participant.pk, room.pk, self.direct_inbox_unread_ttl)
             else:
-                unread_state = mark_unread(participant.pk, room.slug, self.direct_inbox_unread_ttl)
+                unread_state = mark_unread(participant.pk, room.pk, self.direct_inbox_unread_ttl)
 
-            slugs = unread_state.get("slugs", [])
+            room_ids = unread_state.get("roomIds", [])
             raw_counts = unread_state.get("counts", {})
             counts = raw_counts if isinstance(raw_counts, dict) else {}
-            if not counts and isinstance(slugs, list):
-                counts = {slug: 1 for slug in slugs if isinstance(slug, str) and slug}
-            unread_count = counts.get(room.slug, 0)
+            unread_count = counts.get(str(room.pk), 0)
             payload = {
                 "type": "direct_inbox_item",
                 "item": {
-                    "slug": room.slug,
+                    "roomId": room.pk,
                     "peer": {
                         "username": user_public_username(peer) if peer else "",
-                        "profileImage": build_profile_url(self.scope, peer_image_name) if peer_image_name else None,
+                        "displayName": user_display_name(peer) if peer else "",
+                        "profileImage": build_profile_url(self.scope, peer_avatar_source) if peer_avatar_source else None,
                         "avatarCrop": peer_avatar_crop,
                     },
                     "lastMessage": message,
                     "lastMessageAt": created_at,
                 },
                 "unread": {
-                    "roomSlug": room.slug,
+                    "roomId": room.pk,
                     "isUnread": unread_count > 0,
-                    "dialogs": unread_state.get("dialogs", len(slugs)),
-                    "slugs": slugs,
+                    "dialogs": unread_state.get("dialogs", len(room_ids)),
+                    "roomIds": room_ids,
                     "counts": counts,
                 },
             }

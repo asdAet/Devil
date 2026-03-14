@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 import type { UserProfile } from "../../entities/user/types";
 import { decodeOrThrow, safeDecode } from "../core/codec";
@@ -6,15 +6,20 @@ import { decodeOrThrow, safeDecode } from "../core/codec";
 const usernameLatinSchema = z
   .string()
   .trim()
-  .regex(/^[A-Za-z]+$/, "Допустимы только латинские буквы (A-Z, a-z).");
+  .toLowerCase()
+  .regex(
+    /^[a-z][a-z0-9_]{2,29}$/,
+    "Username: a-z, 0-9, _, длина 3-30, начинается с буквы.",
+  );
 
 const optionalPublicUsernameSchema = z
   .string()
   .trim()
+  .toLowerCase()
   .optional()
   .transform((value) => value ?? "")
-  .refine((value) => value.length === 0 || /^[A-Za-z]+$/.test(value), {
-    message: "Допустимы только латинские буквы (A-Z, a-z).",
+  .refine((value) => value.length === 0 || /^[a-z][a-z0-9_]{2,29}$/.test(value), {
+    message: "Username: a-z, 0-9, _, длина 3-30, начинается с буквы.",
   });
 
 const avatarCropSchema = z
@@ -29,8 +34,9 @@ const avatarCropSchema = z
 const rawUserProfileSchema = z
   .object({
     name: z.string().optional(),
-    username: z.string().nullable().optional(),
-    publicUsername: z.string().nullable().optional(),
+    handle: z.string().nullable().optional(),
+    publicRef: z.string().optional(),
+    publicId: z.string().optional(),
     email: z.string().optional(),
     profileImage: z.string().nullable().optional(),
     avatarCrop: avatarCropSchema.nullable().optional(),
@@ -60,6 +66,8 @@ const profileEnvelopeSchema = z
 
 const errorPayloadSchema = z
   .object({
+    code: z.string().optional(),
+    message: z.string().optional(),
     error: z.string().optional(),
     detail: z.string().optional(),
     errors: z
@@ -68,31 +76,77 @@ const errorPayloadSchema = z
   })
   .passthrough();
 
-const loginRequestSchema = z
+const loginRequestInputSchema = z
   .object({
-    email: z.string().trim().email(),
+    identifier: z.string().trim().min(1),
     password: z.string().min(1),
   })
-  .strict();
+  .strict()
+  .transform((dto) => ({
+    identifier: dto.identifier.trim(),
+    password: dto.password,
+  }));
 
-const registerRequestSchema = z
+const registerRequestInputSchema = z
   .object({
-    email: z.string().trim().email(),
-    password1: z.string().min(1),
-    password2: z.string().min(1),
+    login: z.string().trim().min(1),
+    password: z.string().min(1),
+    passwordConfirm: z.string().min(1),
+    name: z.string().trim().min(1),
+    username: z.string().trim().optional(),
+    email: z.string().trim().optional(),
   })
-  .strict();
+  .strict()
+  .transform((dto) => {
+    const login = dto.login.trim().toLowerCase();
+    const password = dto.password.trim();
+    const passwordConfirm = dto.passwordConfirm.trim();
+    const name = dto.name.trim();
+    const emailValue = (dto.email || "").trim().toLowerCase();
+    const usernameValue = (dto.username || "").trim().toLowerCase();
+
+    return {
+      login,
+      password,
+      passwordConfirm,
+      name,
+      username: usernameValue || undefined,
+      email: emailValue || undefined,
+    };
+  })
+  .superRefine((dto, ctx) => {
+    if (dto.email && !z.string().email().safeParse(dto.email).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Некорректный email",
+      });
+    }
+  });
 
 const oauthGoogleRequestSchema = z
   .object({
-    idToken: z.string().trim().min(1).optional(),
-    accessToken: z.string().trim().min(1).optional(),
+    idToken: z.string().trim().optional(),
+    accessToken: z.string().trim().optional(),
+    username: optionalPublicUsernameSchema.optional(),
   })
-  .refine(
-    (value) => Boolean(value.idToken || value.accessToken),
-    "Требуется accessToken или idToken",
-  )
-  .strict();
+  .strict()
+  .superRefine((dto, ctx) => {
+    const idToken = (dto.idToken || "").trim();
+    const accessToken = (dto.accessToken || "").trim();
+    if (!idToken && !accessToken) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["idToken"],
+        message: "Требуется idToken или accessToken",
+      });
+    }
+  })
+  .transform((dto) => ({
+    idToken: (dto.idToken || "").trim() || undefined,
+    accessToken: (dto.accessToken || "").trim() || undefined,
+    username: dto.username && dto.username.length > 0 ? dto.username : undefined,
+  }));
 
 const maybeFileSchema = z.custom<File | null | undefined>(
   (value) => {
@@ -106,9 +160,7 @@ const maybeFileSchema = z.custom<File | null | undefined>(
 const updateProfileRequestSchema = z
   .object({
     name: z.string().optional(),
-    last_name: z.string().optional(),
     username: optionalPublicUsernameSchema.optional(),
-    email: z.string().optional(),
     image: maybeFileSchema.optional(),
     avatarCrop: avatarCropSchema.nullable().optional(),
     bio: z.string().optional(),
@@ -117,19 +169,34 @@ const updateProfileRequestSchema = z
 
 const mapUserProfile = (
   dto: z.infer<typeof rawUserProfileSchema>,
-): UserProfile => ({
-  name: dto.name ?? "",
-  username:
-    (dto.publicUsername ??
-      (typeof dto.username === "string" ? dto.username : null) ??
-      "").trim(),
-  email: dto.email ?? "",
-  profileImage: dto.profileImage ?? null,
-  avatarCrop: dto.avatarCrop ?? null,
-  bio: dto.bio ?? "",
-  lastSeen: dto.lastSeen ?? null,
-  registeredAt: dto.registeredAt ?? null,
-});
+): UserProfile => {
+  const handle =
+    typeof dto.handle === "string" && dto.handle.trim().length > 0
+      ? dto.handle.trim()
+      : null;
+  const publicId =
+    typeof dto.publicId === "string" && dto.publicId.trim().length > 0
+      ? dto.publicId.trim()
+      : null;
+  const publicRef =
+    (typeof dto.publicRef === "string" ? dto.publicRef.trim() : "") ||
+    (handle ? `@${handle}` : "") ||
+    (publicId ?? "");
+
+  return {
+    name: dto.name ?? "",
+    username: handle ?? "",
+    handle,
+    publicRef,
+    publicId,
+    email: dto.email ?? "",
+    profileImage: dto.profileImage ?? null,
+    avatarCrop: dto.avatarCrop ?? null,
+    bio: dto.bio ?? "",
+    lastSeen: dto.lastSeen ?? null,
+    registeredAt: dto.registeredAt ?? null,
+  };
+};
 
 export type SessionResponseDto = {
   authenticated: boolean;
@@ -142,8 +209,8 @@ export type ProfileEnvelopeDto = {
 
 export type AuthErrorPayloadDto = z.infer<typeof errorPayloadSchema>;
 
-export type LoginRequestDto = z.infer<typeof loginRequestSchema>;
-export type RegisterRequestDto = z.infer<typeof registerRequestSchema>;
+export type LoginRequestDto = z.infer<typeof loginRequestInputSchema>;
+export type RegisterRequestDto = z.infer<typeof registerRequestInputSchema>;
 export type OAuthGoogleRequestDto = z.infer<typeof oauthGoogleRequestSchema>;
 export type UpdateProfileRequestDto = z.infer<typeof updateProfileRequestSchema>;
 
@@ -183,10 +250,10 @@ export const decodeAuthErrorPayload = (
 ): AuthErrorPayloadDto | null => safeDecode(errorPayloadSchema, input);
 
 export const buildLoginRequestDto = (input: unknown): LoginRequestDto =>
-  decodeOrThrow(loginRequestSchema, input, "auth/login-request");
+  decodeOrThrow(loginRequestInputSchema, input, "auth/login-request");
 
 export const buildRegisterRequestDto = (input: unknown): RegisterRequestDto =>
-  decodeOrThrow(registerRequestSchema, input, "auth/register-request");
+  decodeOrThrow(registerRequestInputSchema, input, "auth/register-request");
 
 export const buildOAuthGoogleRequestDto = (
   input: unknown,
@@ -204,3 +271,6 @@ export const buildUpdateProfileRequestDto = (
 
 export const validatePublicUsername = (username: string): string =>
   decodeOrThrow(usernameLatinSchema, username, "auth/public-username");
+
+
+

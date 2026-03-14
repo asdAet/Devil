@@ -34,7 +34,7 @@ describe("chat HTTP DTO decoders", () => {
 
   it("decodes direct start response", () => {
     const decoded = decodeDirectStartResponse({
-      slug: "dm_123",
+      roomId: 123,
       kind: "direct",
       peer: {
         username: "bob",
@@ -51,13 +51,14 @@ describe("chat HTTP DTO decoders", () => {
       width: 0.33,
       height: 0.44,
     });
+    expect(decoded.roomId).toBe(123);
   });
 
   it("decodes direct chats response", () => {
     const decoded = decodeDirectChatsResponse({
       items: [
         {
-          slug: "dm_123",
+          roomId: 123,
           peer: { username: "bob", profileImage: null },
           lastMessage: "hello",
           lastMessageAt: "2026-02-18T00:00:00Z",
@@ -65,6 +66,6 @@ describe("chat HTTP DTO decoders", () => {
       ],
     });
 
-    expect(decoded.items[0]?.slug).toBe("dm_123");
+    expect(decoded.items[0]?.slug).toBe("123");
   });
 });

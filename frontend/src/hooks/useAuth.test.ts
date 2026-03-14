@@ -13,20 +13,26 @@ const authControllerMock = vi.hoisted(() => ({
   login:
     vi.fn<
       (dto: {
-        email: string;
+        identifier: string;
         password: string;
       }) => Promise<{ authenticated: boolean; user: UserProfile | null }>
     >(),
   oauthGoogle:
     vi.fn<
-      (idToken: string) => Promise<{ authenticated: boolean; user: UserProfile | null }>
+      (
+        token: string,
+        tokenType?: "idToken" | "accessToken",
+      ) => Promise<{ authenticated: boolean; user: UserProfile | null }>
     >(),
   register:
     vi.fn<
       (dto: {
-        email: string;
-        password1: string;
-        password2: string;
+        login: string;
+        password: string;
+        passwordConfirm: string;
+        name: string;
+        username?: string;
+        email?: string;
       }) => Promise<{ authenticated: boolean; user: UserProfile | null }>
     >(),
   logout: vi.fn<() => Promise<{ ok: boolean }>>(),
@@ -139,11 +145,14 @@ describe("useAuth", () => {
     await waitFor(() => expect(result.current.auth.loading).toBe(false));
 
     await act(async () => {
-      await result.current.login({ email: "demo@example.com", password: "pass12345" });
+      await result.current.login({ identifier: "demo_login", password: "pass12345" });
       await result.current.register({
-        email: "demo@example.com",
-        password1: "pass12345",
-        password2: "pass12345",
+        login: "demo_login",
+        password: "pass12345",
+        passwordConfirm: "pass12345",
+        name: "Demo Login",
+        username: undefined,
+        email: undefined,
       });
     });
 
@@ -153,7 +162,7 @@ describe("useAuth", () => {
      */
 
     expect(authControllerMock.login).toHaveBeenCalledWith({
-      email: "demo@example.com",
+      identifier: "demo_login",
       password: "pass12345",
     });
     /**
@@ -162,9 +171,12 @@ describe("useAuth", () => {
      */
 
     expect(authControllerMock.register).toHaveBeenCalledWith({
-      email: "demo@example.com",
-      password1: "pass12345",
-      password2: "pass12345",
+      login: "demo_login",
+      password: "pass12345",
+      passwordConfirm: "pass12345",
+      name: "Demo Login",
+      username: undefined,
+      email: undefined,
     });
     /**
      * Выполняет метод `expect`.
@@ -182,7 +194,10 @@ describe("useAuth", () => {
       await result.current.loginWithGoogle("id-token");
     });
 
-    expect(authControllerMock.oauthGoogle).toHaveBeenCalledWith("id-token");
+    expect(authControllerMock.oauthGoogle).toHaveBeenCalledWith(
+      "id-token",
+      "idToken",
+    );
     expect(result.current.auth.user?.username).toBe("demo");
   });
 

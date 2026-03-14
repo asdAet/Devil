@@ -24,7 +24,7 @@ describe("groups DTO decoders", () => {
     const decoded = decodeGroupListResponse({
       items: [
         {
-          slug: "g-1",
+          roomId: 101,
           name: "Group",
           description: "desc",
           username: "group",

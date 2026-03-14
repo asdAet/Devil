@@ -8,6 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from rooms.models import Room
+from users.identity import user_public_username
 
 from ._typing import TypedAPIClient
 
@@ -40,25 +41,22 @@ class TestCreateGroup(APITestCase):
         assert data["name"] == "My Group"
         assert data["isPublic"] is False
         assert data["memberCount"] == 1
-        assert data["createdBy"] == "owner"
+        assert data["createdBy"] == user_public_username(self.user)
         assert data["avatarUrl"] is not None
         _assert_signed_media_url(data["avatarUrl"])
         assert data["avatarCrop"] is None
 
-        room = Room.objects.get(slug=data["slug"])
+        room = Room.objects.get(pk=int(data["roomId"]))
         assert room.kind == Room.Kind.GROUP
         assert room.member_count == 1
 
-    def test_create_public_group_without_username(self):
+    def test_create_public_group_without_username_is_rejected(self):
         resp = self.api_client.post(
             "/api/groups/",
             {"name": "Public Group", "isPublic": True},
             format="json",
         )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["isPublic"] is True
-        assert data["username"] is None
+        assert resp.status_code == 400
 
     def test_create_public_group_with_username(self):
         resp = self.api_client.post(
@@ -103,32 +101,30 @@ class TestGroupDetail(APITestCase):
             {"name": "Test Group", "isPublic": True, "username": "testgrp"},
             format="json",
         )
-        self.slug = resp.json()["slug"]
+        self.room_id = resp.json()["roomId"]
 
     def test_get_public_group_info_unauthenticated(self):
         self.api_client.force_authenticate(user=None)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/")
         assert resp.status_code == 200
         assert resp.json()["name"] == "Test Group"
 
     def test_update_group(self):
         resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"description": "Updated desc", "slowModeSeconds": 30},
             format="json",
         )
         assert resp.status_code == 200
         assert resp.json()["slowModeSeconds"] == 30
 
-    def test_update_public_group_allows_empty_username(self):
+    def test_update_public_group_rejects_empty_username(self):
         resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"username": ""},
             format="json",
         )
-        assert resp.status_code == 200
-        assert resp.json()["isPublic"] is True
-        assert resp.json()["username"] is None
+        assert resp.status_code == 400
 
     def test_update_group_rejects_duplicate_username(self):
         other = self.api_client.post(
@@ -139,7 +135,7 @@ class TestGroupDetail(APITestCase):
         assert other.status_code == 201
 
         resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"username": "taken_group"},
             format="json",
         )
@@ -148,26 +144,26 @@ class TestGroupDetail(APITestCase):
     def test_update_group_forbidden_for_non_admin(self):
         self.api_client.force_authenticate(user=self.other)
         resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"name": "Hacked"},
             format="json",
         )
         assert resp.status_code == 403
 
     def test_delete_group(self):
-        resp = self.api_client.delete(f"/api/groups/{self.slug}/")
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/")
         assert resp.status_code == 204
-        assert not Room.objects.filter(slug=self.slug).exists()
+        assert not Room.objects.filter(pk=int(self.room_id)).exists()
 
     def test_delete_group_forbidden_for_non_owner(self):
         self.api_client.force_authenticate(user=self.other)
-        resp = self.api_client.delete(f"/api/groups/{self.slug}/")
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/")
         assert resp.status_code == 403
 
     def test_update_group_avatar_with_multipart_patch(self):
         avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
         resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"avatar": avatar},
             format="multipart",
         )
@@ -180,14 +176,14 @@ class TestGroupDetail(APITestCase):
     def test_update_group_avatar_crop_persists(self):
         avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
         set_resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"avatar": avatar},
             format="multipart",
         )
         assert set_resp.status_code == 200
 
         crop_resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {
                 "avatarCropX": 0.1,
                 "avatarCropY": 0.2,
@@ -205,7 +201,7 @@ class TestGroupDetail(APITestCase):
             "height": 0.4,
         }
 
-        room = Room.objects.get(slug=self.slug)
+        room = Room.objects.get(pk=int(self.room_id))
         assert room.avatar_crop_x == 0.1
         assert room.avatar_crop_y == 0.2
         assert room.avatar_crop_width == 0.3
@@ -214,14 +210,14 @@ class TestGroupDetail(APITestCase):
     def test_remove_group_avatar_via_avatar_action(self):
         avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
         set_resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"avatar": avatar},
             format="multipart",
         )
         assert set_resp.status_code == 200
 
         remove_resp = self.api_client.patch(
-            f"/api/groups/{self.slug}/",
+            f"/api/groups/{self.room_id}/",
             {"avatarAction": "remove"},
             format="json",
         )
@@ -230,7 +226,7 @@ class TestGroupDetail(APITestCase):
         _assert_signed_media_url(remove_resp.json()["avatarUrl"])
         assert remove_resp.json()["avatarCrop"] is None
 
-        room = Room.objects.get(slug=self.slug)
+        room = Room.objects.get(pk=int(self.room_id))
         assert room.avatar_crop_x is None
         assert room.avatar_crop_y is None
         assert room.avatar_crop_width is None
@@ -254,7 +250,7 @@ class TestPublicGroupList(APITestCase):
 
     def test_list_public_groups(self):
         avatar = SimpleUploadedFile("avatar.png", b"fake-image-content", content_type="image/png")
-        room = Room.objects.get(username="grp0")
+        room = Room.objects.get(public_handle__handle="grp0")
         room.avatar.save(avatar.name, avatar, save=False)
         room.save(update_fields=["avatar"])
 
@@ -339,14 +335,14 @@ class TestPrivateGroupAccess(APITestCase):
         self.api_client.force_authenticate(user=self.owner)
 
         resp = self.api_client.post("/api/groups/", {"name": "Secret Group"}, format="json")
-        self.slug = resp.json()["slug"]
+        self.room_id = resp.json()["roomId"]
 
     def test_private_group_hidden_from_non_member(self):
         self.api_client.force_authenticate(user=self.other)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/")
         assert resp.status_code == 404
 
     def test_private_group_hidden_from_unauthenticated(self):
         self.api_client.force_authenticate(user=None)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/")
         assert resp.status_code == 404

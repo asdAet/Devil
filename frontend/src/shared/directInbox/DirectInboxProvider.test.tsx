@@ -88,8 +88,8 @@ function Probe() {
       <p data-testid="items-order">
         {inbox.items.map((item) => item.slug).join(",")}
       </p>
-      <button onClick={() => inbox.setActiveRoom("dm_1")}>set-active</button>
-      <button onClick={() => inbox.markRead("dm_1")}>mark-read</button>
+      <button onClick={() => inbox.setActiveRoom("1")}>set-active</button>
+      <button onClick={() => inbox.markRead("1")}>mark-read</button>
     </div>
   );
 }
@@ -132,7 +132,7 @@ describe("DirectInboxProvider", () => {
     chatMock.getDirectChats.mockResolvedValue({
       items: [
         {
-          slug: "dm_1",
+          slug: "1",
           peer: { username: "alice", profileImage: null },
           lastMessage: "hello",
           lastMessageAt: "2026-02-13T10:00:00Z",
@@ -157,7 +157,7 @@ describe("DirectInboxProvider", () => {
        * @returns Результат выполнения `expect`.
        */
 
-      expect(screen.getByTestId("items-order").textContent).toBe("dm_1");
+      expect(screen.getByTestId("items-order").textContent).toBe("1");
     });
 
     /**
@@ -170,7 +170,7 @@ describe("DirectInboxProvider", () => {
         new MessageEvent("message", {
           data: JSON.stringify({
             type: "direct_unread_state",
-            unread: { dialogs: 1, slugs: ["dm_1"], counts: { dm_1: 2 } },
+            unread: { dialogs: 1, roomIds: [1], counts: { "1": 2 } },
           }),
         }),
       );
@@ -187,7 +187,7 @@ describe("DirectInboxProvider", () => {
      * @returns Результат выполнения `expect`.
      */
 
-    expect(screen.getByTestId("unread-counts").textContent).toBe('{"dm_1":2}');
+    expect(screen.getByTestId("unread-counts").textContent).toBe('{"1":2}');
 
     /**
      * Выполняет метод `act`.
@@ -199,8 +199,7 @@ describe("DirectInboxProvider", () => {
         new MessageEvent("message", {
           data: JSON.stringify({
             type: "direct_mark_read_ack",
-            roomSlug: "dm_1",
-            unread: { dialogs: 0, slugs: [], counts: {} },
+            unread: { dialogs: 0, roomIds: [], counts: {} },
           }),
         }),
       );
@@ -229,13 +228,13 @@ describe("DirectInboxProvider", () => {
     chatMock.getDirectChats.mockResolvedValue({
       items: [
         {
-          slug: "dm_old",
+          slug: "1",
           peer: { username: "alice", profileImage: null },
           lastMessage: "old",
           lastMessageAt: "2026-02-13T10:00:00Z",
         },
         {
-          slug: "dm_new",
+          slug: "2",
           peer: { username: "bob", profileImage: null },
           lastMessage: "new",
           lastMessageAt: "2026-02-13T11:00:00Z",
@@ -261,7 +260,7 @@ describe("DirectInboxProvider", () => {
        */
 
       expect(screen.getByTestId("items-order").textContent).toBe(
-        "dm_old,dm_new",
+        "1,2",
       );
     });
 
@@ -276,12 +275,12 @@ describe("DirectInboxProvider", () => {
           data: JSON.stringify({
             type: "direct_inbox_item",
             item: {
-              slug: "dm_old",
+              roomId: 1,
               peer: { username: "alice", profileImage: null },
               lastMessage: "latest",
               lastMessageAt: "2026-02-13T12:00:00Z",
             },
-            unread: { dialogs: 1, slugs: ["dm_old"], counts: { dm_old: 3 } },
+            unread: { dialogs: 1, roomIds: [1], counts: { "1": 3 } },
           }),
         }),
       );
@@ -292,7 +291,7 @@ describe("DirectInboxProvider", () => {
      * @returns Результат выполнения `expect`.
      */
 
-    expect(screen.getByTestId("items-order").textContent).toBe("dm_old,dm_new");
+    expect(screen.getByTestId("items-order").textContent).toBe("1,2");
     /**
      * Выполняет метод `expect`.
      * @returns Результат выполнения `expect`.
@@ -305,7 +304,7 @@ describe("DirectInboxProvider", () => {
      */
 
     expect(screen.getByTestId("unread-counts").textContent).toBe(
-      '{"dm_old":3}',
+      '{"1":3}',
     );
   });
 
@@ -345,7 +344,7 @@ describe("DirectInboxProvider", () => {
         new MessageEvent("message", {
           data: JSON.stringify({
             type: "direct_unread_state",
-            unread: { dialogs: 1, slugs: ["dm_1"], counts: { dm_1: 1 } },
+            unread: { dialogs: 1, roomIds: [1], counts: { "1": 1 } },
           }),
         }),
       );
@@ -363,7 +362,7 @@ describe("DirectInboxProvider", () => {
     expect(
       payloads.some(
         (payload) =>
-          payload?.type === "mark_read" && payload?.roomSlug === "dm_1",
+          payload?.type === "mark_read" && payload?.roomId === 1,
       ),
     ).toBe(true);
     /**
@@ -374,7 +373,7 @@ describe("DirectInboxProvider", () => {
     expect(
       payloads.some(
         (payload) =>
-          payload?.type === "set_active_room" && payload?.roomSlug === "dm_1",
+          payload?.type === "set_active_room" && payload?.roomId === 1,
       ),
     ).toBe(true);
     /**
@@ -444,7 +443,7 @@ describe("DirectInboxProvider", () => {
     expect(
       payloads.some(
         (payload) =>
-          payload?.type === "set_active_room" && payload?.roomSlug === "dm_1",
+          payload?.type === "set_active_room" && payload?.roomId === 1,
       ),
     ).toBe(true);
   });
@@ -453,7 +452,7 @@ describe("DirectInboxProvider", () => {
     chatMock.getDirectChats.mockResolvedValue({
       items: [
         {
-          slug: "dm_1",
+          slug: "1",
           peer: { username: "alice", profileImage: null },
           lastMessage: "hello",
           lastMessageAt: "2026-02-13T10:00:00Z",
@@ -468,7 +467,7 @@ describe("DirectInboxProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("items-order").textContent).toBe("dm_1");
+      expect(screen.getByTestId("items-order").textContent).toBe("1");
     });
 
     act(() => {
@@ -476,17 +475,17 @@ describe("DirectInboxProvider", () => {
         new MessageEvent("message", {
           data: JSON.stringify({
             type: "direct_unread_state",
-            unread: { dialogs: 0, slugs: [], counts: {} },
+            unread: { dialogs: 0, roomIds: [], counts: {} },
           }),
         }),
       );
     });
 
     act(() => {
-      setUnreadOverride({ roomSlug: "dm_1", unreadCount: 4 });
+      setUnreadOverride({ roomSlug: "1", unreadCount: 4 });
     });
 
     expect(screen.getByTestId("unread-count").textContent).toBe("1");
-    expect(screen.getByTestId("unread-counts").textContent).toBe('{"dm_1":4}');
+    expect(screen.getByTestId("unread-counts").textContent).toBe('{"1":4}');
   });
 });

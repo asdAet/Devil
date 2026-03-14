@@ -3,11 +3,17 @@ import type { AxiosInstance } from "axios";
 export async function joinViaInvite(
   apiClient: AxiosInstance,
   code: string,
-): Promise<{ slug: string }> {
-  const response = await apiClient.post<{ slug?: string }>(
+): Promise<{ roomId: number }> {
+  const response = await apiClient.post<{ roomId?: number | string }>(
     `/invite/${encodeURIComponent(code)}/join/`,
   );
-  return {
-    slug: ((response.data as Record<string, unknown>).slug as string) ?? "",
-  };
+  const payload =
+    typeof response.data === "object" && response.data !== null
+      ? (response.data as Record<string, unknown>)
+      : {};
+  const roomId =
+    typeof payload.roomId === "number"
+      ? payload.roomId
+      : Number(payload.roomId ?? NaN);
+  return { roomId: Number.isFinite(roomId) ? Math.trunc(roomId) : 0 };
 }

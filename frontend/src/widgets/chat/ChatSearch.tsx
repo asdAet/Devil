@@ -85,7 +85,9 @@ export function ChatSearch({ slug, onResultClick }: Props) {
               role="button"
               tabIndex={0}
             >
-              <span className={styles.resultUser}>{r.username}</span>
+              <span className={styles.resultUser}>
+                {r.displayName ?? r.username}
+              </span>
               <span className={styles.resultTime}>
                 {formatTimestamp(r.createdAt)}
               </span>

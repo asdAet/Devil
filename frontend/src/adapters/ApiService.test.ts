@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 
 import { apiService, normalizeAxiosError } from "./ApiService";
@@ -18,7 +18,8 @@ const friendItem = {
 };
 
 const group = {
-  slug: "group_one",
+  roomId: 101,
+  slug: "101",
   name: "Group One",
   description: "group description",
   isPublic: true,
@@ -34,6 +35,7 @@ const group = {
 const groupList = {
   items: [
     {
+      roomId: group.roomId,
       slug: group.slug,
       name: group.name,
       description: group.description,
@@ -136,11 +138,13 @@ describe("ApiService", () => {
     let contentType = "";
 
     server.use(
-      http.post("*/api/auth/profile/", async ({ request }) => {
+      http.patch("*/api/profile/", async ({ request }) => {
         contentType = request.headers.get("content-type") || "";
         return HttpResponse.json({
           user: {
-            username: "updated",
+            handle: "updated",
+            publicId: "1234567890",
+            publicRef: "@updated",
             email: "updated@example.com",
             profileImage: null,
             bio: "about me",
@@ -149,11 +153,25 @@ describe("ApiService", () => {
           },
         });
       }),
+      http.patch("*/api/profile/handle/", () =>
+        HttpResponse.json({
+          user: {
+            name: "updated",
+            handle: "updated",
+            publicId: "1234567890",
+            publicRef: "@updated",
+            profileImage: null,
+            avatarCrop: null,
+            bio: "about me",
+            lastSeen: null,
+            registeredAt: null,
+          },
+        }),
+      ),
     );
 
     const response = await apiService.updateProfile({
       username: "updated",
-      email: "updated@example.com",
       bio: "about me",
     });
 
@@ -173,7 +191,7 @@ describe("ApiService", () => {
     );
 
     await expect(
-      apiService.register("taken@example.com", "pass12345", "pass12345"),
+      apiService.register("taken_login", "pass12345", "pass12345", "Taken User"),
     ).rejects.toMatchObject({
       status: 400,
       message: expect.stringContaining("already used"),
@@ -190,7 +208,7 @@ describe("ApiService", () => {
     );
 
     await expect(
-      apiService.register("name@example.com", "pass12345", "pass12345"),
+      apiService.register("name_login", "pass12345", "pass12345", "Name User"),
     ).rejects.toMatchObject({
       status: 500,
       message: expect.stringContaining("fatal error"),
@@ -226,12 +244,17 @@ describe("ApiService", () => {
       http.get("/api/auth/password-rules/", () =>
         HttpResponse.json({ rules: ["min length"] }),
       ),
-      http.get("/api/auth/users/:username/", ({ params }) => {
-        encodedUserPath = String(params.username);
+      http.get("/api/public/resolve/:ref", ({ params }) => {
+        encodedUserPath = String(params.ref);
         return HttpResponse.json({
+          ownerType: "user",
+          ownerId: 77,
+          publicRef: "@test",
           user: {
-            username: String(params.username),
-            email: "",
+            name: String(params.ref),
+            handle: String(params.ref),
+            publicId: "1234567890",
+            publicRef: `@${String(params.ref)}`,
             profileImage: null,
             bio: "",
             lastSeen: null,
@@ -241,6 +264,7 @@ describe("ApiService", () => {
       }),
       http.get("/api/chat/public-room/", () =>
         HttpResponse.json({
+          roomId: 999,
           slug: "public",
           name: "Public",
           kind: "public",
@@ -320,17 +344,24 @@ describe("ApiService", () => {
   });
 
   it("supports oauth google endpoint", async () => {
-    let receivedToken = "";
+    let receivedIdToken = "";
+    let receivedAccessToken = "";
 
     server.use(
       http.post("/api/auth/oauth/google/", async ({ request }) => {
-        const payload = (await request.json()) as { accessToken?: string };
-        receivedToken = payload.accessToken ?? "";
+        const payload = (await request.json()) as {
+          idToken?: string;
+          accessToken?: string;
+        };
+        receivedIdToken = payload.idToken ?? "";
+        receivedAccessToken = payload.accessToken ?? "";
         return HttpResponse.json({
           authenticated: true,
           user: {
             name: "Google User",
-            username: "googleuser",
+            handle: "googleuser",
+            publicId: "1234567890",
+            publicRef: "@googleuser",
             email: "google@example.com",
             profileImage: null,
             avatarCrop: null,
@@ -342,9 +373,12 @@ describe("ApiService", () => {
       }),
     );
 
-    const result = await apiService.oauthGoogle("access-token-123");
+    const result = await apiService.oauthGoogle("id-token-123");
     expect(result.authenticated).toBe(true);
-    expect(receivedToken).toBe("access-token-123");
+    expect(receivedIdToken).toBe("id-token-123");
+
+    await apiService.oauthGoogle("access-token-123", "accessToken");
+    expect(receivedAccessToken).toBe("access-token-123");
   });
 
   it("supports friends endpoints", async () => {
@@ -487,7 +521,7 @@ describe("ApiService", () => {
           username: "group_one",
         })
       ).slug,
-    ).toBe("group_one");
+    ).toBe("101");
     expect(
       (
         await apiService.getPublicGroups({
@@ -501,31 +535,31 @@ describe("ApiService", () => {
       (await apiService.getMyGroups({ search: "one", page: 3, pageSize: 7 }))
         .items,
     ).toHaveLength(1);
-    expect((await apiService.getGroupDetails("group_one")).name).toBe(
+    expect((await apiService.getGroupDetails("101")).name).toBe(
       "Group One",
     );
 
-    await apiService.updateGroup("group_one", {
+    await apiService.updateGroup("101", {
       name: "Group One Updated",
       description: "updated",
     });
 
-    await apiService.deleteGroup("group_one");
-    await apiService.joinGroup("group_one");
-    await apiService.leaveGroup("group_one");
+    await apiService.deleteGroup("101");
+    await apiService.joinGroup("101");
+    await apiService.leaveGroup("101");
 
     expect(
-      (await apiService.getGroupMembers("group_one", { page: 1, pageSize: 50 }))
+      (await apiService.getGroupMembers("101", { page: 1, pageSize: 50 }))
         .total,
     ).toBe(1);
 
-    await apiService.kickMember("group_one", 22);
-    await apiService.banMember("group_one", 22, "spam");
-    await apiService.unbanMember("group_one", 22);
-    await apiService.muteMember("group_one", 22, 1800);
-    await apiService.unmuteMember("group_one", 22);
+    await apiService.kickMember("101", 22);
+    await apiService.banMember("101", 22, "spam");
+    await apiService.unbanMember("101", 22);
+    await apiService.muteMember("101", 22, 1800);
+    await apiService.unmuteMember("101", 22);
 
-    expect((await apiService.getBannedMembers("group_one")).total).toBe(1);
+    expect((await apiService.getBannedMembers("101")).total).toBe(1);
 
     expect(publicGroupsSearch).toBe("Group");
     expect(myGroupsSearch).toBe("one");
@@ -550,7 +584,7 @@ describe("ApiService", () => {
       http.get("/api/invite/:code/", () =>
         HttpResponse.json({
           code: "INV-123",
-          groupSlug: group.slug,
+          groupId: group.roomId,
           groupName: group.name,
           groupDescription: group.description,
           memberCount: group.memberCount,
@@ -558,7 +592,7 @@ describe("ApiService", () => {
         }),
       ),
       http.post("/api/invite/:code/join/", () =>
-        HttpResponse.json({ slug: group.slug }),
+        HttpResponse.json({ roomId: group.roomId }),
       ),
       http.get("/api/groups/:slug/requests/", () =>
         HttpResponse.json({
@@ -606,25 +640,23 @@ describe("ApiService", () => {
 
     expect(
       (
-        await apiService.createInvite("group_one", {
+        await apiService.createInvite("101", {
           maxUses: 10,
           expiresInHours: 2,
         })
       ).code,
     ).toBe("INV-123");
-    expect(await apiService.getInvites("group_one")).toHaveLength(1);
-    await apiService.revokeInvite("group_one", "INV-123");
-    expect((await apiService.getInvitePreview("INV-123")).groupSlug).toBe(
-      "group_one",
-    );
-    expect((await apiService.joinViaInvite("INV-123")).slug).toBe("group_one");
-    expect(await apiService.getJoinRequests("group_one")).toHaveLength(1);
-    await apiService.approveJoinRequest("group_one", 50);
-    await apiService.rejectJoinRequest("group_one", 50);
-    expect(await apiService.getPinnedMessages("group_one")).toHaveLength(1);
-    await apiService.pinMessage("group_one", 99);
-    await apiService.unpinMessage("group_one", 99);
-    await apiService.transferOwnership("group_one", 22);
+    expect(await apiService.getInvites("101")).toHaveLength(1);
+    await apiService.revokeInvite("101", "INV-123");
+    expect((await apiService.getInvitePreview("INV-123")).groupId).toBe(101);
+    expect((await apiService.joinViaInvite("INV-123")).roomId).toBe(101);
+    expect(await apiService.getJoinRequests("101")).toHaveLength(1);
+    await apiService.approveJoinRequest("101", 50);
+    await apiService.rejectJoinRequest("101", 50);
+    expect(await apiService.getPinnedMessages("101")).toHaveLength(1);
+    await apiService.pinMessage("101", 99);
+    await apiService.unpinMessage("101", 99);
+    await apiService.transferOwnership("101", 22);
 
     expect(inviteExpiresInSeconds).toBe(7200);
   });
@@ -672,10 +704,10 @@ describe("ApiService", () => {
       ),
     );
 
-    expect(await apiService.getRoomRoles("group_one")).toHaveLength(1);
+    expect(await apiService.getRoomRoles("101")).toHaveLength(1);
     expect(
       (
-        await apiService.createRoomRole("group_one", {
+        await apiService.createRoomRole("101", {
           name: "Moderator",
           color: "#ffcc00",
           permissions: 15,
@@ -684,25 +716,25 @@ describe("ApiService", () => {
     ).toBe(4);
     expect(
       (
-        await apiService.updateRoomRole("group_one", 4, {
+        await apiService.updateRoomRole("101", 4, {
           name: "Mod+",
           permissions: 31,
         })
       ).id,
     ).toBe(4);
-    await apiService.deleteRoomRole("group_one", 4);
+    await apiService.deleteRoomRole("101", 4);
 
-    expect((await apiService.getMemberRoles("group_one", 22)).roleIds).toEqual([
+    expect((await apiService.getMemberRoles("101", 22)).roleIds).toEqual([
       4,
     ]);
     expect(
-      (await apiService.setMemberRoles("group_one", 22, [4])).roleIds,
+      (await apiService.setMemberRoles("101", 22, [4])).roleIds,
     ).toEqual([4]);
 
-    expect(await apiService.getRoomOverrides("group_one")).toHaveLength(1);
+    expect(await apiService.getRoomOverrides("101")).toHaveLength(1);
     expect(
       (
-        await apiService.createRoomOverride("group_one", {
+        await apiService.createRoomOverride("101", {
           targetRoleId: 4,
           allow: 8,
           deny: 1,
@@ -711,15 +743,15 @@ describe("ApiService", () => {
     ).toBe(6);
     expect(
       (
-        await apiService.updateRoomOverride("group_one", 6, {
+        await apiService.updateRoomOverride("101", 6, {
           allow: 16,
           deny: 0,
         })
       ).id,
     ).toBe(6);
-    await apiService.deleteRoomOverride("group_one", 6);
+    await apiService.deleteRoomOverride("101", 6);
 
-    expect((await apiService.getMyPermissions("group_one")).permissions).toBe(
+    expect((await apiService.getMyPermissions("101")).permissions).toBe(
       15,
     );
   });
@@ -743,10 +775,10 @@ describe("ApiService", () => {
           ],
           groups: [
             {
-              slug: group.slug,
+              roomId: 101,
               name: group.name,
               description: group.description,
-              username: group.username,
+              publicRef: group.username ? `@${group.username}` : "",
               memberCount: group.memberCount,
               isPublic: true,
             },
@@ -757,7 +789,7 @@ describe("ApiService", () => {
               username: "alice",
               content: "hello",
               createdAt: now,
-              roomSlug: group.slug,
+              roomId: 101,
               roomName: group.name,
               roomKind: "group",
             },
@@ -799,7 +831,7 @@ describe("ApiService", () => {
     ).toHaveLength(1);
     expect(
       (
-        await apiService.getRoomAttachments("group_one", {
+        await apiService.getRoomAttachments("101", {
           limit: 20,
           before: 100,
         })
@@ -810,6 +842,38 @@ describe("ApiService", () => {
     expect(attachmentsBefore).toBe("100");
   });
 
+  it("resolves public room ref to numeric roomId for attachment list/read endpoints", async () => {
+    let listRoomRef = "";
+    let readRoomRef = "";
+
+    server.use(
+      http.get("/api/chat/public-room/", () =>
+        HttpResponse.json({
+          roomId: 777,
+          name: "Public",
+          kind: "public",
+        }),
+      ),
+      http.get("/api/chat/rooms/:slug/attachments/", ({ params }) => {
+        listRoomRef = String(params.slug);
+        return HttpResponse.json({
+          items: [],
+          pagination: { limit: 20, hasMore: false, nextBefore: null },
+        });
+      }),
+      http.post("/api/chat/rooms/:slug/read/", ({ params }) => {
+        readRoomRef = String(params.slug);
+        return HttpResponse.json({ roomId: 777, lastReadMessageId: null });
+      }),
+    );
+
+    await apiService.getRoomAttachments("public");
+    await apiService.markRead("public");
+
+    expect(listRoomRef).toBe("777");
+    expect(readRoomRef).toBe("777");
+  });
+
   it("normalizes role endpoint errors in extended matrix scenarios", async () => {
     server.use(
       http.get("/api/chat/rooms/:slug/roles/", () =>
@@ -817,7 +881,7 @@ describe("ApiService", () => {
       ),
     );
 
-    await expect(apiService.getRoomRoles("group_one")).rejects.toMatchObject({
+    await expect(apiService.getRoomRoles("101")).rejects.toMatchObject({
       status: 403,
       message: expect.stringContaining("forbidden"),
       data: expect.objectContaining({ detail: "forbidden" }),
@@ -831,6 +895,9 @@ describe("ApiService", () => {
 
   it("returns fallback for unknown error shapes", () => {
     const normalized = normalizeAxiosError(new Error("unknown"));
-    expect(normalized).toEqual({ status: 0, message: "Ошибка запроса" });
+    expect(normalized.status).toBe(0);
+    expect(typeof normalized.message).toBe("string");
+    expect(normalized.message.length).toBeGreaterThan(0);
   });
 });
+

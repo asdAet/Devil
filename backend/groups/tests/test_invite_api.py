@@ -6,7 +6,6 @@ from django.test import TestCase
 from django.utils import timezone
 
 from groups.infrastructure.models import InviteLink
-from rooms.models import Room
 
 from ._typing import TypedAPIClient
 
@@ -26,11 +25,11 @@ class TestInviteLinks(APITestCase):
         self.api_client.force_authenticate(user=self.owner)
 
         resp = self.api_client.post("/api/groups/", {"name": "Invite Group"}, format="json")
-        self.slug = resp.json()["slug"]
+        self.room_id = int(resp.json()["roomId"])
 
     def test_create_invite(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/",
+            f"/api/groups/{self.room_id}/invites/",
             {"name": "General"},
             format="json",
         )
@@ -42,7 +41,7 @@ class TestInviteLinks(APITestCase):
 
     def test_create_invite_with_expiry(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/",
+            f"/api/groups/{self.room_id}/invites/",
             {"expiresInSeconds": 3600, "maxUses": 10},
             format="json",
         )
@@ -53,7 +52,7 @@ class TestInviteLinks(APITestCase):
 
     def test_join_via_invite(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code = resp.json()["code"]
 
@@ -62,11 +61,11 @@ class TestInviteLinks(APITestCase):
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "joined"
-        assert data["roomSlug"] == self.slug
+        assert data["roomId"] == self.room_id
 
     def test_invite_preview(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code = resp.json()["code"]
 
@@ -77,11 +76,11 @@ class TestInviteLinks(APITestCase):
 
     def test_revoke_invite(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code = resp.json()["code"]
 
-        resp = self.api_client.delete(f"/api/groups/{self.slug}/invites/{code}/")
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/invites/{code}/")
         assert resp.status_code == 204
 
         invite = InviteLink.objects.get(code=code)
@@ -94,7 +93,7 @@ class TestInviteLinks(APITestCase):
 
     def test_expired_invite_rejected(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code = resp.json()["code"]
 
@@ -109,7 +108,7 @@ class TestInviteLinks(APITestCase):
 
     def test_max_uses_enforced(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/",
+            f"/api/groups/{self.room_id}/invites/",
             {"maxUses": 1},
             format="json",
         )
@@ -127,7 +126,7 @@ class TestInviteLinks(APITestCase):
     def test_banned_user_cannot_join(self):
         # Create invite and join
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code = resp.json()["code"]
 
@@ -137,14 +136,14 @@ class TestInviteLinks(APITestCase):
         # Ban the joiner
         self.api_client.force_authenticate(user=self.owner)
         self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.joiner.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.joiner.pk}/ban/",
             {"reason": "test"},
             format="json",
         )
 
         # Create new invite and try to join again
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code2 = resp.json()["code"]
 
@@ -154,5 +153,5 @@ class TestInviteLinks(APITestCase):
 
     def test_list_invites_requires_manage_invites(self):
         self.api_client.force_authenticate(user=self.joiner)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/invites/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/invites/")
         assert resp.status_code == 403

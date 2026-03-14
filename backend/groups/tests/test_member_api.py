@@ -8,6 +8,7 @@ from django.test import TestCase
 
 from roles.models import Membership, Role
 from rooms.models import Room
+from users.identity import user_public_id
 
 from ._typing import TypedAPIClient
 
@@ -26,20 +27,20 @@ def _assert_signed_media_url(url: str):
     assert "sig" in query
 
 
-def _create_group_with_member(client: TypedAPIClient, owner, member):
-    """Helper: create group, invite link, join via link, return slug."""
+def _create_group_with_member(client: TypedAPIClient, owner, member) -> int:
+    """Helper: create group, invite link, join via link, return room id."""
     client.force_authenticate(user=owner)
     resp = client.post("/api/groups/", {"name": "Test Group"}, format="json")
-    slug = resp.json()["slug"]
+    room_id = int(resp.json()["roomId"])
 
-    resp = client.post(f"/api/groups/{slug}/invites/", {}, format="json")
+    resp = client.post(f"/api/groups/{room_id}/invites/", {}, format="json")
     code = resp.json()["code"]
 
     client.force_authenticate(user=member)
     client.post(f"/api/invite/{code}/join/")
 
     client.force_authenticate(user=owner)
-    return slug
+    return room_id
 
 
 @pytest.mark.django_db
@@ -56,38 +57,36 @@ class TestJoinLeave(APITestCase):
             {"name": "Public", "isPublic": True, "username": "pubgrp"},
             format="json",
         )
-        slug = resp.json()["slug"]
+        room_id = int(resp.json()["roomId"])
 
         self.api_client.force_authenticate(user=self.member)
-        resp = self.api_client.post(f"/api/groups/{slug}/join/")
+        resp = self.api_client.post(f"/api/groups/{room_id}/join/")
         assert resp.status_code == 200
 
     def test_join_private_group_rejected(self):
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post("/api/groups/", {"name": "Private"}, format="json")
-        slug = resp.json()["slug"]
+        room_id = int(resp.json()["roomId"])
 
         self.api_client.force_authenticate(user=self.member)
-        resp = self.api_client.post(f"/api/groups/{slug}/join/")
+        resp = self.api_client.post(f"/api/groups/{room_id}/join/")
         assert resp.status_code == 403
 
     def test_leave_group(self):
-        slug = _create_group_with_member(self.api_client, self.owner, self.member)
+        room_id = _create_group_with_member(self.api_client, self.owner, self.member)
 
         self.api_client.force_authenticate(user=self.member)
-        resp = self.api_client.post(f"/api/groups/{slug}/leave/")
+        resp = self.api_client.post(f"/api/groups/{room_id}/leave/")
         assert resp.status_code == 204
 
-        assert not Membership.objects.filter(
-            room__slug=slug, user=self.member
-        ).exists()
+        assert not Membership.objects.filter(room_id=room_id, user=self.member).exists()
 
     def test_owner_cannot_leave(self):
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post("/api/groups/", {"name": "Test"}, format="json")
-        slug = resp.json()["slug"]
+        room_id = int(resp.json()["roomId"])
 
-        resp = self.api_client.post(f"/api/groups/{slug}/leave/")
+        resp = self.api_client.post(f"/api/groups/{room_id}/leave/")
         assert resp.status_code == 400
 
 
@@ -98,51 +97,43 @@ class TestKickBanMute(APITestCase):
         self.owner = User.objects.create_user(username="owner", password="testpass123")
         self.member = User.objects.create_user(username="member", password="testpass123")
         self.other = User.objects.create_user(username="other", password="testpass123")
-        self.slug = _create_group_with_member(self.api_client, self.owner, self.member)
+        self.room_id = _create_group_with_member(self.api_client, self.owner, self.member)
 
     def test_kick_member(self):
         self.api_client.force_authenticate(user=self.owner)
-        resp = self.api_client.delete(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/"
-        )
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/members/{self.member.pk}/")
         assert resp.status_code == 204
         assert not Membership.objects.filter(
-            room__slug=self.slug, user=self.member, is_banned=False
+            room_id=self.room_id, user=self.member, is_banned=False
         ).exists()
 
     def test_kick_requires_permission(self):
         self.api_client.force_authenticate(user=self.member)
-        resp = self.api_client.delete(
-            f"/api/groups/{self.slug}/members/{self.owner.pk}/"
-        )
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/members/{self.owner.pk}/")
         assert resp.status_code == 403
 
     def test_kick_self_returns_400(self):
         self.api_client.force_authenticate(user=self.owner)
-        resp = self.api_client.delete(
-            f"/api/groups/{self.slug}/members/{self.owner.pk}/"
-        )
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/members/{self.owner.pk}/")
         assert resp.status_code == 400
 
     def test_ban_member(self):
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/ban/",
             {"reason": "spam"},
             format="json",
         )
         assert resp.status_code == 204
 
-        membership = Membership.objects.get(
-            room__slug=self.slug, user=self.member
-        )
+        membership = Membership.objects.get(room_id=self.room_id, user=self.member)
         assert membership.is_banned is True
         assert membership.ban_reason == "spam"
 
     def test_ban_self_returns_400(self):
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.owner.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.owner.pk}/ban/",
             {"reason": "self"},
             format="json",
         )
@@ -151,31 +142,25 @@ class TestKickBanMute(APITestCase):
     def test_unban_member(self):
         self.api_client.force_authenticate(user=self.owner)
         self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/ban/",
             {"reason": "test"},
             format="json",
         )
-        resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/unban/"
-        )
+        resp = self.api_client.post(f"/api/groups/{self.room_id}/members/{self.member.pk}/unban/")
         assert resp.status_code == 204
 
-        assert not Membership.objects.filter(
-            room__slug=self.slug, user=self.member
-        ).exists()
+        assert not Membership.objects.filter(room_id=self.room_id, user=self.member).exists()
 
     def test_member_can_rejoin_after_unban_via_invite(self):
         self.api_client.force_authenticate(user=self.owner)
         self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/ban/",
             {"reason": "test"},
             format="json",
         )
-        self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/unban/"
-        )
+        self.api_client.post(f"/api/groups/{self.room_id}/members/{self.member.pk}/unban/")
         invite_response = self.api_client.post(
-            f"/api/groups/{self.slug}/invites/", {}, format="json"
+            f"/api/groups/{self.room_id}/invites/", {}, format="json"
         )
         code = invite_response.json()["code"]
 
@@ -183,49 +168,45 @@ class TestKickBanMute(APITestCase):
         resp = self.api_client.post(f"/api/invite/{code}/join/")
         assert resp.status_code == 200
         assert Membership.objects.filter(
-            room__slug=self.slug, user=self.member, is_banned=False
+            room_id=self.room_id, user=self.member, is_banned=False
         ).exists()
 
     def test_kicked_member_loses_access_to_members_api(self):
         self.api_client.force_authenticate(user=self.owner)
-        self.api_client.delete(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/"
-        )
+        self.api_client.delete(f"/api/groups/{self.room_id}/members/{self.member.pk}/")
 
         self.api_client.force_authenticate(user=self.member)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/members/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/members/")
         assert resp.status_code == 403
 
     def test_banned_member_loses_access_to_members_api(self):
         self.api_client.force_authenticate(user=self.owner)
         self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/ban/",
             {"reason": "test"},
             format="json",
         )
 
         self.api_client.force_authenticate(user=self.member)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/members/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/members/")
         assert resp.status_code == 403
 
     def test_mute_member(self):
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/mute/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/mute/",
             {"durationSeconds": 3600},
             format="json",
         )
         assert resp.status_code == 204
 
-        membership = Membership.objects.get(
-            room__slug=self.slug, user=self.member
-        )
+        membership = Membership.objects.get(room_id=self.room_id, user=self.member)
         assert membership.is_muted is True
 
     def test_mute_self_returns_400(self):
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.owner.pk}/mute/",
+            f"/api/groups/{self.room_id}/members/{self.owner.pk}/mute/",
             {"durationSeconds": 3600},
             format="json",
         )
@@ -234,30 +215,24 @@ class TestKickBanMute(APITestCase):
     def test_unmute_member(self):
         self.api_client.force_authenticate(user=self.owner)
         self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/mute/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/mute/",
             {"durationSeconds": 3600},
             format="json",
         )
-        resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/unmute/"
-        )
+        resp = self.api_client.post(f"/api/groups/{self.room_id}/members/{self.member.pk}/unmute/")
         assert resp.status_code == 204
 
-        membership = Membership.objects.get(
-            room__slug=self.slug, user=self.member
-        )
+        membership = Membership.objects.get(room_id=self.room_id, user=self.member)
         assert membership.is_muted is False
 
     def test_unmute_self_returns_400(self):
         self.api_client.force_authenticate(user=self.owner)
-        resp = self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.owner.pk}/unmute/"
-        )
+        resp = self.api_client.post(f"/api/groups/{self.room_id}/members/{self.owner.pk}/unmute/")
         assert resp.status_code == 400
 
     def test_list_members(self):
         self.api_client.force_authenticate(user=self.owner)
-        resp = self.api_client.get(f"/api/groups/{self.slug}/members/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/members/")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 2
@@ -272,40 +247,35 @@ class TestKickBanMute(APITestCase):
     def test_list_banned(self):
         self.api_client.force_authenticate(user=self.owner)
         self.api_client.post(
-            f"/api/groups/{self.slug}/members/{self.member.pk}/ban/",
+            f"/api/groups/{self.room_id}/members/{self.member.pk}/ban/",
             {"reason": "test"},
             format="json",
         )
-        resp = self.api_client.get(f"/api/groups/{self.slug}/banned/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/banned/")
         assert resp.status_code == 200
         items = resp.json()["items"]
         assert len(items) == 1
-        assert items[0]["username"] == "member"
+        assert items[0]["username"] == user_public_id(self.member)
 
     def test_hierarchy_prevents_kicking_higher_role(self):
         """A member with Admin role should not be kickable by a Moderator."""
-        slug = self.slug
-        room = Room.objects.get(slug=slug)
+        room = Room.objects.get(pk=self.room_id)
 
-        # Give member the Admin role
         admin_role = Role.objects.get(room=room, name="Admin")
         mod_role = Role.objects.get(room=room, name="Moderator")
 
         mod = User.objects.create_user(username="mod", password="testpass123")
-        # Join mod to group
         self.api_client.force_authenticate(user=self.owner)
-        resp = self.api_client.post(f"/api/groups/{slug}/invites/", {}, format="json")
+        resp = self.api_client.post(f"/api/groups/{self.room_id}/invites/", {}, format="json")
         code = resp.json()["code"]
         self.api_client.force_authenticate(user=mod)
         self.api_client.post(f"/api/invite/{code}/join/")
 
-        # Assign roles
         member_ms = Membership.objects.get(room=room, user=self.member)
         member_ms.roles.add(admin_role)
         mod_ms = Membership.objects.get(room=room, user=mod)
         mod_ms.roles.add(mod_role)
 
-        # Mod tries to kick Admin — should fail
         self.api_client.force_authenticate(user=mod)
-        resp = self.api_client.delete(f"/api/groups/{slug}/members/{self.member.pk}/")
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/members/{self.member.pk}/")
         assert resp.status_code == 403

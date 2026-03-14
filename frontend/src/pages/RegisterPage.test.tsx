@@ -14,6 +14,12 @@ describe("RegisterPage", () => {
       />,
     );
 
+    fireEvent.change(screen.getByTestId("auth-login-input"), {
+      target: { value: "alice_login" },
+    });
+    fireEvent.change(screen.getByTestId("auth-name-input"), {
+      target: { value: "Alice" },
+    });
     fireEvent.change(screen.getByTestId("auth-email-input"), {
       target: { value: "alice@example.com" },
     });
@@ -25,11 +31,14 @@ describe("RegisterPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Создать аккаунт" }));
 
-    expect(onSubmit).toHaveBeenCalledWith(
-      "alice@example.com",
-      "secret123",
-      "secret123",
-    );
+    expect(onSubmit).toHaveBeenCalledWith({
+      login: "alice_login",
+      password: "secret123",
+      passwordConfirm: "secret123",
+      name: "Alice",
+      username: undefined,
+      email: "alice@example.com",
+    });
   });
 
   it("renders google oauth button disabled when oauth is unavailable", () => {

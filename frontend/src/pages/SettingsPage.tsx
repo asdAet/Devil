@@ -2,6 +2,7 @@
 
 import type { UserProfile } from "../entities/user/types";
 import { formatFullName } from "../shared/lib/format";
+import { formatPublicRef } from "../shared/lib/publicRef";
 import { EmptyState } from "../shared/ui";
 import styles from "../styles/pages/SettingsPage.module.css";
 
@@ -44,7 +45,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: Props) {
       user.name,
       (user as { last_name?: string | null }).last_name,
     ) || "Без имени";
-  const publicUsername = user.username.trim();
+  const publicRef = (user.publicRef || user.username || "").trim();
 
   return (
     <div className={styles.root}>
@@ -55,8 +56,8 @@ export function SettingsPage({ user, onNavigate, onLogout }: Props) {
         <div className={styles.row}>
           <div>
             <div className={styles.rowLabel}>{fullName}</div>
-            {publicUsername && (
-              <div className={styles.rowDesc}>@{publicUsername}</div>
+            {publicRef && (
+              <div className={styles.rowDesc}>{formatPublicRef(publicRef)}</div>
             )}
             <div className={styles.rowDesc}>{user.email}</div>
           </div>

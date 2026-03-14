@@ -40,13 +40,19 @@ from rooms.services import (
     direct_pair_key,
     direct_peer_for_user,
     direct_room_slug,
-    ensure_direct_roles,
+    ensure_direct_memberships,
     ensure_direct_room_with_retry,
-    ensure_role,
-    ensure_room_owner_role,
     parse_pair_key_users,
 )
-from users.identity import get_user_by_public_username, normalize_public_username, user_public_username
+from users.identity import (
+    resolve_public_ref,
+    room_public_ref,
+    user_display_name,
+    user_profile_avatar_source,
+    user_public_ref,
+    user_public_username,
+)
+from users.models import PublicHandle
 
 from .constants import PUBLIC_ROOM_NAME, PUBLIC_ROOM_SLUG
 from chat_app_django.media_utils import build_profile_url_from_request, serialize_avatar_crop
@@ -55,7 +61,7 @@ User = get_user_model()
 
 
 class DirectStartInputSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    ref = serializers.CharField()
 
 
 def _build_profile_pic_url(request, profile_pic):
@@ -70,10 +76,9 @@ def _build_profile_pic_url(request, profile_pic):
 
 def _serialize_peer(request, user, *, is_blocked: bool = False):
     profile_pic = None
-    profile = getattr(user, "profile", None)
-    image = getattr(profile, "image", None) if profile else None
-    if image:
-        profile_pic = _build_profile_pic_url(request, image)
+    avatar_source = user_profile_avatar_source(user)
+    if avatar_source:
+        profile_pic = _build_profile_pic_url(request, avatar_source)
 
     profile = getattr(user, "profile", None)
     last_seen = getattr(profile, "last_seen", None)
@@ -83,6 +88,7 @@ def _serialize_peer(request, user, *, is_blocked: bool = False):
     return {
         "userId": user.pk,
         "username": user_public_username(user),
+        "displayName": user_display_name(user),
         "profileImage": profile_pic,
         "avatarCrop": serialize_avatar_crop(profile),
         "lastSeen": last_seen.isoformat() if last_seen else None,
@@ -95,10 +101,11 @@ def _serialize_reply_to(message: Message | None):
     if not message:
         return None
     if message.is_deleted:
-        return {"id": message.pk, "username": None, "content": "[удалено]"}
+        return {"id": message.pk, "username": None, "displayName": None, "content": "[удалено]"}
     return {
         "id": message.pk,
         "username": user_public_username(message.user) if message.user else message.username,
+        "displayName": user_display_name(message.user) if message.user else (message.username or ""),
         "content": message.message_content[:150],
     }
 
@@ -133,10 +140,6 @@ def _serialize_group_avatar_for_room(request, room: Room) -> tuple[str | None, d
     return avatar_url, serialize_avatar_crop(room)
 
 
-def _normalize_username(raw_username):
-    return normalize_public_username(raw_username)
-
-
 def _public_room():
     try:
         room, _created = Room.objects.get_or_create(
@@ -157,9 +160,6 @@ def _public_room():
         return Room(slug=PUBLIC_ROOM_SLUG, name=PUBLIC_ROOM_NAME, kind=Room.Kind.PUBLIC)
 
 
-from chat.utils import is_valid_room_slug as _is_valid_room_slug
-
-
 def _parse_positive_int(raw_value: str | None, param_name: str) -> int:
     try:
         parsed = int(raw_value)  # type: ignore[arg-type]
@@ -175,7 +175,7 @@ def _is_transient_db_lock(exc: OperationalError) -> bool:
     return "locked" in message or "deadlock" in message
 
 
-def _ensure_direct_roles_with_retry(room: Room, initiator, peer, *, created: bool) -> None:
+def _ensure_direct_memberships_with_retry(room: Room, initiator, peer) -> None:
     attempts = max(
         1,
         int(
@@ -189,7 +189,7 @@ def _ensure_direct_roles_with_retry(room: Room, initiator, peer, *, created: boo
     for attempt in range(attempts):
         try:
             with transaction.atomic():
-                ensure_direct_roles(room, initiator, peer, created=created)
+                ensure_direct_memberships(room, initiator, peer)
             return
         except OperationalError as exc:
             if attempt == attempts - 1 or not _is_transient_db_lock(exc):
@@ -197,25 +197,21 @@ def _ensure_direct_roles_with_retry(room: Room, initiator, peer, *, created: boo
             time.sleep(0.05 * (attempt + 1))
 
 
-def _resolve_room(room_slug: str):
-    if room_slug == PUBLIC_ROOM_SLUG:
-        return _public_room(), None
-
-    if not _is_valid_room_slug(room_slug):
-        return None, Response({"error": "Некорректный slug комнаты"}, status=http_status.HTTP_400_BAD_REQUEST)
-
-    room = Room.objects.filter(slug=room_slug).first()
+def _resolve_room(room_id: int):
+    room = Room.objects.filter(pk=room_id).first()
     return room, None
 
 
 def _serialize_room_details(request, room: Room, created: bool):
     group_avatar_url, group_avatar_crop = _serialize_group_avatar_for_room(request, room)
     payload = {
-        "slug": room.slug,
+        "roomId": room.pk,
         "name": room.name,
         "kind": room.kind,
         "created": created,
-        "createdBy": user_public_username(room.created_by) if room.created_by else None,
+        "createdBy": user_display_name(room.created_by) if room.created_by else None,
+        "createdByRef": user_public_username(room.created_by) if room.created_by else None,
+        "publicRef": room_public_ref(room) if room.kind == Room.Kind.GROUP else None,
         "peer": None,
         "avatarUrl": group_avatar_url,
         "avatarCrop": group_avatar_crop,
@@ -250,7 +246,7 @@ def _serialize_room_details(request, room: Room, created: bool):
 @permission_classes([AllowAny])
 def public_room(request):
     room = _public_room()
-    serializer = RoomPublicSerializer({"slug": room.slug, "name": room.name, "kind": room.kind})
+    serializer = RoomPublicSerializer({"roomId": room.pk, "name": room.name, "kind": room.kind})
     return Response(serializer.data)
 
 
@@ -259,16 +255,17 @@ class DirectStartApiView(GenericAPIView):
     serializer_class = DirectStartInputSerializer
 
     def get(self, _request):
-        return Response({"detail": "Используйте POST с именем пользователя"})
+        return Response({"detail": "Используйте POST с публичным ref пользователя"})
 
     def post(self, request):
-        target_username = _normalize_username(request.data.get("username"))
-        if not target_username:
-            return Response({"error": "Требуется имя пользователя"}, status=http_status.HTTP_400_BAD_REQUEST)
+        target_ref = str(request.data.get("ref") or "").strip()
+        if not target_ref:
+            return Response({"error": "Требуется ref"}, status=http_status.HTTP_400_BAD_REQUEST)
 
-        target = get_user_by_public_username(target_username)
-        if not target:
+        owner_type, resolved = resolve_public_ref(target_ref)
+        if owner_type != "user" or resolved is None:
             return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
+        target = resolved
 
         if target.pk == request.user.pk:
             return Response({"error": "Нельзя начать личный чат с самим собой"}, status=http_status.HTTP_400_BAD_REQUEST)
@@ -277,18 +274,18 @@ class DirectStartApiView(GenericAPIView):
         slug = direct_room_slug(pair_key)
 
         try:
-            room, created = ensure_direct_room_with_retry(request.user, target, pair_key, slug)
+            room, _created = ensure_direct_room_with_retry(request.user, target, pair_key, slug)
         except OperationalError:
             return Response({"error": "Сервис временно недоступен"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
 
         try:
-            _ensure_direct_roles_with_retry(room, request.user, target, created=created)
+            _ensure_direct_memberships_with_retry(room, request.user, target)
         except OperationalError:
             return Response({"error": "Сервис временно недоступен"}, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response(
             {
-                "slug": room.slug,
+                "roomId": room.pk,
                 "kind": room.kind,
                 "peer": _serialize_peer(request, target),
             }
@@ -339,7 +336,7 @@ def direct_chats(request):
         )
         items.append(
             {
-                "slug": room.slug,
+                "roomId": room.pk,
                 "peer": _serialize_peer(request, peer),
                 "lastMessage": last_message.message_content if last_message else "",
                 "lastMessageAt": last_message.date_added.isoformat() if last_message else None,
@@ -356,47 +353,29 @@ def direct_chats(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def room_details(request, room_slug):
+def room_details(request, room_id: int):
     try:
-        room, error_response = _resolve_room(room_slug)
+        room, error_response = _resolve_room(room_id)
         if error_response:
             return error_response
 
-        created = False
         if room is None:
-            if not request.user or not request.user.is_authenticated:
+            return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        if room.kind in {Room.Kind.PRIVATE, Room.Kind.DIRECT, Room.Kind.GROUP}:
+            try:
+                ensure_can_read_or_404(room, request.user)
+            except Http404:
                 return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
 
-            room = Room.objects.create(
-                slug=room_slug,
-                name=user_public_username(request.user) or request.user.username,
-                kind=Room.Kind.PRIVATE,
-                created_by=request.user,
-            )
-            ensure_role(room, request.user, "Owner", granted_by=request.user)
-            created = True
-        else:
-            if room.kind in {Room.Kind.PRIVATE, Room.Kind.DIRECT, Room.Kind.GROUP}:
-                try:
-                    ensure_can_read_or_404(room, request.user)
-                except Http404:
-                    if room.kind not in {Room.Kind.GROUP}:
-                        ensure_room_owner_role(room)
-                        try:
-                            ensure_can_read_or_404(room, request.user)
-                        except Http404:
-                            return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
-                    else:
-                        return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
-
-        return Response(_serialize_room_details(request, room, created=created))
+        return Response(_serialize_room_details(request, room, created=False))
     except (OperationalError, ProgrammingError, IntegrityError):
         return Response(
             {
-                "slug": room_slug,
-                "name": room_slug,
-                "kind": Room.Kind.PRIVATE,
-                "created": True,
+                "roomId": room_id,
+                "name": None,
+                "kind": None,
+                "created": False,
                 "createdBy": None,
                 "peer": None,
                 "avatarUrl": None,
@@ -407,8 +386,8 @@ def room_details(request, room_slug):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def room_messages(request, room_slug):
-    room, error_response = _resolve_room(room_slug)
+def room_messages(request, room_id: int):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
 
@@ -503,8 +482,9 @@ def _broadcast_to_room(room: Room, event: dict):
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
-    room_identifier = room.pk if getattr(room, "pk", None) else room.slug
-    group_name = f"chat_room_{room_identifier}"
+    if getattr(room, "pk", None) is None:
+        return
+    group_name = f"chat_room_{room.pk}"
     async_to_sync(channel_layer.group_send)(group_name, event)
 
 
@@ -518,8 +498,8 @@ def _ensure_room_read_access(request, room: Room):
 
 @api_view(["PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
-def message_detail(request, room_slug, message_id):
-    room, error_response = _resolve_room(room_slug)
+def message_detail(request, room_id: int, message_id):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
     if room is None:
@@ -570,8 +550,8 @@ def message_detail(request, room_slug, message_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def message_reactions(request, room_slug, message_id):
-    room, error_response = _resolve_room(room_slug)
+def message_reactions(request, room_id: int, message_id):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
     if room is None:
@@ -594,12 +574,14 @@ def message_reactions(request, room_slug, message_id):
             "emoji": reaction.emoji,
             "userId": request.user.pk,
             "username": user_public_username(request.user),
+            "displayName": user_display_name(request.user),
         })
         return Response({
             "messageId": message_id,
             "emoji": reaction.emoji,
             "userId": request.user.pk,
             "username": user_public_username(request.user),
+            "displayName": user_display_name(request.user),
         })
     except MessageNotFoundError:
         return Response({"error": "Сообщение не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
@@ -611,8 +593,8 @@ def message_reactions(request, room_slug, message_id):
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def message_reaction_remove(request, room_slug, message_id, emoji):
-    room, error_response = _resolve_room(room_slug)
+def message_reaction_remove(request, room_id: int, message_id, emoji):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
     if room is None:
@@ -630,6 +612,7 @@ def message_reaction_remove(request, room_slug, message_id, emoji):
         "emoji": emoji,
         "userId": request.user.pk,
         "username": user_public_username(request.user),
+        "displayName": user_display_name(request.user),
     })
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
@@ -639,8 +622,8 @@ def message_reaction_remove(request, room_slug, message_id, emoji):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser])
-def upload_attachments(request, room_slug):
-    room, error_response = _resolve_room(room_slug)
+def upload_attachments(request, room_id: int):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
     if room is None:
@@ -692,6 +675,9 @@ def upload_attachments(request, room_slug):
                 "username": user_public_username(attachment.message.user)
                 if attachment.message.user
                 else attachment.message.username,
+                "displayName": user_display_name(attachment.message.user)
+                if attachment.message.user
+                else (attachment.message.username or ""),
             }
             for attachment in batch
         ]
@@ -765,11 +751,16 @@ def upload_attachments(request, room_slug):
         )
 
     max_size = int(getattr(settings, "CHAT_ATTACHMENT_MAX_SIZE_MB", 10)) * 1024 * 1024
-    allowed_types = {
-        str(item).strip().lower()
-        for item in getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [])
-        if str(item).strip()
-    }
+    allow_any_type = bool(getattr(settings, "CHAT_ATTACHMENT_ALLOW_ANY_TYPE", True))
+    allowed_types = (
+        set()
+        if allow_any_type
+        else {
+            str(item).strip().lower()
+            for item in getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [])
+            if str(item).strip()
+        }
+    )
     alias_map = {
         "audio/mp3": "audio/mpeg",
         "audio/x-mp3": "audio/mpeg",
@@ -806,7 +797,7 @@ def upload_attachments(request, room_slug):
     resolved_files = []
     for f in files:
         resolved_content_type = _resolve_content_type(f)
-        if allowed_types and resolved_content_type not in allowed_types:
+        if (not allow_any_type) and allowed_types and resolved_content_type not in allowed_types:
             return _error_response(
                 f"Тип файла '{resolved_content_type}' не поддерживается",
                 code="unsupported_type",
@@ -842,13 +833,14 @@ def upload_attachments(request, room_slug):
 
     user = request.user
     profile = getattr(user, "profile", None)
-    image = getattr(profile, "image", None) if profile else None
-    profile_pic = getattr(image, "name", "") or ""
+    avatar_source = (user_profile_avatar_source(user) or "").strip()
+    if len(avatar_source) > 255:
+        avatar_source = ""
     message_kwargs = {
         "message_content": message_content,
         "username": user_public_username(user),
         "user": user,
-        "profile_pic": profile_pic,
+        "profile_pic": avatar_source,
         "room": room,
     }
     if reply_to_id:
@@ -879,14 +871,15 @@ def upload_attachments(request, room_slug):
 
         attachments_data.append(_serialize_attachment_item(request, attachment))
 
-    profile_url = _build_profile_pic_url(request, image) if image else None
+    profile_url = _build_profile_pic_url(request, avatar_source) if avatar_source else None
     _broadcast_to_room(room, {
         "type": "chat_message",
         "message": message_content,
         "username": user_public_username(user),
+        "displayName": user_display_name(user),
         "profile_pic": profile_url,
         "avatar_crop": serialize_avatar_crop(profile),
-        "room": room.slug,
+        "roomId": room.pk,
         "id": msg.pk,
         "createdAt": msg.date_added.isoformat(),
         "replyTo": _serialize_reply_to(msg.reply_to),
@@ -902,8 +895,8 @@ def upload_attachments(request, room_slug):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def search_messages(request, room_slug):
-    room, error_response = _resolve_room(room_slug)
+def search_messages(request, room_id: int):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
     if room is None:
@@ -973,6 +966,7 @@ def search_messages(request, room_slug):
         results.append({
             "id": msg.pk,
             "username": user_public_username(msg.user) if msg.user else msg.username,
+            "displayName": user_display_name(msg.user) if msg.user else (msg.username or ""),
             "content": msg.message_content,
             "createdAt": msg.date_added.isoformat(),
             "highlight": getattr(msg, "headline", None),
@@ -1046,8 +1040,7 @@ def _interaction_user_ids(user, room_ids: set[int]) -> set[int]:
 @permission_classes([IsAuthenticated])
 def global_search(request):
     raw_q = request.query_params.get("q", "").strip()
-    is_handle_query = raw_q.startswith("@")
-    q = raw_q[1:].strip() if is_handle_query else raw_q
+    q = raw_q[1:].strip() if raw_q.startswith("@") else raw_q
     if len(q) < 2:
         return Response({"error": "Запрос должен содержать минимум 2 символа"}, status=http_status.HTTP_400_BAD_REQUEST)
 
@@ -1060,37 +1053,42 @@ def global_search(request):
 
     users = []
     groups = []
-    if is_handle_query:
-        users_qs = (
-            User.objects.filter(pk__in=interaction_user_ids)
-            .filter(profile__username__icontains=q)
-            .select_related("profile")
-            .order_by("profile__username", "username")[:users_limit]
-        )
-        users = [_serialize_peer(request, found_user) for found_user in users_qs]
+    handle_query = q.lower()
+    user_ids_by_handle = list(
+        PublicHandle.objects.filter(user_id__isnull=False, handle__icontains=handle_query)
+        .values_list("user_id", flat=True)
+    )
+    users_qs = (
+        User.objects.filter(pk__in=interaction_user_ids)
+        .filter(pk__in=user_ids_by_handle)
+        .select_related("profile")
+        .order_by("id")[:users_limit]
+    )
+    users = [_serialize_peer(request, found_user) for found_user in users_qs]
 
-        groups_qs = (
-            Room.objects.filter(
-                kind=Room.Kind.GROUP,
-            )
-            .filter(
-                Q(id__in=interaction_room_ids) | Q(is_public=True)
-            )
-            .filter(username__icontains=q)
-            .distinct()
-            .order_by("-member_count", "name")[:groups_limit]
-        )
-        groups = [
+    group_room_ids = list(
+        PublicHandle.objects.filter(room_id__isnull=False, handle__icontains=handle_query)
+        .values_list("room_id", flat=True)
+    )
+    groups_qs = (
+        Room.objects.filter(kind=Room.Kind.GROUP)
+        .filter(Q(id__in=interaction_room_ids) | Q(is_public=True))
+        .filter(id__in=group_room_ids)
+        .distinct()
+        .order_by("-member_count", "name")[:groups_limit]
+    )
+    groups = []
+    for room in groups_qs:
+        groups.append(
             {
-                "slug": room.slug,
+                "roomId": room.pk,
                 "name": room.name,
                 "description": room.description[:200],
-                "username": room.username,
+                "publicRef": room_public_ref(room),
                 "memberCount": room.member_count,
                 "isPublic": room.is_public,
             }
-            for room in groups_qs
-        ]
+        )
 
     if interaction_room_ids:
         messages_qs = (
@@ -1109,9 +1107,10 @@ def global_search(request):
         {
             "id": msg.pk,
             "username": user_public_username(msg.user) if msg.user else msg.username,
+            "displayName": user_display_name(msg.user) if msg.user else (msg.username or ""),
             "content": msg.message_content,
             "createdAt": msg.date_added.isoformat(),
-            "roomSlug": msg.room.slug if msg.room else "",
+            "roomId": msg.room_id,
             "roomName": msg.room.name if msg.room else "",
             "roomKind": msg.room.kind if msg.room else "",
         }
@@ -1129,15 +1128,15 @@ def global_search(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def mark_read_view(request, room_slug):
-    room, error_response = _resolve_room(room_slug)
+def mark_read_view(request, room_id: int):
+    room, error_response = _resolve_room(room_id)
     if error_response:
         return error_response
     if room is None:
         return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
 
-    if room.slug == PUBLIC_ROOM_SLUG:
-        return Response({"roomSlug": room.slug, "lastReadMessageId": None})
+    if room.kind == Room.Kind.PUBLIC:
+        return Response({"roomId": room.pk, "lastReadMessageId": None})
 
     try:
         _ensure_room_read_access(request, room)
@@ -1165,18 +1164,19 @@ def mark_read_view(request, room_slug):
     if room.kind == Room.Kind.DIRECT:
         from direct_inbox.state import mark_read as di_mark_read
         di_ttl = int(getattr(settings, "DIRECT_INBOX_UNREAD_TTL", 30 * 24 * 60 * 60))
-        di_mark_read(request.user.pk, room.slug, di_ttl)
+        di_mark_read(request.user.pk, room.pk, di_ttl)
 
     _broadcast_to_room(room, {
         "type": "chat_read_receipt",
         "userId": request.user.pk,
         "username": user_public_username(request.user),
+        "displayName": user_display_name(request.user),
         "lastReadMessageId": state.last_read_message_id,
-        "roomSlug": room.slug,
+        "roomId": room.pk,
     })
 
     return Response({
-        "roomSlug": room.slug,
+        "roomId": room.pk,
         "lastReadMessageId": state.last_read_message_id,
     })
 

@@ -128,7 +128,7 @@ class GroupController {
     return apiService.getInvitePreview(code);
   }
 
-  public async joinViaInvite(code: string): Promise<{ slug: string }> {
+  public async joinViaInvite(code: string): Promise<{ roomId: number }> {
     const result = await apiService.joinViaInvite(code);
     emitConversationListRefresh();
     return result;

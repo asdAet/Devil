@@ -5,6 +5,7 @@ export type RoomKind = "public" | "private" | "direct" | "group";
 export type RoomPeer = {
   userId?: number;
   username: string;
+  displayName?: string;
   profileImage: string | null;
   avatarCrop?: AvatarCrop | null;
   lastSeen?: string | null;
@@ -13,6 +14,7 @@ export type RoomPeer = {
 };
 
 export type RoomDetails = {
+  roomId?: number;
   slug: string;
   name: string;
   kind: RoomKind;

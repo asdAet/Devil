@@ -104,14 +104,14 @@ class ChatController {
 
   /**
    * Выполняет метод `startDirectChat`.
-   * @param username Входной параметр `username`.
+   * @param publicRef Входной параметр `publicRef`.
    * @returns Результат выполнения `startDirectChat`.
    */
 
   public async startDirectChat(
-    username: string,
+    publicRef: string,
   ): Promise<DirectStartResponseDto> {
-    const response = await apiService.startDirectChat(username);
+    const response = await apiService.startDirectChat(publicRef);
     return response;
   }
 

@@ -12,6 +12,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import TransactionTestCase
 
 from presence.routing import websocket_urlpatterns as presence_urlpatterns
+from users.identity import user_public_username
 
 User = get_user_model()
 application = URLRouter(presence_urlpatterns)
@@ -66,8 +67,9 @@ class PresenceConsumerTests(TransactionTestCase):
             payload = json.loads(await communicator.receive_from(timeout=2))
             self.assertIn('online', payload)
             usernames = [entry['username'] for entry in payload['online']]
-            self.assertIn(self.user.username, usernames)
-            current = next(entry for entry in payload['online'] if entry['username'] == self.user.username)
+            current_username = user_public_username(self.user)
+            self.assertIn(current_username, usernames)
+            current = next(entry for entry in payload['online'] if entry['username'] == current_username)
             self.assertEqual(
                 current.get('avatarCrop'),
                 {'x': 0.1, 'y': 0.2, 'width': 0.3, 'height': 0.4},

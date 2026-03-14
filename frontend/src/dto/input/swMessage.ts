@@ -12,8 +12,8 @@ const invalidateMessageSchema = z
       "userProfile",
       "selfProfile",
     ]),
-    slug: z.string().trim().min(1).optional(),
-    username: z.string().trim().min(1).optional(),
+    roomRef: z.string().trim().min(1).optional(),
+    publicRef: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -30,10 +30,10 @@ const hasRequiredDiscriminatorFields = (
 ): message is z.infer<typeof swMessageSchema> => {
   if (message.type !== "invalidate") return true;
   if (message.key === "roomMessages" || message.key === "roomDetails") {
-    return Boolean(message.slug);
+    return Boolean(message.roomRef);
   }
   if (message.key === "userProfile") {
-    return Boolean(message.username);
+    return Boolean(message.publicRef);
   }
   return true;
 };

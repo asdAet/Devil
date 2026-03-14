@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from messages.models import Message
-from roles.models import Membership, Role
+from roles.models import Membership
 from rooms.models import Room
 
 from ._typing import TypedAPIClient
@@ -17,16 +17,19 @@ class APITestCase(TestCase):
     api_client: TypedAPIClient
 
 
-def _setup_group_with_message(client: TypedAPIClient, owner):
-    """Create a group and a message inside it, return (slug, message_id)."""
+def _setup_group_with_message(client: TypedAPIClient, owner) -> tuple[int, int]:
+    """Create a group and a message inside it, return (room_id, message_id)."""
     client.force_authenticate(user=owner)
     resp = client.post("/api/groups/", {"name": "Pin Group"}, format="json")
-    slug = resp.json()["slug"]
-    room = Room.objects.get(slug=slug)
+    room_id = int(resp.json()["roomId"])
+    room = Room.objects.get(pk=room_id)
     msg = Message.objects.create(
-        room=room, user=owner, username=owner.username, message_content="Hello!"
+        room=room,
+        user=owner,
+        username=owner.username,
+        message_content="Hello!",
     )
-    return slug, msg.pk
+    return room_id, msg.pk
 
 
 @pytest.mark.django_db
@@ -35,11 +38,11 @@ class TestPinnedMessages(APITestCase):
         self.api_client = TypedAPIClient()
         self.owner = User.objects.create_user(username="owner", password="testpass123")
         self.member = User.objects.create_user(username="member", password="testpass123")
-        self.slug, self.msg_id = _setup_group_with_message(self.api_client, self.owner)
+        self.room_id, self.msg_id = _setup_group_with_message(self.api_client, self.owner)
 
     def test_pin_message(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/pins/",
+            f"/api/groups/{self.room_id}/pins/",
             {"messageId": self.msg_id},
             format="json",
         )
@@ -48,11 +51,11 @@ class TestPinnedMessages(APITestCase):
 
     def test_list_pinned(self):
         self.api_client.post(
-            f"/api/groups/{self.slug}/pins/",
+            f"/api/groups/{self.room_id}/pins/",
             {"messageId": self.msg_id},
             format="json",
         )
-        resp = self.api_client.get(f"/api/groups/{self.slug}/pins/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/pins/")
         assert resp.status_code == 200
         items = resp.json()["items"]
         assert len(items) == 1
@@ -60,20 +63,20 @@ class TestPinnedMessages(APITestCase):
 
     def test_unpin_message(self):
         self.api_client.post(
-            f"/api/groups/{self.slug}/pins/",
+            f"/api/groups/{self.room_id}/pins/",
             {"messageId": self.msg_id},
             format="json",
         )
-        resp = self.api_client.delete(f"/api/groups/{self.slug}/pins/{self.msg_id}/")
+        resp = self.api_client.delete(f"/api/groups/{self.room_id}/pins/{self.msg_id}/")
         assert resp.status_code == 204
 
-        resp = self.api_client.get(f"/api/groups/{self.slug}/pins/")
+        resp = self.api_client.get(f"/api/groups/{self.room_id}/pins/")
         assert len(resp.json()["items"]) == 0
 
     def test_pin_requires_permission(self):
         self.api_client.force_authenticate(user=self.member)
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/pins/",
+            f"/api/groups/{self.room_id}/pins/",
             {"messageId": self.msg_id},
             format="json",
         )
@@ -81,7 +84,7 @@ class TestPinnedMessages(APITestCase):
 
     def test_pin_nonexistent_message(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/pins/",
+            f"/api/groups/{self.room_id}/pins/",
             {"messageId": 99999},
             format="json",
         )
@@ -97,10 +100,9 @@ class TestOwnershipTransfer(APITestCase):
         self.api_client.force_authenticate(user=self.owner)
 
         resp = self.api_client.post("/api/groups/", {"name": "Transfer Group"}, format="json")
-        self.slug = resp.json()["slug"]
+        self.room_id = int(resp.json()["roomId"])
 
-        # Add member via invite
-        resp = self.api_client.post(f"/api/groups/{self.slug}/invites/", {}, format="json")
+        resp = self.api_client.post(f"/api/groups/{self.room_id}/invites/", {}, format="json")
         code = resp.json()["code"]
         self.api_client.force_authenticate(user=self.member)
         self.api_client.post(f"/api/invite/{code}/join/")
@@ -108,29 +110,27 @@ class TestOwnershipTransfer(APITestCase):
 
     def test_transfer_ownership(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/transfer-ownership/",
+            f"/api/groups/{self.room_id}/transfer-ownership/",
             {"userId": self.member.pk},
             format="json",
         )
         assert resp.status_code == 200
 
-        room = Room.objects.get(slug=self.slug)
+        room = Room.objects.get(pk=self.room_id)
         assert room.created_by_id == self.member.pk
 
-        # Old owner should have Admin role, not Owner
         owner_ms = Membership.objects.get(room=room, user=self.owner)
         role_names = set(owner_ms.roles.values_list("name", flat=True))
         assert "Owner" not in role_names
         assert "Admin" in role_names
 
-        # New owner should have Owner role
         member_ms = Membership.objects.get(room=room, user=self.member)
         role_names = set(member_ms.roles.values_list("name", flat=True))
         assert "Owner" in role_names
 
     def test_transfer_to_self_fails(self):
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/transfer-ownership/",
+            f"/api/groups/{self.room_id}/transfer-ownership/",
             {"userId": self.owner.pk},
             format="json",
         )
@@ -139,7 +139,7 @@ class TestOwnershipTransfer(APITestCase):
     def test_non_owner_cannot_transfer(self):
         self.api_client.force_authenticate(user=self.member)
         resp = self.api_client.post(
-            f"/api/groups/{self.slug}/transfer-ownership/",
+            f"/api/groups/{self.room_id}/transfer-ownership/",
             {"userId": self.owner.pk},
             format="json",
         )
@@ -147,9 +147,9 @@ class TestOwnershipTransfer(APITestCase):
 
     def test_owner_can_leave_after_transfer(self):
         self.api_client.post(
-            f"/api/groups/{self.slug}/transfer-ownership/",
+            f"/api/groups/{self.room_id}/transfer-ownership/",
             {"userId": self.member.pk},
             format="json",
         )
-        resp = self.api_client.post(f"/api/groups/{self.slug}/leave/")
+        resp = self.api_client.post(f"/api/groups/{self.room_id}/leave/")
         assert resp.status_code == 204

@@ -14,10 +14,15 @@ def register(request):
     if request.method == "POST":
         form = EmailRegisterForm(request.POST)
         if form.is_valid():
-            auth_service.register_with_email(
-                form.cleaned_data.get("email", ""),
-                form.cleaned_data.get("password1", ""),
-                form.cleaned_data.get("password2", ""),
+            email = form.cleaned_data.get("email", "")
+            local = (email.split("@", 1)[0] if "@" in email else email).strip().lower() or "user"
+            auth_service.register_user(
+                login=local,
+                password=form.cleaned_data.get("password1", ""),
+                password_confirm=form.cleaned_data.get("password2", ""),
+                name=local,
+                username=None,
+                email=email,
             )
             email = form.cleaned_data.get("email", "")
             messages.success(request, f"{email} has been created!")

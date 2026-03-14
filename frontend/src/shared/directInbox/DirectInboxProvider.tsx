@@ -42,6 +42,21 @@ const mergeItem = (
   return next;
 };
 
+const parseRoomIdRef = (
+  value: string | number | null | undefined,
+): number | null => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return Math.trunc(value);
+  }
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.trunc(parsed);
+};
+
 /**
  * Провайдер списка direct-чатов и unread-состояния.
  * @param props Пользователь, флаг готовности и дочерние компоненты.
@@ -59,7 +74,7 @@ export function DirectInboxProvider({
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const unreadOverrides = useUnreadOverrides();
 
-  const activeRoomRef = useRef<string | null>(null);
+  const activeRoomRef = useRef<string | number | null>(null);
 
   const wsUrl = useMemo(() => {
     if (!ready || !user) return null;
@@ -136,34 +151,46 @@ export function DirectInboxProvider({
   });
 
   const setActiveRoom = useCallback(
-    (roomSlug: string | null) => {
-      activeRoomRef.current = roomSlug;
+    (roomRef: string | number | null) => {
+      activeRoomRef.current = roomRef;
       if (status !== "online") return;
-      send(JSON.stringify({ type: "set_active_room", roomSlug }));
+      const roomId = parseRoomIdRef(roomRef);
+      send(
+        JSON.stringify({
+          type: "set_active_room",
+          roomId,
+        }),
+      );
     },
     [send, status],
   );
 
   const markRead = useCallback(
-    (roomSlug: string) => {
-      const slug = roomSlug.trim();
-      if (!slug) return;
-      clearUnreadOverride(slug);
+    (roomRef: string | number) => {
+      const roomId = parseRoomIdRef(roomRef);
+      if (!roomId) return;
+      const roomKey = String(roomId);
+      clearUnreadOverride(roomKey);
 
       setUnreadSlugs((prev) => {
-        if (!prev.includes(slug)) return prev;
-        return prev.filter((item) => item !== slug);
+        if (!prev.includes(roomKey)) return prev;
+        return prev.filter((item) => item !== roomKey);
       });
 
       setUnreadCounts((prev) => {
-        if (!(slug in prev)) return prev;
+        if (!(roomKey in prev)) return prev;
         const next = { ...prev };
-        delete next[slug];
+        delete next[roomKey];
         return next;
       });
 
       if (status !== "online") return;
-      send(JSON.stringify({ type: "mark_read", roomSlug: slug }));
+      send(
+        JSON.stringify({
+          type: "mark_read",
+          roomId,
+        }),
+      );
     },
     [send, status],
   );
@@ -173,7 +200,6 @@ export function DirectInboxProvider({
     const nextCounts = { ...unreadCounts };
 
     for (const [slug, overrideCount] of Object.entries(unreadOverrides)) {
-      if (!slug.startsWith("dm_")) continue;
       if (!knownDirectSlugs.has(slug) && !(slug in nextCounts)) continue;
       if (overrideCount > 0) {
         nextCounts[slug] = overrideCount;
@@ -226,7 +252,7 @@ export function DirectInboxProvider({
     send(
       JSON.stringify({
         type: "set_active_room",
-        roomSlug: activeRoomRef.current,
+        roomId: parseRoomIdRef(activeRoomRef.current),
       }),
     );
 

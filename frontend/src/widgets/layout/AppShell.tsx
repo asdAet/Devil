@@ -36,7 +36,8 @@ function ShellLayout({
   const isMainActive = location.pathname !== "/";
   const isChatRoute =
     location.pathname.startsWith("/rooms/") ||
-    /^\/(?:@|%40)[^/]+$/i.test(location.pathname);
+    location.pathname === "/direct" ||
+    location.pathname.startsWith("/direct/");
 
   return (
     <div
@@ -74,7 +75,7 @@ function ShellLayout({
           {children}
         </div>
       </div>
-      <InfoPanel currentUsername={user?.username ?? null} />
+      <InfoPanel currentUsername={user?.publicRef ?? user?.username ?? null} />
     </div>
   );
 }
