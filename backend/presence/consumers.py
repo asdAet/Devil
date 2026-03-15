@@ -35,6 +35,8 @@ def _to_async(func: Callable[..., T]) -> Callable[..., Awaitable[T]]:
 
 def _ws_connect_rate_limited(scope, endpoint: str) -> bool:
     """Checks websocket connect rate limit per endpoint and IP."""
+    if bool(getattr(settings, "WS_CONNECT_RATE_LIMIT_DISABLED", False)):
+        return False
     if endpoint == "presence":
         limit = int(getattr(settings, "WS_CONNECT_RATE_LIMIT_PRESENCE", getattr(settings, "WS_CONNECT_RATE_LIMIT", 60)))
         window = int(getattr(settings, "WS_CONNECT_RATE_WINDOW_PRESENCE", getattr(settings, "WS_CONNECT_RATE_WINDOW", 60)))

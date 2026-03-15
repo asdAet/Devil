@@ -17,6 +17,11 @@ import {
   formatLastSeen,
   formatRegistrationDate,
 } from "../shared/lib/format";
+import {
+  buildDirectPath,
+  formatPublicRef,
+  normalizePublicRef,
+} from "../shared/lib/publicRef";
 import { AvatarMedia, Button, Card, Panel } from "../shared/ui";
 import styles from "../styles/pages/UserProfilePage.module.css";
 
@@ -41,7 +46,11 @@ export function UserProfilePage({
 }: Props) {
   const { user, loading, error } = useUserProfile(username);
   const { online: presenceOnline, status: presenceStatus } = usePresence();
-  const isSelfRoute = currentUser?.username === username;
+  const currentPublicRef = normalizePublicRef(
+    currentUser?.publicRef || currentUser?.username || "",
+  );
+  const routePublicRef = normalizePublicRef(username);
+  const isSelfRoute = Boolean(currentPublicRef) && currentPublicRef === routePublicRef;
   const profileUser = isSelfRoute ? currentUser : user;
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -271,16 +280,23 @@ export function UserProfilePage({
     );
   }
 
-  const isSelf = currentUser?.username === profileUser.username;
+  const profilePublicRef = normalizePublicRef(
+    profileUser.publicRef || profileUser.username || "",
+  );
+  const isSelf = Boolean(currentPublicRef) && currentPublicRef === profilePublicRef;
   const fullName =
     formatFullName(
       profileUser.name,
       (profileUser as { last_name?: string | null }).last_name,
     ) || "Без имени";
-  const publicUsername = (profileUser.username || "").trim();
+  const publicHandle = (profileUser.username || "").trim();
+  const publicRef = (profileUser.publicRef || publicHandle).trim();
+  const avatarIdentity = profileUser.name || publicHandle || publicRef || "user";
   const isUserOnline =
     presenceStatus === "online" &&
-    presenceOnline.some((entry) => entry.username === profileUser.username);
+    presenceOnline.some(
+      (entry) => normalizePublicRef(entry.username) === normalizePublicRef(publicRef),
+    );
 
   return (
     <Card wide>
@@ -315,12 +331,12 @@ export function UserProfilePage({
           {profileUser.profileImage ? (
             <AvatarMedia
               src={profileUser.profileImage}
-              alt={profileUser.username}
+              alt={avatarIdentity}
               avatarCrop={profileUser.avatarCrop}
               loading="eager"
             />
           ) : (
-            <span>{avatarFallback(profileUser.username)}</span>
+            <span>{avatarFallback(avatarIdentity)}</span>
           )}
         </div>
       </div>
@@ -330,7 +346,7 @@ export function UserProfilePage({
           className={styles.avatarLightbox}
           role="dialog"
           aria-modal="true"
-          aria-label={`Аватар ${profileUser.username}`}
+          aria-label={`Аватар ${avatarIdentity}`}
           onClick={closePreview}
         >
           <div
@@ -358,7 +374,7 @@ export function UserProfilePage({
             <img
               className={styles.avatarLightboxImage}
               src={profileUser.profileImage}
-              alt={`Аватар ${profileUser.username}`}
+              alt={`Аватар ${avatarIdentity}`}
               draggable={false}
             />
           </div>
@@ -368,8 +384,8 @@ export function UserProfilePage({
       <div className={styles.stack}>
         <div>
           <h2>{fullName}</h2>
-          {publicUsername && (
-            <p className={styles.usernameHandle}>@{publicUsername}</p>
+          {publicRef && (
+            <p className={styles.usernameHandle}>{formatPublicRef(publicRef)}</p>
           )}
           {profileUser.bio?.trim() ? (
             <div data-testid="profile-bio-section">
@@ -409,12 +425,10 @@ export function UserProfilePage({
               Редактировать
             </Button>
           )}
-          {!isSelf && currentUser && publicUsername && (
+          {!isSelf && currentUser && publicRef && (
             <Button
               variant="link"
-              onClick={() =>
-                onNavigate(`/@${encodeURIComponent(publicUsername)}`)
-              }
+              onClick={() => onNavigate(buildDirectPath(publicRef))}
               data-testid="send-dm-button"
             >
               Отправить сообщение

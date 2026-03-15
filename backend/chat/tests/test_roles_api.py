@@ -31,7 +31,7 @@ class RoomRolesApiTests(TestCase):
         ensure_membership(self.room, self.other, role_name="Member")
 
     def _url(self, suffix: str) -> str:
-        return f"/api/chat/rooms/{self.room.slug}/{suffix}"
+        return f"/api/chat/rooms/{self.room.pk}/{suffix}"
 
     def test_roles_api_denies_user_without_manage_roles(self):
         self.client.force_login(self.member)
@@ -183,7 +183,7 @@ class RoomRolesApiTests(TestCase):
         response = self.client.get(self._url("permissions/me/"))
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["roomSlug"], self.room.slug)
+        self.assertEqual(payload["roomId"], self.room.pk)
         self.assertTrue(payload["isMember"])
         self.assertFalse(payload["isBanned"])
         self.assertFalse(payload["canJoin"])
@@ -198,13 +198,12 @@ class RoomRolesApiTests(TestCase):
             name="Roles Public",
             kind=Room.Kind.GROUP,
             is_public=True,
-            username="rolespublic01",
             created_by=self.owner,
         )
         ensure_membership(public_group, self.owner, role_name="Owner")
 
         self.client.force_login(self.member)
-        response = self.client.get(f"/api/chat/rooms/{public_group.slug}/permissions/me/")
+        response = self.client.get(f"/api/chat/rooms/{public_group.pk}/permissions/me/")
         self.assertEqual(response.status_code, 200)
 
         payload = response.json()
@@ -226,7 +225,7 @@ class RoomRolesApiTests(TestCase):
         ensure_membership(direct_room, self.member)
 
         self.client.force_login(self.owner)
-        response = self.client.get(f"/api/chat/rooms/{direct_room.slug}/roles/")
+        response = self.client.get(f"/api/chat/rooms/{direct_room.pk}/roles/")
         self.assertEqual(response.status_code, 400)
 
     def test_permissions_me_hides_private_room_for_outsider(self):
@@ -239,5 +238,5 @@ class RoomRolesApiTests(TestCase):
         ensure_membership(hidden_room, self.owner, role_name="Owner")
 
         self.client.force_login(self.member)
-        response = self.client.get(f"/api/chat/rooms/{hidden_room.slug}/permissions/me/")
+        response = self.client.get(f"/api/chat/rooms/{hidden_room.pk}/permissions/me/")
         self.assertEqual(response.status_code, 404)

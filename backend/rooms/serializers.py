@@ -1,13 +1,18 @@
 from rest_framework import serializers
 
+from users.identity import user_public_username
+
 from .models import Room
 
 
 class RoomSerializer(serializers.ModelSerializer):
-    created_by = serializers.SlugRelatedField(
-        slug_field="username",
-        read_only=True,
-    )
+    created_by = serializers.SerializerMethodField()
+
+    def get_created_by(self, obj: Room):
+        creator = getattr(obj, "created_by", None)
+        if creator is None:
+            return None
+        return user_public_username(creator)
 
     class Meta:
         model = Room
@@ -16,7 +21,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
 
 class RoomDetailSerializer(serializers.Serializer):
-    slug = serializers.CharField()
+    roomId = serializers.IntegerField()
     name = serializers.CharField()
     kind = serializers.CharField()
     created = serializers.BooleanField(required=False)
@@ -25,6 +30,6 @@ class RoomDetailSerializer(serializers.Serializer):
 
 
 class RoomPublicSerializer(serializers.Serializer):
-    slug = serializers.CharField()
+    roomId = serializers.IntegerField()
     name = serializers.CharField()
     kind = serializers.CharField()

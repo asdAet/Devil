@@ -1,4 +1,4 @@
-"""Group ownership transfer."""
+﻿"""Group ownership transfer."""
 
 from __future__ import annotations
 
@@ -15,16 +15,17 @@ from groups.application.group_service import (
 )
 from roles.models import Membership, Role
 from roles.permissions import Perm
+from users.identity import user_public_username
 
 
-def transfer_ownership(actor, room_slug: str, new_owner_user_id: int) -> None:
+def transfer_ownership(actor, room_id: int, new_owner_user_id: int) -> None:
     """Transfer group ownership to another member.
 
     Only the current owner (ADMINISTRATOR) can transfer.
     The old owner is demoted to Admin.
     """
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_group_permission(room, actor, Perm.ADMINISTRATOR)
 
     if int(new_owner_user_id) == actor.pk:
@@ -63,8 +64,10 @@ def transfer_ownership(actor, room_slug: str, new_owner_user_id: int) -> None:
         "group.ownership.transferred",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         new_owner_user_id=new_owner_user_id,
     )
+
+

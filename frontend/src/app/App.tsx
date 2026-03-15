@@ -10,6 +10,7 @@ import { DirectInboxProvider } from "../shared/directInbox";
 import { RuntimeConfigProvider } from "../shared/config/RuntimeConfigProvider";
 import { useRuntimeConfig } from "../shared/config/RuntimeConfigContext";
 import { GoogleOAuthError, signInWithGoogle } from "../shared/auth/googleIdentity";
+import { buildUserProfilePath } from "../shared/lib/publicRef";
 import { AppShell } from "../widgets/layout/AppShell";
 import { AppRoutes } from "./routes";
 import shellStyles from "../styles/layout/AppShell.module.css";
@@ -36,8 +37,15 @@ function AppInner() {
   useEffect(() => {
     const root = document.documentElement;
     const updateViewportVars = () => {
-      root.style.setProperty("--app-height", `${window.innerHeight}px`);
-      root.style.setProperty("--app-width", `${window.innerWidth}px`);
+      const visualViewport = window.visualViewport;
+      const viewportHeight = Math.round(
+        visualViewport?.height ?? window.innerHeight,
+      );
+      const viewportWidth = Math.round(
+        visualViewport?.width ?? window.innerWidth,
+      );
+      root.style.setProperty("--app-height", `${viewportHeight}px`);
+      root.style.setProperty("--app-width", `${viewportWidth}px`);
     };
 
     updateViewportVars();
@@ -46,11 +54,13 @@ function AppInner() {
       passive: true,
     });
     window.visualViewport?.addEventListener("resize", updateViewportVars);
+    window.visualViewport?.addEventListener("scroll", updateViewportVars);
 
     return () => {
       window.removeEventListener("resize", updateViewportVars);
       window.removeEventListener("orientationchange", updateViewportVars);
       window.visualViewport?.removeEventListener("resize", updateViewportVars);
+      window.visualViewport?.removeEventListener("scroll", updateViewportVars);
     };
   }, []);
 
@@ -98,6 +108,7 @@ function AppInner() {
           .filter((value) => typeof value === "string") as string[];
         if (parts.length) return parts.join(" ");
       }
+      if (typeof record.message === "string") return record.message;
       if (typeof record.error === "string") return record.error;
       if (typeof record.detail === "string") return record.detail;
       return null;
@@ -156,10 +167,10 @@ function AppInner() {
   );
 
   const handleLogin = useCallback(
-    async (email: string, password: string) => {
+    async (identifier: string, password: string) => {
       setError(null);
       try {
-        await login({ email, password });
+        await login({ identifier, password });
         setBanner("Добро пожаловать обратно!");
         onNavigate("/");
       } catch (err) {
@@ -171,13 +182,20 @@ function AppInner() {
   );
 
   const handleRegister = useCallback(
-    async (email: string, password1: string, password2: string) => {
+    async (payload: {
+      login: string;
+      password: string;
+      passwordConfirm: string;
+      name: string;
+      username?: string;
+      email?: string;
+    }) => {
       setError(null);
       try {
         await register({
-          email,
-          password1,
-          password2,
+          ...payload,
+          username: payload.username,
+          email: payload.email,
         });
         setBanner("Аккаунт создан. Можно общаться!");
         onNavigate("/");
@@ -200,8 +218,8 @@ function AppInner() {
     }
     setError(null);
     try {
-      const accessToken = await signInWithGoogle(runtimeConfig.googleOAuthClientId);
-      await loginWithGoogle(accessToken);
+      const googleAuth = await signInWithGoogle(runtimeConfig.googleOAuthClientId);
+      await loginWithGoogle(googleAuth.token, googleAuth.tokenType);
       setBanner("Вход через Google выполнен успешно.");
       onNavigate("/");
     } catch (err) {
@@ -233,10 +251,15 @@ function AppInner() {
       try {
         await updateProfile(fields);
         setBanner("Профиль обновлен");
-        const nextUsername =
-          (fields.username?.trim() || auth.user?.username || "").trim() || null;
-        if (nextUsername) {
-          onNavigate(`/users/${encodeURIComponent(nextUsername)}`);
+        const nextPublicRef =
+          (
+            fields.username?.trim() ||
+            auth.user?.publicRef ||
+            auth.user?.username ||
+            ""
+          ).trim() || null;
+        if (nextPublicRef) {
+          onNavigate(buildUserProfilePath(nextPublicRef));
         }
         return { ok: true };
       } catch (err) {
@@ -321,7 +344,9 @@ function AppInner() {
  */
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <RuntimeConfigProvider>
         <AppInner />
       </RuntimeConfigProvider>

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { UserProfile } from "../entities/user/types";
 import type { AvatarCrop } from "../shared/api/users";
 import { useUsernameMaxLength } from "../shared/config/limits";
+import { normalizePublicRef } from "../shared/lib/publicRef";
 import {
   avatarFallback,
   formatLastSeen,
@@ -149,9 +150,15 @@ export function ProfilePage({ user, onSave, onNavigate }: Props) {
   const genericError =
     formError || fieldErrors.non_field_errors?.[0] || fieldErrors.__all__?.[0];
   const avatarIdentity = user.username ?? user.name ?? "user";
+  const currentPublicRef = normalizePublicRef(
+    user.publicRef || user.username || "",
+  );
   const isUserOnline =
     presenceStatus === "online" &&
-    presenceOnline.some((entry) => entry.username === user.username);
+    presenceOnline.some(
+      (entry) =>
+        normalizePublicRef(entry.username) === normalizePublicRef(currentPublicRef),
+    );
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;

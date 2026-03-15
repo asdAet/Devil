@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const chatMock = vi.hoisted(() => ({
   getUnreadCounts:
-    vi.fn<() => Promise<Array<{ roomSlug: string; unreadCount: number }>>>(),
+    vi.fn<() => Promise<Array<{ roomId: number; unreadCount: number }>>>(),
   globalSearch: vi.fn<
     (query: string) => Promise<{
       users: Array<{
@@ -13,10 +13,10 @@ const chatMock = vi.hoisted(() => ({
         lastSeen: null;
       }>;
       groups: Array<{
-        slug: string;
+        roomId: number;
         name: string;
         description: string;
-        username: string | null;
+        publicRef: string;
         memberCount: number;
         isPublic: boolean;
       }>;
@@ -25,7 +25,7 @@ const chatMock = vi.hoisted(() => ({
         username: string;
         content: string;
         createdAt: string;
-        roomSlug: string;
+        roomId: number;
         roomName: string;
         roomKind: "public" | "private" | "direct" | "group";
       }>;

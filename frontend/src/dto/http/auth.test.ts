@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildOAuthGoogleRequestDto,
   buildLoginRequestDto,
   buildRegisterRequestDto,
   decodeAuthErrorPayload,
@@ -14,7 +15,9 @@ describe("auth DTO decoders", () => {
       authenticated: true,
       user: {
         name: "Alice",
-        username: "alice",
+        handle: "alice",
+        publicRef: "@alice",
+        publicId: "1234567890",
         email: "alice@example.com",
         profileImage: null,
         avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
@@ -27,6 +30,8 @@ describe("auth DTO decoders", () => {
     expect(decoded.authenticated).toBe(true);
     expect(decoded.user?.name).toBe("Alice");
     expect(decoded.user?.username).toBe("alice");
+    expect(decoded.user?.publicRef).toBe("@alice");
+    expect(decoded.user?.publicId).toBe("1234567890");
     expect(decoded.user?.avatarCrop).toEqual({
       x: 0.1,
       y: 0.2,
@@ -38,13 +43,16 @@ describe("auth DTO decoders", () => {
   it("decodes profile envelope with defaults", () => {
     const decoded = decodeProfileEnvelopeResponse({
       user: {
-        username: null,
+        publicRef: "",
       },
     });
 
     expect(decoded.user).toEqual({
       name: "",
       username: "",
+      handle: null,
+      publicRef: "",
+      publicId: null,
       email: "",
       profileImage: null,
       avatarCrop: null,
@@ -56,29 +64,79 @@ describe("auth DTO decoders", () => {
 
   it("validates outgoing login payload", () => {
     expect(
-      buildLoginRequestDto({ email: "  demo@example.com ", password: "pass" }),
+      buildLoginRequestDto({
+        identifier: "  demo_login ",
+        password: "pass",
+      }),
     ).toEqual({
-      email: "demo@example.com",
+      identifier: "demo_login",
       password: "pass",
     });
+  });
+
+  it("keeps username empty when only fallback publicId exists", () => {
+    const decoded = decodeSessionResponse({
+      authenticated: true,
+      user: {
+        name: "No Handle",
+        publicId: "1234567890",
+      },
+    });
+
+    expect(decoded.user?.username).toBe("");
+    expect(decoded.user?.publicRef).toBe("1234567890");
   });
 
   it("validates outgoing register payload", () => {
     expect(
       buildRegisterRequestDto({
-        email: "new@example.com",
-        password1: "pass12345",
-        password2: "pass12345",
+        login: "NEW_LOGIN",
+        password: "pass12345",
+        passwordConfirm: "pass12345",
+        name: "New Login",
       }),
     ).toEqual({
-      email: "new@example.com",
-      password1: "pass12345",
-      password2: "pass12345",
+      login: "new_login",
+      password: "pass12345",
+      passwordConfirm: "pass12345",
+      name: "New Login",
+      email: undefined,
+      username: undefined,
     });
   });
 
   it("safely decodes auth error payload", () => {
-    const decoded = decodeAuthErrorPayload({ errors: { email: ["taken"] } });
+    const decoded = decodeAuthErrorPayload({
+      code: "email_taken",
+      message: "Email already used",
+      errors: { email: ["taken"] },
+    });
+    expect(decoded?.code).toBe("email_taken");
+    expect(decoded?.message).toBe("Email already used");
     expect(decoded?.errors?.email).toEqual(["taken"]);
+  });
+
+  it("builds oauth request with idToken", () => {
+    expect(
+      buildOAuthGoogleRequestDto({
+        idToken: " id-token ",
+      }),
+    ).toEqual({
+      idToken: "id-token",
+      accessToken: undefined,
+      username: undefined,
+    });
+  });
+
+  it("builds oauth request with accessToken", () => {
+    expect(
+      buildOAuthGoogleRequestDto({
+        accessToken: " access-token ",
+      }),
+    ).toEqual({
+      idToken: undefined,
+      accessToken: "access-token",
+      username: undefined,
+    });
   });
 });

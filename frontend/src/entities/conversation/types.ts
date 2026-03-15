@@ -6,6 +6,7 @@ export type ConversationItem = {
   type: ConversationType;
   slug: string;
   name: string;
+  directRef?: string;
   avatarUrl: string | null;
   avatarCrop: AvatarCrop | null;
   lastMessage: string;

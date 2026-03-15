@@ -140,6 +140,7 @@ const extractErrorMessage = (
   }
 
   if (typed?.error) return typed.error;
+  if (typed?.message) return typed.message;
   if (typed?.detail) return typed.detail;
 
   return undefined;
@@ -251,21 +252,40 @@ class ApiService implements IApiService {
     return this.runWithDecode(async () => getSession(this.apiClient));
   }
 
-  public async login(email: string, password: string) {
+  public async login(identifier: string, password: string) {
     return this.runWithDecode(async () =>
-      login(this.apiClient, email, password),
+      login(this.apiClient, identifier, password),
     );
   }
 
-  public async oauthGoogle(accessToken: string) {
+  public async oauthGoogle(
+    token: string,
+    tokenType: "idToken" | "accessToken" = "idToken",
+    username?: string,
+  ) {
     return this.runWithDecode(async () =>
-      oauthGoogle(this.apiClient, accessToken),
+      oauthGoogle(this.apiClient, token, tokenType, username),
     );
   }
 
-  public async register(email: string, password1: string, password2: string) {
+  public async register(
+    loginValue: string,
+    password: string,
+    passwordConfirm: string,
+    name: string,
+    username?: string,
+    email?: string,
+  ) {
     return this.runWithDecode(async () =>
-      register(this.apiClient, email, password1, password2),
+      register(
+        this.apiClient,
+        loginValue,
+        password,
+        passwordConfirm,
+        name,
+        username,
+        email,
+      ),
     );
   }
 
@@ -300,9 +320,9 @@ class ApiService implements IApiService {
     );
   }
 
-  public async startDirectChat(username: string) {
+  public async startDirectChat(publicRef: string) {
     return this.runWithDecode(async () =>
-      startDirectChat(this.apiClient, username),
+      startDirectChat(this.apiClient, publicRef),
     );
   }
 
@@ -310,9 +330,9 @@ class ApiService implements IApiService {
     return this.runWithDecode(async () => getDirectChats(this.apiClient));
   }
 
-  public async getUserProfile(username: string) {
+  public async getUserProfile(publicRef: string) {
     return this.runWithDecode(async () =>
-      getUserProfile(this.apiClient, username),
+      getUserProfile(this.apiClient, publicRef),
     );
   }
 
@@ -435,8 +455,8 @@ class ApiService implements IApiService {
 
   public async getPublicGroups(params?: {
     search?: string;
-    page?: number;
-    pageSize?: number;
+    limit?: number;
+    before?: number;
   }) {
     return this.runWithDecode(async () =>
       getPublicGroups(this.apiClient, params),
@@ -445,8 +465,8 @@ class ApiService implements IApiService {
 
   public async getMyGroups(params?: {
     search?: string;
-    page?: number;
-    pageSize?: number;
+    limit?: number;
+    before?: number;
   }) {
     return this.runWithDecode(async () => getMyGroups(this.apiClient, params));
   }
@@ -477,7 +497,7 @@ class ApiService implements IApiService {
 
   public async getGroupMembers(
     slug: string,
-    params?: { page?: number; pageSize?: number },
+    params?: { limit?: number; before?: number },
   ) {
     return this.runWithDecode(async () =>
       getGroupMembers(this.apiClient, slug, params),
@@ -518,9 +538,12 @@ class ApiService implements IApiService {
     );
   }
 
-  public async getBannedMembers(slug: string) {
+  public async getBannedMembers(
+    slug: string,
+    params?: { limit?: number; before?: number },
+  ) {
     return this.runWithDecode(async () =>
-      getBannedMembers(this.apiClient, slug),
+      getBannedMembers(this.apiClient, slug, params),
     );
   }
 
@@ -708,3 +731,5 @@ class ApiService implements IApiService {
 }
 
 export const apiService = new ApiService();
+
+

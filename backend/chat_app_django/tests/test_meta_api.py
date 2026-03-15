@@ -12,6 +12,7 @@ class ClientConfigApiTests(TestCase):
         CHAT_ROOM_SLUG_REGEX=r"^[a-z0-9-]{3,20}$",
         CHAT_ATTACHMENT_MAX_SIZE_MB=25,
         CHAT_ATTACHMENT_MAX_PER_MESSAGE=7,
+        CHAT_ATTACHMENT_ALLOW_ANY_TYPE=False,
         CHAT_ATTACHMENT_ALLOWED_TYPES=["audio/mpeg", "audio/webm"],
         MEDIA_URL_TTL_SECONDS=120,
         GOOGLE_OAUTH_CLIENT_ID="google-client-id",

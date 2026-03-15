@@ -1,7 +1,8 @@
-﻿import type { AxiosInstance } from "axios";
+import type { AxiosInstance } from "axios";
 
 import { decodeRoomMessagesResponse } from "../../dto";
 import type { RoomMessagesResponse } from "../../domain/interfaces/IApiService";
+import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 /**
  * Загружает сообщения комнаты с пагинацией.
@@ -15,7 +16,8 @@ export async function getRoomMessages(
   slug: string,
   params?: { limit?: number; beforeId?: number },
 ): Promise<RoomMessagesResponse> {
-  const encodedSlug = encodeURIComponent(slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const query = new URLSearchParams();
   if (params?.limit) {
     query.set("limit", String(params.limit));
@@ -25,7 +27,7 @@ export async function getRoomMessages(
   }
 
   const suffix = query.toString();
-  const url = `/chat/rooms/${encodedSlug}/messages/${suffix ? `?${suffix}` : ""}`;
+  const url = `/chat/rooms/${encodedRoomRef}/messages/${suffix ? `?${suffix}` : ""}`;
   const response = await apiClient.get<unknown>(url);
   return decodeRoomMessagesResponse(response.data);
 }

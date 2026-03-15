@@ -6,19 +6,19 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q, QuerySet
 
 from friends.models import Friendship
-from users.identity import normalize_public_username
+from users.identity import normalize_public_ref, resolve_public_ref
 
 User = get_user_model()
 
 
 def get_user_by_username(username: str):
-    normalized = normalize_public_username(username)
+    normalized = normalize_public_ref(username)
     if not normalized:
         return None
-    user = User.objects.filter(profile__username=normalized).first()
-    if user is not None:
-        return user
-    return User.objects.filter(username=normalized).first()
+    owner_type, owner = resolve_public_ref(normalized)
+    if owner_type != "user":
+        return None
+    return owner
 
 
 def get_user_by_id(user_id: int):

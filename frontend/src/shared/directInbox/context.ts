@@ -11,8 +11,8 @@ export type DirectInboxContextValue = {
   unreadSlugs: string[];
   unreadCounts: Record<string, number>;
   unreadDialogsCount: number;
-  setActiveRoom: (roomSlug: string | null) => void;
-  markRead: (roomSlug: string) => void;
+  setActiveRoom: (roomRef: string | number | null) => void;
+  markRead: (roomRef: string | number) => void;
   refresh: () => Promise<void>;
 };
 

@@ -57,7 +57,6 @@ class ChatAccessTests(TestCase):
             name='Public Group',
             kind=Room.Kind.GROUP,
             is_public=True,
-            username='gaccess01',
             created_by=self.owner,
         )
         ensure_membership(group, self.owner, role_name="Owner")

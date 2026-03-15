@@ -19,26 +19,53 @@ export async function updateProfile(
 ): Promise<{ user: UserProfile }> {
   const dto = buildUpdateProfileRequestDto(fields);
 
-  const form = new FormData();
+  let latest: { user: UserProfile } | null = null;
+
+  const profileForm = new FormData();
+  let hasProfileFields = false;
+
   if (dto.name !== undefined) {
-    form.append("name", dto.name);
-  }
-  if (dto.username !== undefined) {
-    form.append("username", dto.username);
+    profileForm.append("name", dto.name);
+    hasProfileFields = true;
   }
   if (dto.image) {
-    form.append("image", dto.image);
+    profileForm.append("image", dto.image);
+    hasProfileFields = true;
   }
   if (dto.avatarCrop) {
-    form.append("avatarCropX", String(dto.avatarCrop.x));
-    form.append("avatarCropY", String(dto.avatarCrop.y));
-    form.append("avatarCropWidth", String(dto.avatarCrop.width));
-    form.append("avatarCropHeight", String(dto.avatarCrop.height));
+    profileForm.append("avatarCropX", String(dto.avatarCrop.x));
+    profileForm.append("avatarCropY", String(dto.avatarCrop.y));
+    profileForm.append("avatarCropWidth", String(dto.avatarCrop.width));
+    profileForm.append("avatarCropHeight", String(dto.avatarCrop.height));
+    hasProfileFields = true;
   }
   if (dto.bio !== undefined) {
-    form.append("bio", dto.bio);
+    profileForm.append("bio", dto.bio);
+    hasProfileFields = true;
   }
 
-  const response = await apiClient.post<unknown>("/auth/profile/", form);
-  return decodeProfileEnvelopeResponse(response.data);
+  if (hasProfileFields) {
+    const profileResponse = await apiClient.patch<unknown>(
+      "/profile/",
+      profileForm,
+    );
+    latest = decodeProfileEnvelopeResponse(profileResponse.data);
+  }
+
+  if (dto.username !== undefined) {
+    const handleResponse = await apiClient.patch<unknown>(
+      "/profile/handle/",
+      {
+        username: dto.username,
+      },
+    );
+    latest = decodeProfileEnvelopeResponse(handleResponse.data);
+  }
+
+  if (latest) {
+    return latest;
+  }
+
+  const fallbackResponse = await apiClient.get<unknown>("/profile/");
+  return decodeProfileEnvelopeResponse(fallbackResponse.data);
 }

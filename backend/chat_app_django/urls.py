@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from . import health
 from . import meta_api
 from groups.interfaces.urls import invite_urlpatterns as _group_invite_urls
+from users import api as users_api
 
 
 def _absolute(request, raw_path: str) -> str:
@@ -48,11 +49,20 @@ def api_index(request):
             "csrf": _link(request, "api-csrf-token"),
             "session": _link(request, "api-session"),
             "presenceSession": _link(request, "api-presence-session"),
+            "passwordRules": _link(request, "api-password-rules"),
             "login": _link(request, "api-login"),
             "logout": _link(request, "api-logout"),
             "register": _link(request, "api-register"),
-            "passwordRules": _link(request, "api-password-rules"),
+        },
+        "profile": {
             "profile": _link(request, "api-profile"),
+            "profileHandle": _link(request, "api-profile-handle"),
+        },
+        "settings": {
+            "security": _link(request, "api-settings-security"),
+        },
+        "public": {
+            "resolve": _absolute(request, "/api/public/resolve/{ref}"),
         },
         "sessionAuth": {
             "login": _first_link(request, ["rest_framework:login", "login"]),
@@ -62,15 +72,15 @@ def api_index(request):
             "publicRoom": _link(request, "api-public-room"),
             "directStart": _link(request, "api-direct-start"),
             "directChats": _link(request, "api-direct-chats"),
-            "roomRolesTemplate": _absolute(request, "/api/chat/rooms/<room_slug>/roles/"),
+            "roomRolesTemplate": _absolute(request, "/api/chat/rooms/{room_id}/roles/"),
             "roomMemberRolesTemplate": _absolute(
                 request,
-                "/api/chat/rooms/<room_slug>/members/<user_id>/roles/",
+                "/api/chat/rooms/{room_id}/members/{user_id}/roles/",
             ),
-            "roomOverridesTemplate": _absolute(request, "/api/chat/rooms/<room_slug>/overrides/"),
+            "roomOverridesTemplate": _absolute(request, "/api/chat/rooms/{room_id}/overrides/"),
             "roomPermissionsMeTemplate": _absolute(
                 request,
-                "/api/chat/rooms/<room_slug>/permissions/me/",
+                "/api/chat/rooms/{room_id}/permissions/me/",
             ),
         },
         "friends": {
@@ -83,9 +93,9 @@ def api_index(request):
         "groups": {
             "create": _absolute(request, "/api/groups/"),
             "publicList": _absolute(request, "/api/groups/public/"),
-            "detailTemplate": _absolute(request, "/api/groups/<slug>/"),
-            "invitePreviewTemplate": _absolute(request, "/api/invite/<code>/"),
-            "inviteJoinTemplate": _absolute(request, "/api/invite/<code>/join/"),
+            "detailTemplate": _absolute(request, "/api/groups/{room_id}/"),
+            "invitePreviewTemplate": _absolute(request, "/api/invite/{code}/"),
+            "inviteJoinTemplate": _absolute(request, "/api/invite/{code}/join/"),
         },
         "audit": {
             "events": _link(request, "api-admin-audit-events"),
@@ -94,25 +104,25 @@ def api_index(request):
     }
 
     templates = {
-        "authPublicProfile": _absolute(request, "/api/auth/users/<username>/"),
-        "authMedia": _absolute(request, "/api/auth/media/<path>?exp=<unix>&sig=<hmac>"),
-        "chatRoomDetails": _absolute(request, "/api/chat/rooms/<room_slug>/"),
-        "chatRoomMessages": _absolute(request, "/api/chat/rooms/<room_slug>/messages/?limit=50"),
-        "chatRoomRoles": _absolute(request, "/api/chat/rooms/<room_slug>/roles/"),
-        "chatRoomRoleDetail": _absolute(request, "/api/chat/rooms/<room_slug>/roles/<role_id>/"),
-        "chatRoomMemberRoles": _absolute(request, "/api/chat/rooms/<room_slug>/members/<user_id>/roles/"),
-        "chatRoomOverrides": _absolute(request, "/api/chat/rooms/<room_slug>/overrides/"),
+        "publicResolve": _absolute(request, "/api/public/resolve/{ref}"),
+        "authMedia": _absolute(request, "/api/auth/media/{path}?exp={unix}&sig={hmac}"),
+        "chatRoomDetails": _absolute(request, "/api/chat/rooms/{room_id}/"),
+        "chatRoomMessages": _absolute(request, "/api/chat/rooms/{room_id}/messages/?limit=50"),
+        "chatRoomRoles": _absolute(request, "/api/chat/rooms/{room_id}/roles/"),
+        "chatRoomRoleDetail": _absolute(request, "/api/chat/rooms/{room_id}/roles/{role_id}/"),
+        "chatRoomMemberRoles": _absolute(request, "/api/chat/rooms/{room_id}/members/{user_id}/roles/"),
+        "chatRoomOverrides": _absolute(request, "/api/chat/rooms/{room_id}/overrides/"),
         "chatRoomOverrideDetail": _absolute(
             request,
-            "/api/chat/rooms/<room_slug>/overrides/<override_id>/",
+            "/api/chat/rooms/{room_id}/overrides/{override_id}/",
         ),
-        "chatRoomPermissionsMe": _absolute(request, "/api/chat/rooms/<room_slug>/permissions/me/"),
-        "auditEventDetail": _absolute(request, "/api/admin/audit/events/<event_id>/"),
-        "auditUsernameHistory": _absolute(request, "/api/admin/audit/users/<user_id>/username-history/"),
-        "friendsRemove": _absolute(request, "/api/friends/<user_id>/"),
-        "friendsAccept": _absolute(request, "/api/friends/requests/<friendship_id>/accept/"),
-        "friendsDecline": _absolute(request, "/api/friends/requests/<friendship_id>/decline/"),
-        "friendsUnblock": _absolute(request, "/api/friends/block/<user_id>/"),
+        "chatRoomPermissionsMe": _absolute(request, "/api/chat/rooms/{room_id}/permissions/me/"),
+        "auditEventDetail": _absolute(request, "/api/admin/audit/events/{event_id}/"),
+        "auditUsernameHistory": _absolute(request, "/api/admin/audit/users/{user_id}/username-history/"),
+        "friendsRemove": _absolute(request, "/api/friends/{user_id}/"),
+        "friendsAccept": _absolute(request, "/api/friends/requests/{friendship_id}/accept/"),
+        "friendsDecline": _absolute(request, "/api/friends/requests/{friendship_id}/decline/"),
+        "friendsUnblock": _absolute(request, "/api/friends/block/{user_id}/"),
     }
 
     return Response(
@@ -144,6 +154,11 @@ urlpatterns = [
     path("api/health/ready/", health.ready, name="health-ready"),
     path("api/meta/client-config/", meta_api.client_config_view, name="api-client-config"),
     path("api/auth/", include("users.urls")),
+    path("api/profile/", users_api.profile_view, name="api-profile"),
+    path("api/profile/handle/", users_api.profile_handle_view, name="api-profile-handle"),
+    path("api/settings/security/", users_api.security_settings_view, name="api-settings-security"),
+    path("api/public/resolve/<path:ref>/", users_api.public_resolve_view, name="api-public-resolve"),
+    path("api/public/resolve/<path:ref>", users_api.public_resolve_view),
     path("api/chat/", include("chat.api_urls")),
     path("api/friends/", include("friends.interfaces.urls")),
     path("api/groups/", include("groups.interfaces.urls")),
@@ -164,3 +179,4 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,
     )
+

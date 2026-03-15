@@ -14,7 +14,6 @@ from django.conf import settings
 from chat_app_django.ip_utils import get_client_ip_from_scope
 from chat_app_django.security.audit import audit_ws_event
 from chat_app_django.security.rate_limit import DbRateLimiter, RateLimitPolicy
-from chat.utils import is_valid_room_slug as _is_valid_room_slug
 from roles.access import can_read
 from rooms.models import Room
 
@@ -37,6 +36,8 @@ def _to_async(func: Callable[..., T]) -> Callable[..., Awaitable[T]]:
 
 def _ws_connect_rate_limited(scope, endpoint: str) -> bool:
     """Checks websocket connect rate limit per endpoint and IP."""
+    if bool(getattr(settings, "WS_CONNECT_RATE_LIMIT_DISABLED", False)):
+        return False
     limit = int(getattr(settings, "WS_CONNECT_RATE_LIMIT", 60))
     window = int(getattr(settings, "WS_CONNECT_RATE_WINDOW", 60))
     ip = get_client_ip_from_scope(scope) or "unknown"
@@ -117,17 +118,20 @@ class DirectInboxConsumer(AsyncWebsocketConsumer):
             return
 
         if event_type == "set_active_room":
-            raw_slug = payload.get("roomSlug")
-            if raw_slug is None:
+            raw_room_id = payload.get("roomId")
+            if raw_room_id is None:
                 await self._clear_active_room(conn_only=True)
                 audit_ws_event(
                     "ws.direct_inbox.set_active_room.success",
                     self.scope,
                     endpoint="direct_inbox",
-                    room_slug=None,
+                    room_id=None,
                 )
                 return
-            if not isinstance(raw_slug, str):
+
+            try:
+                room_id = int(raw_room_id)
+            except (TypeError, ValueError):
                 audit_ws_event(
                     "ws.direct_inbox.set_active_room.rejected",
                     self.scope,
@@ -137,42 +141,43 @@ class DirectInboxConsumer(AsyncWebsocketConsumer):
                 await self._send_error("invalid_payload")
                 return
 
-            room_slug = raw_slug.strip()
-            if not _is_valid_room_slug(room_slug):
+            if room_id <= 0:
                 audit_ws_event(
                     "ws.direct_inbox.set_active_room.rejected",
                     self.scope,
                     endpoint="direct_inbox",
                     reason="forbidden",
-                    room_slug=room_slug,
+                    room_id=room_id,
                 )
                 await self._send_error("forbidden")
                 return
 
-            room = await self._load_room(room_slug)
+            room = await self._load_room(room_id)
             if not room or room.kind != Room.Kind.DIRECT or not await self._can_read(room):
                 audit_ws_event(
                     "ws.direct_inbox.set_active_room.rejected",
                     self.scope,
                     endpoint="direct_inbox",
                     reason="forbidden",
-                    room_slug=room_slug,
+                    room_id=room_id,
                 )
                 await self._send_error("forbidden")
                 return
 
-            await self._set_active_room(room_slug)
+            await self._set_active_room(room_id)
             audit_ws_event(
                 "ws.direct_inbox.set_active_room.success",
                 self.scope,
                 endpoint="direct_inbox",
-                room_slug=room_slug,
+                room_id=room_id,
             )
             return
 
         if event_type == "mark_read":
-            raw_slug = payload.get("roomSlug")
-            if not isinstance(raw_slug, str):
+            raw_room_id = payload.get("roomId")
+            try:
+                room_id = int(raw_room_id)
+            except (TypeError, ValueError):
                 audit_ws_event(
                     "ws.direct_inbox.mark_read.rejected",
                     self.scope,
@@ -182,42 +187,41 @@ class DirectInboxConsumer(AsyncWebsocketConsumer):
                 await self._send_error("invalid_payload")
                 return
 
-            room_slug = raw_slug.strip()
-            if not _is_valid_room_slug(room_slug):
+            if room_id <= 0:
                 audit_ws_event(
                     "ws.direct_inbox.mark_read.rejected",
                     self.scope,
                     endpoint="direct_inbox",
                     reason="forbidden",
-                    room_slug=room_slug,
+                    room_id=room_id,
                 )
                 await self._send_error("forbidden")
                 return
 
-            room = await self._load_room(room_slug)
+            room = await self._load_room(room_id)
             if not room or room.kind != Room.Kind.DIRECT or not await self._can_read(room):
                 audit_ws_event(
                     "ws.direct_inbox.mark_read.rejected",
                     self.scope,
                     endpoint="direct_inbox",
                     reason="forbidden",
-                    room_slug=room_slug,
+                    room_id=room_id,
                 )
                 await self._send_error("forbidden")
                 return
 
-            unread = await self._mark_read(room_slug)
+            unread = await self._mark_read(room_id)
             audit_ws_event(
                 "ws.direct_inbox.mark_read.success",
                 self.scope,
                 endpoint="direct_inbox",
-                room_slug=room_slug,
+                room_id=room_id,
             )
             await self.send(
                 text_data=json.dumps(
                     {
                         "type": "direct_mark_read_ack",
-                        "roomSlug": room_slug,
+                        "roomId": room_id,
                         "unread": unread,
                     }
                 )
@@ -277,11 +281,11 @@ class DirectInboxConsumer(AsyncWebsocketConsumer):
             await self.close(code=DIRECT_INBOX_CLOSE_IDLE_CODE)
             break
 
-    def _load_room_sync(self, room_slug: str) -> Room | None:
-        return Room.objects.filter(slug=room_slug).first()
+    def _load_room_sync(self, room_id: int) -> Room | None:
+        return Room.objects.filter(pk=room_id).first()
 
-    async def _load_room(self, room_slug: str) -> Room | None:
-        return await _to_async(self._load_room_sync)(room_slug)
+    async def _load_room(self, room_id: int) -> Room | None:
+        return await _to_async(self._load_room_sync)(room_id)
 
     def _can_read_sync(self, room: Room) -> bool:
         return can_read(room, self.user)
@@ -295,17 +299,17 @@ class DirectInboxConsumer(AsyncWebsocketConsumer):
     async def _get_unread_state(self) -> dict[str, Any]:
         return await _to_async(self._get_unread_state_sync)()
 
-    def _mark_read_sync(self, room_slug: str) -> dict[str, Any]:
-        return mark_read(self.user.pk, room_slug, self.unread_ttl)
+    def _mark_read_sync(self, room_id: int) -> dict[str, Any]:
+        return mark_read(self.user.pk, room_id, self.unread_ttl)
 
-    async def _mark_read(self, room_slug: str) -> dict[str, Any]:
-        return await _to_async(self._mark_read_sync)(room_slug)
+    async def _mark_read(self, room_id: int) -> dict[str, Any]:
+        return await _to_async(self._mark_read_sync)(room_id)
 
-    def _set_active_room_sync(self, room_slug: str) -> None:
-        set_active_room(self.user.pk, room_slug, self.conn_id, self.active_ttl)
+    def _set_active_room_sync(self, room_id: int) -> None:
+        set_active_room(self.user.pk, room_id, self.conn_id, self.active_ttl)
 
-    async def _set_active_room(self, room_slug: str) -> None:
-        await _to_async(self._set_active_room_sync)(room_slug)
+    async def _set_active_room(self, room_id: int) -> None:
+        await _to_async(self._set_active_room_sync)(room_id)
 
     def _clear_active_room_sync(self, conn_only: bool = False) -> None:
         clear_active_room(self.user.pk, self.conn_id if conn_only else None)

@@ -10,6 +10,7 @@ from rest_framework.response import Response
 @permission_classes([AllowAny])
 def client_config_view(_request):
     """Returns client-facing limits and policies from backend settings."""
+    allow_any_type = bool(getattr(settings, "CHAT_ATTACHMENT_ALLOW_ANY_TYPE", True))
     return Response(
         {
             "usernameMaxLength": int(getattr(settings, "USERNAME_MAX_LENGTH", 30)),
@@ -19,11 +20,15 @@ def client_config_view(_request):
             ),
             "chatAttachmentMaxSizeMb": int(getattr(settings, "CHAT_ATTACHMENT_MAX_SIZE_MB", 10)),
             "chatAttachmentMaxPerMessage": int(getattr(settings, "CHAT_ATTACHMENT_MAX_PER_MESSAGE", 5)),
-            "chatAttachmentAllowedTypes": [
-                str(item)
-                for item in getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [])
-                if str(item).strip()
-            ],
+            "chatAttachmentAllowedTypes": (
+                []
+                if allow_any_type
+                else [
+                    str(item)
+                    for item in getattr(settings, "CHAT_ATTACHMENT_ALLOWED_TYPES", [])
+                    if str(item).strip()
+                ]
+            ),
             "mediaUrlTtlSeconds": int(getattr(settings, "MEDIA_URL_TTL_SECONDS", 300)),
             "mediaMode": "signed_only",
             "googleOAuthClientId": str(getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "") or ""),

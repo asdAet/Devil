@@ -322,50 +322,6 @@
   color: var(--tg-primary, #2fb3a3);
 }
 
-/* ---- actions overlay ---- */
-
-.actions {
-  position: absolute;
-  top: -4px;
-  right: 52px;
-  display: none;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--tg-bg-surface, #2b2b2b);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  z-index: 5;
-}
-
-.message:hover .actions {
-  display: flex;
-}
-
-.messageOwn .actions {
-  right: auto;
-  left: 52px;
-}
-
-.actionBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--tg-text-secondary, #aaa);
-  cursor: pointer;
-  transition: background var(--tg-transition-fast, 150ms), color var(--tg-transition-fast, 150ms);
-}
-
-.actionBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--tg-text-primary, #fff);
-}
-
 /* ---- emoji picker popup ---- */
 
 .emojiBackdrop {
@@ -450,21 +406,18 @@
     max-width: min(100%, 300px);
   }
 
-  .actions {
-    top: -2px;
-    right: 14px;
-    padding: 1px;
-    gap: 1px;
+  .footerInfo {
+    float: none;
+    width: 100%;
+    margin-left: 0;
+    margin-top: 4px;
+    justify-content: flex-end;
+    position: static;
   }
 
-  .messageOwn .actions {
-    right: auto;
-    left: 14px;
-  }
-
-  .actionBtn {
-    width: 32px;
-    height: 32px;
+  .checkMark {
+    min-width: 16px;
+    color: rgba(255, 255, 255, 0.72);
   }
 }
 

@@ -11,8 +11,8 @@ from rooms.models import Room
 User = get_user_model()
 
 
-def get_room_by_slug(room_slug: str) -> Room | None:
-    return Room.objects.filter(slug=room_slug).first()
+def get_room_by_id(room_id: int) -> Room | None:
+    return Room.objects.filter(pk=room_id).first()
 
 
 def get_default_role_permissions(room: Room) -> int | None:

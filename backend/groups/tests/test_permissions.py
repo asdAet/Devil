@@ -11,6 +11,7 @@ from roles.application.permission_service import compute_permissions
 from roles.models import Membership, Role
 from roles.permissions import Perm
 from rooms.models import Room
+from users.identity import set_room_public_handle
 
 User = get_user_model()
 
@@ -93,9 +94,9 @@ class TestPublicGroupPermissions(TestCase):
             slug="g-public-perm-test-abc12345",
             kind=Room.Kind.GROUP,
             is_public=True,
-            username="pubpermtest",
             created_by=self.owner,
         )
+        set_room_public_handle(self.room, "pubpermtest")
         roles = Role.create_defaults_for_room(self.room)
         owner_ms = Membership.objects.create(room=self.room, user=self.owner)
         owner_ms.roles.add(roles["Owner"])

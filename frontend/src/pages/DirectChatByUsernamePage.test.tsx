@@ -34,7 +34,7 @@ describe("DirectChatByUsernamePage", () => {
     render(
       <DirectChatByUsernamePage
         user={null}
-        username="alice"
+        publicRef="alice"
         onNavigate={onNavigate}
       />,
     );
@@ -51,7 +51,7 @@ describe("DirectChatByUsernamePage", () => {
     render(
       <DirectChatByUsernamePage
         user={user}
-        username="missing"
+        publicRef="missing"
         onNavigate={vi.fn()}
       />,
     );
@@ -63,7 +63,7 @@ describe("DirectChatByUsernamePage", () => {
 
   it("renders chat page when direct chat is resolved", async () => {
     controllerMock.startDirectChat.mockResolvedValue({
-      slug: "dm_123",
+      roomId: 123,
       kind: "direct",
       peer: { username: "alice", profileImage: null },
     });
@@ -71,13 +71,13 @@ describe("DirectChatByUsernamePage", () => {
     render(
       <DirectChatByUsernamePage
         user={user}
-        username="alice"
+        publicRef="alice"
         onNavigate={vi.fn()}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("CHAT:dm_123")).toBeInTheDocument();
+      expect(screen.getByText("CHAT:123")).toBeInTheDocument();
     });
   });
 });

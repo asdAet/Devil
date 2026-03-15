@@ -10,6 +10,7 @@ from django.test import TestCase
 
 from messages.models import Message
 from rooms.models import Room
+from users.identity import user_public_id
 from users.models import Profile
 from users.signals import ensure_profile
 
@@ -80,5 +81,5 @@ class UserSignalsTests(TestCase):
             user.username = 'new_name'
             user.save(update_fields=['username'])
 
-        self.assertTrue(Message.objects.filter(user=user, username='new_name').exists())
+        self.assertTrue(Message.objects.filter(user=user, username=user_public_id(user)).exists())
         self.assertTrue(any('user.username.changed' in line for line in captured.output))

@@ -2,7 +2,14 @@
 import styles from "../styles/pages/RegisterPage.module.css";
 
 type Props = {
-  onSubmit: (email: string, password1: string, password2: string) => void;
+  onSubmit: (payload: {
+    login: string;
+    password: string;
+    passwordConfirm: string;
+    name: string;
+    username?: string;
+    email?: string;
+  }) => void;
   onGoogleAuth?: () => Promise<void> | void;
   googleAuthDisabledReason?: string | null;
   onNavigate: (path: string) => void;
@@ -23,12 +30,14 @@ export function RegisterPage({
       mode="register"
       title="Регистрация"
       submitLabel="Создать аккаунт"
-      onSubmit={(email, password, confirm) => onSubmit(email, password, confirm ?? "")}
+      onSubmit={(payload) => {
+        if ("identifier" in payload) return;
+        onSubmit(payload);
+      }}
       onGoogleAuth={onGoogleAuth}
       googleAuthDisabledReason={googleAuthDisabledReason}
       onNavigate={onNavigate}
       error={error}
-      requireConfirm
       passwordRules={passwordRules}
       className={styles.page}
     />

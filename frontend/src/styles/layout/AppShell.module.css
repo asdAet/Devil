@@ -44,6 +44,10 @@
   overscroll-behavior-y: contain;
 }
 
+.mainInnerChat {
+  overflow: hidden;
+}
+
 .banners {
   position: sticky;
   top: var(--safe-top, 0px);

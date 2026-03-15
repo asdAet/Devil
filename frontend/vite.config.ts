@@ -31,16 +31,33 @@ export default defineConfig({
     }),
   ],
   server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
       },
       "/ws": {
-        target: "http://localhost:8000",
+        target: "ws://localhost:8000",
         ws: true,
         changeOrigin: true,
         secure: false,
+        rewriteWsOrigin: true,
+        configure: (proxy) => {
+          proxy.on("error", (error) => {
+            const code = (error as NodeJS.ErrnoException).code;
+            if (
+              code === "ECONNABORTED" ||
+              code === "ECONNRESET" ||
+              code === "EPIPE"
+            ) {
+              return;
+            }
+            console.error("[vite][ws-proxy] unexpected error", error);
+          });
+        },
       },
     },
   },

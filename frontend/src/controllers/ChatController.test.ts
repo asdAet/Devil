@@ -289,7 +289,7 @@ describe("ChatController", () => {
 
   it("delegates pass-through methods to apiService with original args", async () => {
     const directStartResponse: DirectStartResponseDto = {
-      slug: "dm_1",
+      roomId: 1,
       kind: "direct",
       peer: {
         username: "alice",
@@ -299,9 +299,7 @@ describe("ChatController", () => {
         bio: null,
       },
     };
-    const unreadCounts: UnreadCountItem[] = [
-      { roomSlug: "room_1", unreadCount: 3 },
-    ];
+    const unreadCounts: UnreadCountItem[] = [{ roomId: 101, unreadCount: 3 }];
     const editedMessage = {
       id: 7,
       content: "edited",
@@ -342,7 +340,7 @@ describe("ChatController", () => {
       ],
     };
     const readState: ReadStateResult = {
-      roomSlug: "room_1",
+      roomId: 101,
       lastReadMessageId: 44,
     };
     const searchResult: GlobalSearchResult = {
@@ -356,10 +354,10 @@ describe("ChatController", () => {
       ],
       groups: [
         {
-          slug: "g1",
+          roomId: 101,
           name: "Group 1",
           description: "",
-          username: "group1",
+          publicRef: "@group1",
           memberCount: 2,
           isPublic: true,
         },
@@ -370,7 +368,7 @@ describe("ChatController", () => {
           username: "alice",
           content: "hello",
           createdAt: "2026-01-01T00:00:00.000Z",
-          roomSlug: "room_1",
+          roomId: 101,
           roomName: "Room 1",
           roomKind: "group",
         },

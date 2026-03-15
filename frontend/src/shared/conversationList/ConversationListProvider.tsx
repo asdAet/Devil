@@ -118,7 +118,7 @@ export function ConversationListProvider({ user, ready, children }: Props) {
       if (!mountedRef.current) return;
       const map: Record<string, number> = {};
       for (const item of counts) {
-        map[item.roomSlug] = item.unreadCount;
+        map[String(item.roomId)] = item.unreadCount;
       }
       setRoomUnreads(map);
       setGroupItems(groups.items);
@@ -219,7 +219,8 @@ export function ConversationListProvider({ user, ready, children }: Props) {
         conversations.push({
           type: "direct",
           slug: dm.slug,
-          name: dm.peer.username,
+          name: dm.peer.displayName ?? dm.peer.username,
+          directRef: dm.peer.username,
           avatarUrl: dm.peer.profileImage ?? null,
           avatarCrop: dm.peer.avatarCrop ?? null,
           lastMessage: dm.lastMessage,

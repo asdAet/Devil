@@ -76,7 +76,7 @@ describe("UserProfilePage", () => {
     );
 
     fireEvent.click(screen.getByTestId("send-dm-button"));
-    expect(onNavigate).toHaveBeenCalledWith("/@alice");
+    expect(onNavigate).toHaveBeenCalledWith("/direct/alice");
   });
 
   it("shows @username under profile name", () => {

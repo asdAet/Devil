@@ -20,20 +20,20 @@ const postMessage = (message: SwCacheMessage): void => {
 
 /**
  * Инвалидирует кэш сообщений комнаты.
- * @param slug Идентификатор комнаты.
+ * @param roomRef Room ref (обычно roomId).
  */
-export const invalidateRoomMessages = (slug: string) => {
-  if (!slug) return;
-  postMessage({ type: "invalidate", key: "roomMessages", slug });
+export const invalidateRoomMessages = (roomRef: string) => {
+  if (!roomRef) return;
+  postMessage({ type: "invalidate", key: "roomMessages", roomRef });
 };
 
 /**
  * Инвалидирует кэш деталей комнаты.
- * @param slug Идентификатор комнаты.
+ * @param roomRef Room ref (обычно roomId).
  */
-export const invalidateRoomDetails = (slug: string) => {
-  if (!slug) return;
-  postMessage({ type: "invalidate", key: "roomDetails", slug });
+export const invalidateRoomDetails = (roomRef: string) => {
+  if (!roomRef) return;
+  postMessage({ type: "invalidate", key: "roomDetails", roomRef });
 };
 
 /**
@@ -45,11 +45,11 @@ export const invalidateDirectChats = () => {
 
 /**
  * Инвалидирует кэш публичного профиля пользователя.
- * @param username Имя пользователя.
+ * @param publicRef Публичный ref пользователя (handle или fallback-id).
  */
-export const invalidateUserProfile = (username: string) => {
-  if (!username) return;
-  postMessage({ type: "invalidate", key: "userProfile", username });
+export const invalidateUserProfile = (publicRef: string) => {
+  if (!publicRef) return;
+  postMessage({ type: "invalidate", key: "userProfile", publicRef });
 };
 
 /**

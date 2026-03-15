@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
 from friends.models import Friendship
+from users.identity import set_user_public_handle
 
 User = get_user_model()
 
@@ -24,6 +25,9 @@ class FriendsApiTestBase(TestCase):
         self.alice = User.objects.create_user(username="alice", password="pass12345")
         self.bob = User.objects.create_user(username="bob", password="pass12345")
         self.charlie = User.objects.create_user(username="charlie", password="pass12345")
+        set_user_public_handle(self.alice, "alice")
+        set_user_public_handle(self.bob, "bob")
+        set_user_public_handle(self.charlie, "charlie")
 
     def _login(self, user):
         self.client.force_login(user)

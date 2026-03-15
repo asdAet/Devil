@@ -49,6 +49,16 @@ def _validated_data(serializer: Any) -> dict[str, Any]:
     return cast(dict[str, Any], serializer.validated_data)
 
 
+def _parse_positive_int(raw_value: str | None, param_name: str) -> int:
+    try:
+        parsed = int(raw_value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError(f"Некорректный параметр '{param_name}': должно быть целое число")
+    if parsed < 1:
+        raise ValueError(f"Некорректный параметр '{param_name}': должно быть >= 1")
+    return parsed
+
+
 def _handle_group_errors(func):
     """Decorator to handle common group service errors."""
     @wraps(func)
@@ -82,7 +92,7 @@ def create_group(request):
         is_public=bool(data.get("isPublic", False)),
         username=data.get("username"),
     )
-    info = group_service.get_group_info(room.slug, request.user, request=request)
+    info = group_service.get_group_info(room.pk, request.user, request=request)
     return Response(GroupOutputSerializer(info).data, status=http_status.HTTP_201_CREATED)
 
 
@@ -91,12 +101,14 @@ def create_group(request):
 @_handle_group_errors
 def list_public_groups(request):
     search = request.query_params.get("search")
-    page = int(request.query_params.get("page", 1))
-    page_size = min(int(request.query_params.get("pageSize", 20)), 100)
+    limit_raw = request.query_params.get("limit")
+    before_raw = request.query_params.get("before")
+    limit = 20 if limit_raw is None else min(_parse_positive_int(limit_raw, "limit"), 100)
+    before_id = _parse_positive_int(before_raw, "before") if before_raw is not None else None
     result = group_service.list_public_groups(
         search=search,
-        page=page,
-        page_size=page_size,
+        before_id=before_id,
+        limit=limit,
         request=request,
     )
     result["items"] = GroupListItemSerializer(result["items"], many=True).data
@@ -108,13 +120,15 @@ def list_public_groups(request):
 @_handle_group_errors
 def list_my_groups(request):
     search = request.query_params.get("search")
-    page = int(request.query_params.get("page", 1))
-    page_size = min(int(request.query_params.get("pageSize", 20)), 100)
+    limit_raw = request.query_params.get("limit")
+    before_raw = request.query_params.get("before")
+    limit = 20 if limit_raw is None else min(_parse_positive_int(limit_raw, "limit"), 100)
+    before_id = _parse_positive_int(before_raw, "before") if before_raw is not None else None
     result = group_service.list_my_groups(
         request.user,
         search=search,
-        page=page,
-        page_size=page_size,
+        before_id=before_id,
+        limit=limit,
         request=request,
     )
     result["items"] = GroupListItemSerializer(result["items"], many=True).data
@@ -125,11 +139,11 @@ def list_my_groups(request):
 @permission_classes([AllowAny])
 @parser_classes([JSONParser, FormParser, MultiPartParser])
 @_handle_group_errors
-def group_detail(request, slug):
+def group_detail(request, room_id):
     if request.method == "GET":
         user = getattr(request, "user", None)
         actor = user if user and getattr(user, "is_authenticated", False) else None
-        info = group_service.get_group_info(slug, actor, request=request)
+        info = group_service.get_group_info(room_id, actor, request=request)
         return Response(GroupOutputSerializer(info).data)
 
     if request.method == "PATCH":
@@ -168,14 +182,14 @@ def group_detail(request, slug):
         avatar_file = request.FILES.get("avatar")
         if avatar_file is not None:
             kwargs["avatar"] = avatar_file
-        room = group_service.update_group(request.user, slug, **kwargs)
-        info = group_service.get_group_info(room.slug, request.user, request=request)
+        room = group_service.update_group(request.user, room_id, **kwargs)
+        info = group_service.get_group_info(room.pk, request.user, request=request)
         return Response(GroupOutputSerializer(info).data)
 
     # DELETE
     if not getattr(request.user, "is_authenticated", False):
         return _error("Требуется аутентификация", 401)
-    group_service.delete_group(request.user, slug)
+    group_service.delete_group(request.user, room_id)
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -184,30 +198,32 @@ def group_detail(request, slug):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def join_group(request, slug):
-    membership = member_service.join_group(request.user, slug)
-    return Response({"roomSlug": slug, "status": "joined"})
+def join_group(request, room_id):
+    member_service.join_group(request.user, room_id)
+    return Response({"roomId": int(room_id), "status": "joined"})
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def leave_group(request, slug):
-    member_service.leave_group(request.user, slug)
+def leave_group(request, room_id):
+    member_service.leave_group(request.user, room_id)
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def list_members(request, slug):
-    page = int(request.query_params.get("page", 1))
-    page_size = min(int(request.query_params.get("pageSize", 50)), 200)
+def list_members(request, room_id):
+    limit_raw = request.query_params.get("limit")
+    before_raw = request.query_params.get("before")
+    limit = 50 if limit_raw is None else min(_parse_positive_int(limit_raw, "limit"), 200)
+    before_id = _parse_positive_int(before_raw, "before") if before_raw is not None else None
     result = member_service.list_members(
         request.user,
-        slug,
-        page=page,
-        page_size=page_size,
+        room_id,
+        before_id=before_id,
+        limit=limit,
         request=request,
     )
     return Response(result)
@@ -216,20 +232,20 @@ def list_members(request, slug):
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def kick_member(request, slug, user_id):
-    member_service.kick_member(request.user, slug, int(user_id))
+def kick_member(request, room_id, user_id):
+    member_service.kick_member(request.user, room_id, int(user_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def ban_member(request, slug, user_id):
+def ban_member(request, room_id, user_id):
     ser = BanInputSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     data = _validated_data(ser)
     member_service.ban_member(
-        request.user, slug, int(user_id), reason=data.get("reason", "")
+        request.user, room_id, int(user_id), reason=data.get("reason", "")
     )
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
@@ -237,20 +253,20 @@ def ban_member(request, slug, user_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def unban_member(request, slug, user_id):
-    member_service.unban_member(request.user, slug, int(user_id))
+def unban_member(request, room_id, user_id):
+    member_service.unban_member(request.user, room_id, int(user_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def mute_member(request, slug, user_id):
+def mute_member(request, room_id, user_id):
     ser = MuteInputSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     data = _validated_data(ser)
     member_service.mute_member(
-        request.user, slug, int(user_id),
+        request.user, room_id, int(user_id),
         duration_seconds=data["durationSeconds"],
     )
     return Response(status=http_status.HTTP_204_NO_CONTENT)
@@ -259,18 +275,25 @@ def mute_member(request, slug, user_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def unmute_member(request, slug, user_id):
-    member_service.unmute_member(request.user, slug, int(user_id))
+def unmute_member(request, room_id, user_id):
+    member_service.unmute_member(request.user, room_id, int(user_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def list_banned(request, slug):
-    page = int(request.query_params.get("page", 1))
-    page_size = int(request.query_params.get("pageSize", 50))
-    data = member_service.list_banned(request.user, slug, page=page, page_size=page_size)
+def list_banned(request, room_id):
+    limit_raw = request.query_params.get("limit")
+    before_raw = request.query_params.get("before")
+    limit = 50 if limit_raw is None else min(_parse_positive_int(limit_raw, "limit"), 200)
+    before_id = _parse_positive_int(before_raw, "before") if before_raw is not None else None
+    data = member_service.list_banned(
+        request.user,
+        room_id,
+        before_id=before_id,
+        limit=limit,
+    )
     return Response(data)
 
 
@@ -279,14 +302,14 @@ def list_banned(request, slug):
 @api_view(["POST", "GET"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def group_invites(request, slug):
+def group_invites(request, room_id):
     if request.method == "POST":
         ser = InviteCreateInputSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         data = _validated_data(ser)
         invite = invite_service.create_invite(
             request.user,
-            slug,
+            room_id,
             name=data.get("name", ""),
             expires_in_seconds=data.get("expiresInSeconds"),
             max_uses=data.get("maxUses", 0),
@@ -294,15 +317,15 @@ def group_invites(request, slug):
         return Response(InviteOutputSerializer(invite).data, status=http_status.HTTP_201_CREATED)
 
     # GET
-    invites = invite_service.list_invites(request.user, slug)
+    invites = invite_service.list_invites(request.user, room_id)
     return Response({"items": InviteOutputSerializer(invites, many=True).data})
 
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def revoke_invite(request, slug, code):
-    invite_service.revoke_invite(request.user, slug, code)
+def revoke_invite(request, room_id, code):
+    invite_service.revoke_invite(request.user, room_id, code)
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -327,24 +350,24 @@ def join_via_invite(request, code):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def list_join_requests(request, slug):
-    items = member_service.list_join_requests(request.user, slug)
+def list_join_requests(request, room_id):
+    items = member_service.list_join_requests(request.user, room_id)
     return Response({"items": JoinRequestOutputSerializer(items, many=True).data})
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def approve_join_request(request, slug, request_id):
-    member_service.approve_join_request(request.user, slug, int(request_id))
+def approve_join_request(request, room_id, request_id):
+    member_service.approve_join_request(request.user, room_id, int(request_id))
     return Response({"status": "approved"})
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def reject_join_request(request, slug, request_id):
-    member_service.reject_join_request(request.user, slug, int(request_id))
+def reject_join_request(request, room_id, request_id):
+    member_service.reject_join_request(request.user, room_id, int(request_id))
     return Response({"status": "rejected"})
 
 
@@ -353,7 +376,7 @@ def reject_join_request(request, slug, request_id):
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 @_handle_group_errors
-def group_pins(request, slug):
+def group_pins(request, room_id):
     if request.method == "POST":
         if not getattr(request.user, "is_authenticated", False):
             return _error("Требуется аутентификация", 401)
@@ -361,7 +384,7 @@ def group_pins(request, slug):
         ser.is_valid(raise_exception=True)
         data = _validated_data(ser)
         pin = pin_service.pin_message(
-            request.user, slug, data["messageId"]
+            request.user, room_id, data["messageId"]
         )
         return Response(
             {"messageId": pin.message_id, "pinnedAt": pin.pinned_at.isoformat()},
@@ -371,15 +394,15 @@ def group_pins(request, slug):
     # GET
     user = getattr(request, "user", None)
     actor = user if user and getattr(user, "is_authenticated", False) else None
-    items = pin_service.list_pinned(slug, actor)
+    items = pin_service.list_pinned(room_id, actor)
     return Response({"items": PinOutputSerializer(items, many=True).data})
 
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def unpin_message(request, slug, message_id):
-    pin_service.unpin_message(request.user, slug, int(message_id))
+def unpin_message(request, room_id, message_id):
+    pin_service.unpin_message(request.user, room_id, int(message_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -388,12 +411,12 @@ def unpin_message(request, slug, message_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @_handle_group_errors
-def transfer_ownership(request, slug):
+def transfer_ownership(request, room_id):
     ser = TransferOwnershipInputSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     data = _validated_data(ser)
     ownership_service.transfer_ownership(
-        request.user, slug, data["userId"]
+        request.user, room_id, data["userId"]
     )
     return Response({"status": "transferred"})
 
@@ -428,7 +451,7 @@ class GroupCreateInteractiveView(_HandledGroupAPIView):
                 is_public=bool(data.get("isPublic", False)),
                 username=data.get("username"),
             )
-            info = group_service.get_group_info(room.slug, request.user, request=request)
+            info = group_service.get_group_info(room.pk, request.user, request=request)
             return Response(
                 GroupOutputSerializer(info).data,
                 status=http_status.HTTP_201_CREATED,
@@ -442,16 +465,16 @@ class GroupDetailInteractiveView(_HandledGroupAPIView):
     serializer_class = GroupUpdateInputSerializer
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
-    def get(self, request, slug):
+    def get(self, request, room_id):
         def _impl():
             user = getattr(request, "user", None)
             actor = user if user and getattr(user, "is_authenticated", False) else None
-            info = group_service.get_group_info(slug, actor, request=request)
+            info = group_service.get_group_info(room_id, actor, request=request)
             return Response(GroupOutputSerializer(info).data)
 
         return self._execute(_impl)
 
-    def patch(self, request, slug):
+    def patch(self, request, room_id):
         def _impl():
             if not getattr(request.user, "is_authenticated", False):
                 return _error("Требуется аутентификация", 401)
@@ -489,17 +512,17 @@ class GroupDetailInteractiveView(_HandledGroupAPIView):
             if avatar_file is not None:
                 kwargs["avatar"] = avatar_file
 
-            room = group_service.update_group(request.user, slug, **kwargs)
-            info = group_service.get_group_info(room.slug, request.user, request=request)
+            room = group_service.update_group(request.user, room_id, **kwargs)
+            info = group_service.get_group_info(room.pk, request.user, request=request)
             return Response(GroupOutputSerializer(info).data)
 
         return self._execute(_impl)
 
-    def delete(self, request, slug):
+    def delete(self, request, room_id):
         def _impl():
             if not getattr(request.user, "is_authenticated", False):
                 return _error("Требуется аутентификация", 401)
-            group_service.delete_group(request.user, slug)
+            group_service.delete_group(request.user, room_id)
             return Response(status=http_status.HTTP_204_NO_CONTENT)
 
         return self._execute(_impl)
@@ -509,14 +532,14 @@ class BanMemberInteractiveView(_HandledGroupAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = BanInputSerializer
 
-    def post(self, request, slug, user_id):
+    def post(self, request, room_id, user_id):
         def _impl():
             ser = self.get_serializer(data=request.data)
             ser.is_valid(raise_exception=True)
             data = _validated_data(ser)
             member_service.ban_member(
                 request.user,
-                slug,
+                room_id,
                 int(user_id),
                 reason=data.get("reason", ""),
             )
@@ -529,14 +552,14 @@ class MuteMemberInteractiveView(_HandledGroupAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = MuteInputSerializer
 
-    def post(self, request, slug, user_id):
+    def post(self, request, room_id, user_id):
         def _impl():
             ser = self.get_serializer(data=request.data)
             ser.is_valid(raise_exception=True)
             data = _validated_data(ser)
             member_service.mute_member(
                 request.user,
-                slug,
+                room_id,
                 int(user_id),
                 duration_seconds=data["durationSeconds"],
             )
@@ -549,21 +572,21 @@ class GroupInvitesInteractiveView(_HandledGroupAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = InviteCreateInputSerializer
 
-    def get(self, request, slug):
+    def get(self, request, room_id):
         def _impl():
-            invites = invite_service.list_invites(request.user, slug)
+            invites = invite_service.list_invites(request.user, room_id)
             return Response({"items": InviteOutputSerializer(invites, many=True).data})
 
         return self._execute(_impl)
 
-    def post(self, request, slug):
+    def post(self, request, room_id):
         def _impl():
             ser = self.get_serializer(data=request.data)
             ser.is_valid(raise_exception=True)
             data = _validated_data(ser)
             invite = invite_service.create_invite(
                 request.user,
-                slug,
+                room_id,
                 name=data.get("name", ""),
                 expires_in_seconds=data.get("expiresInSeconds"),
                 max_uses=data.get("maxUses", 0),
@@ -580,23 +603,23 @@ class GroupPinsInteractiveView(_HandledGroupAPIView):
     permission_classes = [AllowAny]
     serializer_class = PinInputSerializer
 
-    def get(self, request, slug):
+    def get(self, request, room_id):
         def _impl():
             user = getattr(request, "user", None)
             actor = user if user and getattr(user, "is_authenticated", False) else None
-            items = pin_service.list_pinned(slug, actor)
+            items = pin_service.list_pinned(room_id, actor)
             return Response({"items": PinOutputSerializer(items, many=True).data})
 
         return self._execute(_impl)
 
-    def post(self, request, slug):
+    def post(self, request, room_id):
         def _impl():
             if not getattr(request.user, "is_authenticated", False):
                 return _error("Требуется аутентификация", 401)
             ser = self.get_serializer(data=request.data)
             ser.is_valid(raise_exception=True)
             data = _validated_data(ser)
-            pin = pin_service.pin_message(request.user, slug, data["messageId"])
+            pin = pin_service.pin_message(request.user, room_id, data["messageId"])
             return Response(
                 {
                     "messageId": pin.message_id,
@@ -612,16 +635,18 @@ class TransferOwnershipInteractiveView(_HandledGroupAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = TransferOwnershipInputSerializer
 
-    def post(self, request, slug):
+    def post(self, request, room_id):
         def _impl():
             ser = self.get_serializer(data=request.data)
             ser.is_valid(raise_exception=True)
             data = _validated_data(ser)
             ownership_service.transfer_ownership(
                 request.user,
-                slug,
+                room_id,
                 data["userId"],
             )
             return Response({"status": "transferred"})
 
         return self._execute(_impl)
+
+

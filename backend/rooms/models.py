@@ -1,6 +1,16 @@
-from django.conf import settings
-from django.db import models
+﻿from __future__ import annotations
+
 from typing import Optional
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
+from django.db import models
+
+GROUP_PUBLIC_ID_VALIDATOR = RegexValidator(
+    regex=r"^-[1-9]\d{9}$",
+    message="public_id must be a negative 10-digit numeric value.",
+)
 
 
 class Room(models.Model):
@@ -34,7 +44,6 @@ class Room(models.Model):
     )
     created_by_id: Optional[int]
 
-    # ── Group-specific fields ──────────────────────────────────────────
     description = models.TextField(blank=True, default="", max_length=2000)
     avatar = models.ImageField(upload_to="group_avatars/", null=True, blank=True)
     avatar_crop_x = models.FloatField(null=True, blank=True)
@@ -45,12 +54,14 @@ class Room(models.Model):
         default=False,
         help_text="Public groups are discoverable and joinable without invite.",
     )
-    username = models.CharField(
-        max_length=50,
+    public_id = models.CharField(
+        max_length=11,
         unique=True,
         null=True,
         blank=True,
-        help_text="Public group @username for search/join.",
+        db_index=True,
+        validators=[GROUP_PUBLIC_ID_VALIDATOR],
+        help_text="Negative 10-digit public fallback id for groups.",
     )
     slow_mode_seconds = models.PositiveIntegerField(
         default=0,
@@ -72,3 +83,15 @@ class Room(models.Model):
     @property
     def is_group(self) -> bool:
         return self.kind == self.Kind.GROUP
+
+    def save(self, *args, **kwargs):
+        if self.public_id and self.kind != self.Kind.GROUP:
+            raise ValidationError({"public_id": "public_id is supported only for groups."})
+
+        if self.pk is not None:
+            previous = type(self).objects.filter(pk=self.pk).values("public_id", "kind").first()
+            if previous is not None:
+                old_public_id = previous.get("public_id")
+                if old_public_id and old_public_id != self.public_id:
+                    raise ValidationError({"public_id": "public_id is immutable."})
+        super().save(*args, **kwargs)

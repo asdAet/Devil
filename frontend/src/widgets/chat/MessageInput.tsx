@@ -193,7 +193,9 @@ export function MessageInput({
         <div className={styles.replyBar}>
           <div className={styles.replyBarAccent} />
           <div className={styles.replyBarBody}>
-            <div className={styles.replyBarUser}>{replyTo.username}</div>
+            <div className={styles.replyBarUser}>
+              {replyTo.displayName ?? replyTo.username}
+            </div>
             <div className={styles.replyBarText}>{replyTo.content}</div>
           </div>
           <button

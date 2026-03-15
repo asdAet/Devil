@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { UserProfile } from "../entities/user/types";
 import { useFriends } from "../hooks/useFriends";
+import { buildDirectPath } from "../shared/lib/publicRef";
 import { usePresence } from "../shared/presence";
 import { Avatar, Spinner, EmptyState } from "../shared/ui";
 import { AddFriendDialog } from "../widgets/friends/AddFriendDialog";
@@ -76,7 +77,7 @@ export function FriendsPage({ user, onNavigate }: Props) {
   }, [clearInfoMessage, infoMessage]);
 
   const handleMessage = useCallback(
-    (username: string) => onNavigate(`/@${encodeURIComponent(username)}`),
+    (username: string) => onNavigate(buildDirectPath(username)),
     [onNavigate],
   );
 

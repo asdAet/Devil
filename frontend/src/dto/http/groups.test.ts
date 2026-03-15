@@ -24,7 +24,7 @@ describe("groups DTO decoders", () => {
     const decoded = decodeGroupListResponse({
       items: [
         {
-          slug: "g-1",
+          roomId: 101,
           name: "Group",
           description: "desc",
           username: "group",
@@ -34,8 +34,7 @@ describe("groups DTO decoders", () => {
         },
       ],
       total: 1,
-      page: 1,
-      pageSize: 20,
+      pagination: { limit: 20, hasMore: false, nextBefore: null },
     });
 
     expect(decoded.items[0]?.avatarUrl).toBe("https://example.com/a.jpg");

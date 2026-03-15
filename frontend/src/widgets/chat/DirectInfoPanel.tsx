@@ -82,7 +82,7 @@ function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
         )}
 
       <div className={styles.cardMeta}>
-        <span>{item.username}</span>
+        <span>{item.displayName ?? item.username}</span>
         <span>{formatTimestamp(item.createdAt)}</span>
       </div>
     </>
@@ -201,12 +201,14 @@ export function DirectInfoPanel({ slug }: Props) {
       {tab === "profile" && peer && (
         <div className={styles.profile}>
           <Avatar
-            username={peer.username}
+            username={peer.displayName ?? peer.username}
             profileImage={peer.profileImage}
             avatarCrop={peer.avatarCrop}
             size="default"
           />
-          <h4 className={styles.peerName}>{peer.username}</h4>
+          <h4 className={styles.peerName}>
+            {peer.displayName ?? peer.username}
+          </h4>
           <p className={styles.meta}>
             Был(а) в сети: {formatLastSeen(peer.lastSeen ?? null) || "—"}
           </p>

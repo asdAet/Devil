@@ -1,12 +1,12 @@
-"""Coverage test for compatibility re-export module chat.direct_inbox."""
+"""Smoke test for direct_inbox.state exports used by chat runtime."""
 
 from django.test import SimpleTestCase
 
-from chat import direct_inbox
+from direct_inbox import state
 
 
-class ChatDirectInboxModuleTests(SimpleTestCase):
-    def test_module_reexports_state_functions(self):
-        self.assertTrue(callable(direct_inbox.mark_unread))
-        self.assertTrue(callable(direct_inbox.mark_read))
-        self.assertTrue(callable(direct_inbox.get_unread_state))
+class DirectInboxStateModuleTests(SimpleTestCase):
+    def test_module_exports_state_functions(self):
+        self.assertTrue(callable(state.mark_unread))
+        self.assertTrue(callable(state.mark_read))
+        self.assertTrue(callable(state.get_unread_state))

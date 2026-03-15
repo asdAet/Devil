@@ -19,8 +19,8 @@ vi.mock("../pages/ProfilePage", () => ({
 }));
 
 vi.mock("../pages/DirectLayout", () => ({
-  DirectLayout: ({ username }: { username?: string }) => (
-    <div>{username ? `DIRECT_PAGE:${username}` : "DIRECT_PAGE"}</div>
+  DirectLayout: ({ publicRef }: { publicRef?: string }) => (
+    <div>{publicRef ? `DIRECT_PAGE:${publicRef}` : "DIRECT_PAGE"}</div>
   ),
 }));
 
@@ -76,9 +76,9 @@ describe("AppRoutes", () => {
     expect(screen.getByText("REGISTER_PAGE")).toBeInTheDocument();
   });
 
-  it("renders direct by username route", () => {
+  it("renders direct by ref route", () => {
     render(
-      <MemoryRouter initialEntries={["/@alice"]}>
+      <MemoryRouter initialEntries={["/direct/alice"]}>
         <AppRoutes
           user={null}
           error={null}
@@ -91,9 +91,9 @@ describe("AppRoutes", () => {
     expect(screen.getByText("DIRECT_PAGE:alice")).toBeInTheDocument();
   });
 
-  it("treats legacy direct username route as invalid and redirects to home", () => {
+  it("treats legacy /@username route as invalid and redirects to home", () => {
     render(
-      <MemoryRouter initialEntries={["/direct/alice"]}>
+      <MemoryRouter initialEntries={["/@alice"]}>
         <AppRoutes
           user={null}
           error={null}
@@ -121,7 +121,7 @@ describe("AppRoutes", () => {
     expect(screen.getByText("ROOM_PAGE:public")).toBeInTheDocument();
   });
 
-  it("keeps usernames that start with multiple @ symbols", () => {
+  it("normalizes ref route by trimming only one leading @", () => {
     render(
       <MemoryRouter initialEntries={["/users/%40%40%40%40"]}>
         <AppRoutes
@@ -133,7 +133,7 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("USER_PAGE:@@@@")).toBeInTheDocument();
+    expect(screen.getByText("USER_PAGE:@@@")).toBeInTheDocument();
   });
 
   it("redirects invalid room slug to home", () => {

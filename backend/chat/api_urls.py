@@ -1,4 +1,4 @@
-"""Contains chat API routing."""
+﻿"""Contains chat API routing."""
 
 from django.urls import include, path
 
@@ -10,13 +10,14 @@ urlpatterns = [
     path("direct/chats/", api.direct_chats, name="api-direct-chats"),
     path("search/global/", api.global_search, name="api-global-search"),
     path("rooms/unread/", api.unread_counts, name="api-unread-counts"),
-    path("rooms/<str:room_slug>/", include("roles.interfaces.urls")),
-    path("rooms/<path:room_slug>/messages/search/", api.search_messages, name="api-search-messages"),
-    path("rooms/<path:room_slug>/messages/<int:message_id>/reactions/<str:emoji>/", api.message_reaction_remove, name="api-message-reaction-remove"),
-    path("rooms/<path:room_slug>/messages/<int:message_id>/reactions/", api.message_reactions, name="api-message-reactions"),
-    path("rooms/<path:room_slug>/messages/<int:message_id>/", api.message_detail, name="api-message-detail"),
-    path("rooms/<path:room_slug>/messages/", api.room_messages, name="api-room-messages"),
-    path("rooms/<path:room_slug>/attachments/", api.upload_attachments, name="api-upload-attachments"),
-    path("rooms/<path:room_slug>/read/", api.mark_read_view, name="api-mark-read"),
-    path("rooms/<path:room_slug>/", api.room_details, name="api-room-details"),
+    path("rooms/<int:room_id>/", include("roles.interfaces.urls")),
+    path("rooms/<int:room_id>/messages/search/", api.search_messages, name="api-search-messages"),
+    path("rooms/<int:room_id>/messages/<int:message_id>/reactions/<str:emoji>/", api.message_reaction_remove, name="api-message-reaction-remove"),
+    path("rooms/<int:room_id>/messages/<int:message_id>/reactions/", api.message_reactions, name="api-message-reactions"),
+    path("rooms/<int:room_id>/messages/<int:message_id>/", api.message_detail, name="api-message-detail"),
+    path("rooms/<int:room_id>/messages/", api.room_messages, name="api-room-messages"),
+    path("rooms/<int:room_id>/attachments/", api.upload_attachments, name="api-upload-attachments"),
+    path("rooms/<int:room_id>/read/", api.mark_read_view, name="api-mark-read"),
+    path("rooms/<int:room_id>/", api.room_details, name="api-room-details"),
 ]
+

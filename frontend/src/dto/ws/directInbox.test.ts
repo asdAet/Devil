@@ -7,13 +7,13 @@ describe("direct inbox WS DTO decoder", () => {
     const decoded = decodeDirectInboxWsEvent(
       JSON.stringify({
         type: "direct_unread_state",
-        unread: { slugs: ["dm_1"] },
+        unread: { roomIds: [1] },
       }),
     );
 
     expect(decoded.type).toBe("direct_unread_state");
     if (decoded.type === "direct_unread_state") {
-      expect(decoded.unread.counts).toEqual({ dm_1: 1 });
+      expect(decoded.unread.counts).toEqual({ 1: 1 });
       expect(decoded.unread.dialogs).toBe(1);
     }
   });
@@ -23,7 +23,7 @@ describe("direct inbox WS DTO decoder", () => {
       JSON.stringify({
         type: "direct_inbox_item",
         item: {
-          slug: "dm_1",
+          roomId: 1,
           peer: {
             username: "alice",
             profileImage: null,

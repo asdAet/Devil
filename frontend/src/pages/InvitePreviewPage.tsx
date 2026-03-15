@@ -37,7 +37,7 @@ export function InvitePreviewPage({ code, onNavigate }: Props) {
     setError(null);
     try {
       const result = await groupController.joinViaInvite(code);
-      onNavigate(`/rooms/${result.slug}`);
+      onNavigate(`/rooms/${result.roomId}`);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err

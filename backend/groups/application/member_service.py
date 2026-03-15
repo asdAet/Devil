@@ -1,4 +1,4 @@
-"""Group member management: join, leave, kick, ban, mute."""
+﻿"""Group member management: join, leave, kick, ban, mute."""
 
 from __future__ import annotations
 
@@ -41,8 +41,10 @@ def _broadcast_membership_revoked(room: Room, target_user_id: int) -> None:
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
-    room_identifier = room.pk if getattr(room, "pk", None) else room.slug
-    group_name = f"chat_room_{room_identifier}"
+    room_id = getattr(room, "pk", None)
+    if room_id is None:
+        return
+    group_name = f"chat_room_{int(room_id)}"
     async_to_sync(channel_layer.group_send)(
         group_name,
         {
@@ -89,10 +91,10 @@ def _ensure_not_self(actor, target_user_id: int) -> None:
         raise GroupError("Нельзя применить это действие к самому себе")
 
 
-def join_group(actor, room_slug: str) -> Membership:
+def join_group(actor, room_id: int) -> Membership:
     """Join a public group directly."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     if not room.is_public:
         raise GroupForbiddenError("Для вступления в эту группу требуется ссылка-приглашение")
@@ -128,17 +130,17 @@ def join_group(actor, room_slug: str) -> Membership:
         "group.member.joined",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
     )
     return membership
 
 
-def leave_group(actor, room_slug: str) -> None:
+def leave_group(actor, room_id: int) -> None:
     """Leave a group. Owners cannot leave without transferring ownership."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     membership = _get_membership_or_raise(room, actor)
 
@@ -157,16 +159,16 @@ def leave_group(actor, room_slug: str) -> None:
         "group.member.left",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
     )
 
 
-def kick_member(actor, room_slug: str, target_user_id: int) -> None:
+def kick_member(actor, room_id: int, target_user_id: int) -> None:
     """Kick a member from the group."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.KICK_MEMBERS):
@@ -180,7 +182,7 @@ def kick_member(actor, room_slug: str, target_user_id: int) -> None:
 
     _ensure_hierarchy(room, actor, target_membership)
 
-    target_username = target_membership.user.username
+    target_username = user_public_username(target_membership.user)
     with transaction.atomic():
         was_active = not target_membership.is_banned
         target_membership.delete()
@@ -194,9 +196,9 @@ def kick_member(actor, room_slug: str, target_user_id: int) -> None:
         "group.member.kicked",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         target_user_id=target_user_id,
         target_username=target_username,
     )
@@ -204,14 +206,14 @@ def kick_member(actor, room_slug: str, target_user_id: int) -> None:
 
 def ban_member(
     actor,
-    room_slug: str,
+    room_id: int,
     target_user_id: int,
     *,
     reason: str = "",
 ) -> None:
     """Ban a member from the group."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.BAN_MEMBERS):
@@ -235,9 +237,9 @@ def ban_member(
             "group.member.banned",
             actor_user=actor,
             actor_user_id=getattr(actor, "pk", None),
-            actor_username=getattr(actor, "username", None),
+            actor_username=user_public_username(actor),
             is_authenticated=True,
-            room_slug=room.slug,
+            room_id=room.pk,
             target_user_id=target_user_id,
             reason=reason,
         )
@@ -263,18 +265,18 @@ def ban_member(
         "group.member.banned",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         target_user_id=target_user_id,
         reason=reason,
     )
 
 
-def unban_member(actor, room_slug: str, target_user_id: int) -> None:
+def unban_member(actor, room_id: int, target_user_id: int) -> None:
     """Unban a member from the group."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     if not has_permission(room, actor, Perm.BAN_MEMBERS):
         raise GroupForbiddenError("Отсутствует разрешение BAN_MEMBERS")
@@ -292,23 +294,23 @@ def unban_member(actor, room_slug: str, target_user_id: int) -> None:
         "group.member.unbanned",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         target_user_id=target_user_id,
     )
 
 
 def mute_member(
     actor,
-    room_slug: str,
+    room_id: int,
     target_user_id: int,
     *,
     duration_seconds: int,
 ) -> Membership:
     """Mute a member for a specified duration."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.MUTE_MEMBERS):
@@ -335,19 +337,19 @@ def mute_member(
         "group.member.muted",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         target_user_id=target_user_id,
         duration_seconds=duration_seconds,
     )
     return target_membership
 
 
-def unmute_member(actor, room_slug: str, target_user_id: int) -> Membership:
+def unmute_member(actor, room_id: int, target_user_id: int) -> Membership:
     """Unmute a member."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
     _ensure_not_self(actor, int(target_user_id))
 
     if not has_permission(room, actor, Perm.MUTE_MEMBERS):
@@ -367,20 +369,26 @@ def unmute_member(actor, room_slug: str, target_user_id: int) -> Membership:
         "group.member.unmuted",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         target_user_id=target_user_id,
     )
     return target_membership
 
 
 def list_members(
-    actor, room_slug: str, *, page: int = 1, page_size: int = 50, request=None
+    actor,
+    room_id: int,
+    *,
+    before_id: int | None = None,
+    limit: int = 50,
+    request=None,
 ) -> dict:
     """List group members with their roles."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
+    limit = max(1, min(int(limit), 200))
 
     if not has_permission(room, actor, Perm.READ_MESSAGES):
         raise GroupForbiddenError("Нет доступа к просмотру участников")
@@ -389,12 +397,17 @@ def list_members(
         Membership.objects.filter(room=room, is_banned=False)
         .select_related("user", "user__profile")
         .prefetch_related("roles")
-        .order_by("joined_at")
     )
 
     total = qs.count()
-    offset = (max(1, page) - 1) * page_size
-    members = list(qs[offset : offset + page_size])
+    if before_id is not None:
+        qs = qs.filter(id__lt=int(before_id))
+    batch = list(qs.order_by("-id")[: limit + 1])
+    has_more = len(batch) > limit
+    if has_more:
+        batch = batch[:limit]
+    next_before = int(batch[-1].pk) if has_more and batch else None
+
     actor_user_id = getattr(actor, "pk", None)
 
     def _member_dict(m):
@@ -432,19 +445,27 @@ def list_members(
         }
 
     return {
-        "items": [_member_dict(m) for m in members],
+        "items": [_member_dict(m) for m in batch],
         "total": total,
-        "page": page,
-        "pageSize": page_size,
+        "pagination": {
+            "limit": limit,
+            "hasMore": has_more,
+            "nextBefore": next_before,
+        },
     }
 
 
 def list_banned(
-    actor, room_slug: str, *, page: int = 1, page_size: int = 50
+    actor,
+    room_id: int,
+    *,
+    before_id: int | None = None,
+    limit: int = 50,
 ) -> dict:
     """List banned members. Requires BAN_MEMBERS permission."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
+    limit = max(1, min(int(limit), 200))
 
     if not has_permission(room, actor, Perm.BAN_MEMBERS):
         raise GroupForbiddenError("Отсутствует разрешение BAN_MEMBERS")
@@ -452,12 +473,16 @@ def list_banned(
     qs = (
         Membership.objects.filter(room=room, is_banned=True)
         .select_related("user", "banned_by")
-        .order_by("-joined_at")
     )
 
     total = qs.count()
-    offset = (max(1, page) - 1) * page_size
-    banned = list(qs[offset : offset + page_size])
+    if before_id is not None:
+        qs = qs.filter(id__lt=int(before_id))
+    batch = list(qs.order_by("-id")[: limit + 1])
+    has_more = len(batch) > limit
+    if has_more:
+        batch = batch[:limit]
+    next_before = int(batch[-1].pk) if has_more and batch else None
 
     return {
         "items": [
@@ -467,18 +492,21 @@ def list_banned(
                 "reason": m.ban_reason,
                 "bannedBy": user_public_username(m.banned_by) if m.banned_by else None,
             }
-            for m in banned
+            for m in batch
         ],
         "total": total,
-        "page": page,
-        "pageSize": page_size,
+        "pagination": {
+            "limit": limit,
+            "hasMore": has_more,
+            "nextBefore": next_before,
+        },
     }
 
 
-def approve_join_request(actor, room_slug: str, request_id: int) -> Membership:
+def approve_join_request(actor, room_id: int, request_id: int) -> Membership:
     """Approve a pending join request."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     if not has_permission(room, actor, Perm.KICK_MEMBERS):
         raise GroupForbiddenError("Отсутствует разрешение на управление заявками на вступление")
@@ -518,19 +546,19 @@ def approve_join_request(actor, room_slug: str, request_id: int) -> Membership:
         "group.join_request.approved",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         request_id=request_id,
         target_user_id=join_req.user_id,
     )
     return membership
 
 
-def reject_join_request(actor, room_slug: str, request_id: int) -> None:
+def reject_join_request(actor, room_id: int, request_id: int) -> None:
     """Reject a pending join request."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     if not has_permission(room, actor, Perm.KICK_MEMBERS):
         raise GroupForbiddenError("Отсутствует разрешение на управление заявками на вступление")
@@ -550,17 +578,17 @@ def reject_join_request(actor, room_slug: str, request_id: int) -> None:
         "group.join_request.rejected",
         actor_user=actor,
         actor_user_id=getattr(actor, "pk", None),
-        actor_username=getattr(actor, "username", None),
+        actor_username=user_public_username(actor),
         is_authenticated=True,
-        room_slug=room.slug,
+        room_id=room.pk,
         request_id=request_id,
     )
 
 
-def list_join_requests(actor, room_slug: str) -> list[dict]:
+def list_join_requests(actor, room_id: int) -> list[dict]:
     """List pending join requests."""
     _ensure_authenticated(actor)
-    room = _load_group_or_raise(room_slug)
+    room = _load_group_or_raise(room_id)
 
     if not has_permission(room, actor, Perm.KICK_MEMBERS):
         raise GroupForbiddenError("Отсутствует разрешение на просмотр заявок на вступление")
@@ -574,9 +602,11 @@ def list_join_requests(actor, room_slug: str) -> list[dict]:
         {
             "id": r.pk,
             "userId": r.user_id,
-            "username": r.user.username,
+            "username": user_public_username(r.user),
             "message": r.message,
             "createdAt": r.created_at.isoformat(),
         }
         for r in requests
     ]
+
+

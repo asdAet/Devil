@@ -93,7 +93,7 @@ describe("DirectChatsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /alice/i }));
 
-    expect(onNavigate).toHaveBeenCalledWith("/@alice");
+    expect(onNavigate).toHaveBeenCalledWith("/direct/alice");
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(
       container.querySelector('[data-size="tiny"][data-online="true"]'),

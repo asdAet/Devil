@@ -1,34 +1,27 @@
 import { z } from "zod";
 
-import { getChatRoomSlugRegExp } from "../../shared/config/limits";
-
-const usernameSchema = z
-  .string()
-  .transform((value) => value.trim())
-  .transform((value) => {
-    if (!value.startsWith("@")) return value;
-    const next = value.slice(1);
-    return next.startsWith("@") ? value : next;
-  })
-  .refine((value) => value.length > 0, "Требуется имя пользователя");
+import { normalizePublicRef } from "../../shared/lib/publicRef";
 
 /**
- * Декодирует slug комнаты из route-параметра.
- * @param value Сырое значение из маршрута.
- * @returns Валидный slug или null.
+ * Декодирует roomRef из route-параметра.
+ * Разрешены: `public` и положительный roomId.
  */
-export const decodeRoomSlugParam = (value: unknown): string | null => {
-  const roomSlugSchema = z.string().regex(getChatRoomSlugRegExp());
-  const parsed = roomSlugSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+export const decodeRoomRefParam = (value: unknown): string | null => {
+  if (value === "public") return "public";
+  const parsed = z.string().regex(/^\d+$/).safeParse(value);
+  if (!parsed.success) return null;
+  const numeric = Number(parsed.data);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return String(Math.trunc(numeric));
 };
 
 /**
- * Декодирует username из route-параметра.
- * @param value Сырое значение из маршрута.
- * @returns Валидный username без префикса @ или null.
+ * Декодирует public ref из route-параметра.
+ * Нормализует `@handle` -> `handle`.
  */
-export const decodeUsernameParam = (value: unknown): string | null => {
-  const parsed = usernameSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+export const decodePublicRefParam = (value: unknown): string | null => {
+  const parsed = z.string().safeParse(value);
+  if (!parsed.success) return null;
+  const normalized = normalizePublicRef(parsed.data);
+  return normalized.length > 0 ? normalized : null;
 };

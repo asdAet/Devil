@@ -12,5 +12,12 @@ export async function getPublicRoom(
   apiClient: AxiosInstance,
 ): Promise<RoomDetails> {
   const response = await apiClient.get<unknown>("/chat/public-room/");
-  return decodePublicRoomResponse(response.data);
+  const payload =
+    typeof response.data === "object" && response.data !== null
+      ? (response.data as Record<string, unknown>)
+      : {};
+  return decodePublicRoomResponse({
+    ...payload,
+    roomRef: "public",
+  });
 }

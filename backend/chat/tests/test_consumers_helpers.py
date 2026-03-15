@@ -26,6 +26,7 @@ from presence.constants import PRESENCE_CLOSE_IDLE_CODE
 from presence.consumers import PresenceConsumer, _ws_connect_rate_limited as _presence_ws_connect_rate_limited
 from rooms.services import ensure_membership
 from rooms.models import Room
+from users.identity import set_user_public_handle
 from users.models import SecurityRateLimitBucket
 
 User = get_user_model()
@@ -152,14 +153,14 @@ class ChatConsumerInternalTests(TestCase):
                 'message': 'hello',
                 'username': 'chat_internal_user',
                 'profile_pic': '/media/default.jpg',
-                'room': 'private123',
+                'roomId': 123,
             }
         )
 
         consumer.send.assert_awaited_once()
         payload = json.loads(consumer.send.await_args.kwargs['text_data'])
         self.assertEqual(payload['message'], 'hello')
-        self.assertEqual(payload['room'], 'private123')
+        self.assertEqual(payload['roomId'], 123)
 
     def test_receive_ignores_message_for_anonymous_user(self):
         """Проверяет сценарий `test_receive_ignores_message_for_anonymous_user`."""
@@ -244,6 +245,7 @@ class PresenceConsumerInternalTests(TestCase):
         """Проверяет сценарий `setUp`."""
         cache.clear()
         self.user = User.objects.create_user(username='presence_internal_user', password='pass12345')
+        set_user_public_handle(self.user, self.user.username)
 
     def _consumer(self, user=None):
         """Проверяет сценарий `_consumer`."""
@@ -601,7 +603,7 @@ class DirectInboxConsumerInternalTests(TestCase):
         consumer._touch_active_room.assert_awaited_once()
 
         async_to_sync(consumer.receive)('not-json')
-        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomSlug': 123}))
+        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomId': 'bad'}))
         consumer._send_error.assert_awaited_with('invalid_payload')
 
     def test_receive_set_active_room_branches(self):
@@ -613,28 +615,28 @@ class DirectInboxConsumerInternalTests(TestCase):
         consumer._load_room = AsyncMock(return_value=Room(slug='private123', name='p', kind=Room.Kind.PRIVATE))
         consumer._can_read = AsyncMock(return_value=False)
 
-        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomSlug': None}))
+        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomId': None}))
         consumer._clear_active_room.assert_awaited_once_with(conn_only=True)
 
-        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomSlug': 'bad/slug'}))
-        consumer._send_error.assert_awaited_with('forbidden')
+        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomId': 0}))
+        consumer._send_error.assert_any_await('forbidden')
 
-        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomSlug': 'private123'}))
-        consumer._send_error.assert_awaited_with('forbidden')
+        async_to_sync(consumer.receive)(json.dumps({'type': 'set_active_room', 'roomId': 123}))
+        consumer._send_error.assert_any_await('forbidden')
 
     def test_receive_mark_read_branches(self):
         """Проверяет сценарий `test_receive_mark_read_branches`."""
         consumer = self._consumer()
         consumer._send_error = AsyncMock()
-        consumer._mark_read = AsyncMock(return_value={'dialogs': 0, 'slugs': []})
+        consumer._mark_read = AsyncMock(return_value={'dialogs': 0, 'roomIds': []})
         consumer._load_room = AsyncMock(return_value=None)
         consumer._can_read = AsyncMock(return_value=False)
 
-        async_to_sync(consumer.receive)(json.dumps({'type': 'mark_read', 'roomSlug': 123}))
+        async_to_sync(consumer.receive)(json.dumps({'type': 'mark_read', 'roomId': 'bad'}))
         consumer._send_error.assert_awaited_with('invalid_payload')
 
-        async_to_sync(consumer.receive)(json.dumps({'type': 'mark_read', 'roomSlug': 'bad/slug'}))
-        consumer._send_error.assert_awaited_with('forbidden')
+        async_to_sync(consumer.receive)(json.dumps({'type': 'mark_read', 'roomId': 0}))
+        consumer._send_error.assert_any_await('forbidden')
 
     def test_direct_event_and_disconnect_and_watchdogs(self):
         """Проверяет сценарий `test_direct_event_and_disconnect_and_watchdogs`."""

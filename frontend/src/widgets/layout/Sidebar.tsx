@@ -5,6 +5,7 @@ import type { UserProfile } from "../../entities/user/types";
 import { useConversationList } from "../../shared/conversationList/ConversationListProvider";
 import { useDirectInbox } from "../../shared/directInbox";
 import { formatFullName } from "../../shared/lib/format";
+import { buildUserProfilePath, formatPublicRef } from "../../shared/lib/publicRef";
 import { Avatar, Button } from "../../shared/ui";
 import { ConversationList } from "../sidebar/ConversationList";
 import styles from "../../styles/layout/Sidebar.module.css";
@@ -180,10 +181,9 @@ export function Sidebar({ user, onNavigate, onLogout }: Props) {
       ) || "Без имени"
     : "Без имени";
   const publicUsername = (user?.username || "").trim();
-  const profileIdentity = publicUsername || fullName;
-  const profilePath = publicUsername
-    ? `/users/${encodeURIComponent(publicUsername)}`
-    : "/profile";
+  const publicRef = (user?.publicRef || publicUsername).trim();
+  const profileIdentity = publicUsername || publicRef || fullName;
+  const profilePath = publicRef ? buildUserProfilePath(publicRef) : "/profile";
 
   return (
     <aside className={styles.sidebar}>
@@ -208,8 +208,8 @@ export function Sidebar({ user, onNavigate, onLogout }: Props) {
                 />
                 <div className={styles.userIdentity}>
                   <span className={styles.drawerUserName}>{fullName}</span>
-                  {publicUsername && (
-                    <span className={styles.userHandle}>@{publicUsername}</span>
+                  {publicRef && (
+                    <span className={styles.userHandle}>{formatPublicRef(publicRef)}</span>
                   )}
                 </div>
               </div>
@@ -356,8 +356,8 @@ export function Sidebar({ user, onNavigate, onLogout }: Props) {
             />
             <div className={styles.userIdentity}>
               <span className={styles.userName}>{fullName}</span>
-              {publicUsername && (
-                <span className={styles.userHandle}>@{publicUsername}</span>
+              {publicRef && (
+                <span className={styles.userHandle}>{formatPublicRef(publicRef)}</span>
               )}
             </div>
           </button>

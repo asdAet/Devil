@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
-import { decodeRoomSlugParam, decodeUsernameParam } from "../dto";
+import { decodePublicRefParam, decodeRoomRefParam } from "../dto";
 import type { UserProfile } from "../entities/user/types";
 import { ChatRoomPage } from "../pages/ChatRoomPage";
 import { DirectLayout } from "../pages/DirectLayout";
@@ -25,13 +25,16 @@ type AppRoutesProps = {
   passwordRules: string[];
   googleAuthDisabledReason: string | null;
   onNavigate: (path: string) => void;
-  onLogin: (email: string, password: string) => Promise<void>;
+  onLogin: (identifier: string, password: string) => Promise<void>;
   onGoogleOAuth: () => Promise<void>;
-  onRegister: (
-    email: string,
-    password1: string,
-    password2: string,
-  ) => Promise<void>;
+  onRegister: (payload: {
+    login: string;
+    password: string;
+    passwordConfirm: string;
+    name: string;
+    username?: string;
+    email?: string;
+  }) => Promise<void>;
   onLogout: () => Promise<void>;
   onProfileSave: (fields: {
     name?: string;
@@ -49,17 +52,17 @@ function UserProfileRoute({
   onNavigate,
   onLogout,
 }: Pick<AppRoutesProps, "user" | "onNavigate" | "onLogout">) {
-  const params = useParams<{ username: string }>();
-  const username = decodeUsernameParam(params.username);
-  if (!username) {
+  const params = useParams<{ ref: string }>();
+  const ref = decodePublicRefParam(params.ref);
+  if (!ref) {
     return <Navigate to="/" replace />;
   }
 
   return (
     <UserProfilePage
-      key={username}
+      key={ref}
       user={user}
-      username={username}
+      username={ref}
       currentUser={user}
       onNavigate={onNavigate}
       onLogout={onLogout}
@@ -70,40 +73,34 @@ function UserProfileRoute({
 /**
  * Обертка для direct-чата по username из URL.
  */
-function DirectByUsernameRoute({
+function DirectRoute({
   user,
   onNavigate,
 }: Pick<AppRoutesProps, "user" | "onNavigate">) {
-  const params = useParams<{ username: string }>();
-  const rawUsername = params.username || "";
-  if (!rawUsername.startsWith("@")) {
-    return <Navigate to="/" replace />;
-  }
-  const username = decodeUsernameParam(rawUsername);
-  if (!username) {
+  const params = useParams<{ ref: string }>();
+  const ref = decodePublicRefParam(params.ref);
+  if (!ref) {
     return <Navigate to="/direct" replace />;
   }
 
-  return (
-    <DirectLayout user={user} username={username} onNavigate={onNavigate} />
-  );
+  return <DirectLayout user={user} publicRef={ref} onNavigate={onNavigate} />;
 }
 
 /**
- * Обертка для комнаты с валидацией slug.
+ * Обертка для комнаты с валидацией roomRef.
  */
 function RoomRoute({
   user,
   onNavigate,
 }: Pick<AppRoutesProps, "user" | "onNavigate">) {
-  const params = useParams<{ slug: string }>();
-  const slug = decodeRoomSlugParam(params.slug);
-  if (!slug) {
+  const params = useParams<{ roomRef: string }>();
+  const roomRef = decodeRoomRefParam(params.roomRef);
+  if (!roomRef) {
     return <Navigate to="/" replace />;
   }
 
   return (
-    <ChatRoomPage key={slug} slug={slug} user={user} onNavigate={onNavigate} />
+    <ChatRoomPage key={roomRef} slug={roomRef} user={user} onNavigate={onNavigate} />
   );
 }
 
@@ -203,11 +200,11 @@ export function AppRoutes({
         element={<DirectLayout user={user} onNavigate={onNavigate} />}
       />
       <Route
-        path="/:username"
-        element={<DirectByUsernameRoute user={user} onNavigate={onNavigate} />}
+        path="/direct/:ref"
+        element={<DirectRoute user={user} onNavigate={onNavigate} />}
       />
       <Route
-        path="/users/:username"
+        path="/users/:ref"
         element={
           <UserProfileRoute
             user={user}
@@ -217,7 +214,7 @@ export function AppRoutes({
         }
       />
       <Route
-        path="/rooms/:slug"
+        path="/rooms/:roomRef"
         element={<RoomRoute user={user} onNavigate={onNavigate} />}
       />
       <Route path="*" element={<Navigate to="/" replace />} />

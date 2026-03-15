@@ -140,6 +140,7 @@ vi.mock("../../shared/ui", () => ({
 import { GroupInfoPanel } from "./GroupInfoPanel";
 
 const sampleGroup: Group = {
+  roomId: 101,
   slug: "test-group",
   name: "Test Group",
   description: "Test description",

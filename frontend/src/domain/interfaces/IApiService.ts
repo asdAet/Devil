@@ -32,9 +32,7 @@ import type { AvatarCrop } from "../../shared/api/users";
 
 export type UpdateProfileInput = {
   name?: string;
-  last_name?: string;
   username?: string;
-  email?: string;
   image?: File | null;
   avatarCrop?: AvatarCrop | null;
   bio?: string;
@@ -68,7 +66,7 @@ export type RoomMessagesResponse = {
 };
 
 export type DirectStartResponse = {
-  slug: string;
+  roomId: number;
   kind: RoomKind;
   peer: RoomPeer;
 };
@@ -101,11 +99,22 @@ export interface IApiService {
 
   getSession(): Promise<SessionResponse>;
 
-  login(email: string, password: string): Promise<SessionResponse>;
+  login(identifier: string, password: string): Promise<SessionResponse>;
 
-  oauthGoogle(accessToken: string): Promise<SessionResponse>;
+  oauthGoogle(
+    token: string,
+    tokenType?: "idToken" | "accessToken",
+    username?: string,
+  ): Promise<SessionResponse>;
 
-  register(email: string, password1: string, password2: string): Promise<SessionResponse>;
+  register(
+    login: string,
+    password: string,
+    passwordConfirm: string,
+    name: string,
+    username?: string,
+    email?: string,
+  ): Promise<SessionResponse>;
 
   getPasswordRules(): Promise<{ rules: string[] }>;
 
@@ -122,11 +131,11 @@ export interface IApiService {
     params?: { limit?: number; beforeId?: number },
   ): Promise<RoomMessagesResponse>;
 
-  startDirectChat(username: string): Promise<DirectStartResponse>;
+  startDirectChat(publicRef: string): Promise<DirectStartResponse>;
 
   getDirectChats(): Promise<DirectChatsResponse>;
 
-  getUserProfile(username: string): Promise<{ user: UserProfile }>;
+  getUserProfile(publicRef: string): Promise<{ user: UserProfile }>;
 
   // --- Phase 2+3: Messages & Rooms ---
   getUnreadCounts(): Promise<UnreadCountItem[]>;
@@ -179,23 +188,29 @@ export interface IApiService {
   }): Promise<Group>;
   getPublicGroups(params?: {
     search?: string;
-    page?: number;
-    pageSize?: number;
+    limit?: number;
+    before?: number;
   }): Promise<{
     items: GroupListItem[];
     total: number;
-    page: number;
-    pageSize: number;
+    pagination: {
+      limit: number;
+      hasMore: boolean;
+      nextBefore: number | null;
+    };
   }>;
   getMyGroups(params?: {
     search?: string;
-    page?: number;
-    pageSize?: number;
+    limit?: number;
+    before?: number;
   }): Promise<{
     items: GroupListItem[];
     total: number;
-    page: number;
-    pageSize: number;
+    pagination: {
+      limit: number;
+      hasMore: boolean;
+      nextBefore: number | null;
+    };
   }>;
   getGroupDetails(slug: string): Promise<Group>;
   updateGroup(slug: string, data: UpdateGroupInput): Promise<Group>;
@@ -204,8 +219,16 @@ export interface IApiService {
   leaveGroup(slug: string): Promise<void>;
   getGroupMembers(
     slug: string,
-    params?: { page?: number; pageSize?: number },
-  ): Promise<{ items: GroupMember[]; total: number }>;
+    params?: { limit?: number; before?: number },
+  ): Promise<{
+    items: GroupMember[];
+    total: number;
+    pagination: {
+      limit: number;
+      hasMore: boolean;
+      nextBefore: number | null;
+    };
+  }>;
   kickMember(slug: string, userId: number): Promise<void>;
   banMember(slug: string, userId: number, reason?: string): Promise<void>;
   unbanMember(slug: string, userId: number): Promise<void>;
@@ -217,7 +240,16 @@ export interface IApiService {
   unmuteMember(slug: string, userId: number): Promise<void>;
   getBannedMembers(
     slug: string,
-  ): Promise<{ items: BannedMember[]; total: number }>;
+    params?: { limit?: number; before?: number },
+  ): Promise<{
+    items: BannedMember[];
+    total: number;
+    pagination: {
+      limit: number;
+      hasMore: boolean;
+      nextBefore: number | null;
+    };
+  }>;
   createInvite(
     slug: string,
     data?: { maxUses?: number; expiresInHours?: number },
@@ -225,7 +257,7 @@ export interface IApiService {
   getInvites(slug: string): Promise<GroupInvite[]>;
   revokeInvite(slug: string, code: string): Promise<void>;
   getInvitePreview(code: string): Promise<InvitePreview>;
-  joinViaInvite(code: string): Promise<{ slug: string }>;
+  joinViaInvite(code: string): Promise<{ roomId: number }>;
   getJoinRequests(slug: string): Promise<JoinRequest[]>;
   approveJoinRequest(slug: string, requestId: number): Promise<void>;
   rejectJoinRequest(slug: string, requestId: number): Promise<void>;
@@ -304,6 +336,7 @@ export type ReactionResult = {
 export type SearchResultItem = {
   id: number;
   username: string;
+  displayName?: string;
   content: string;
   createdAt: string;
   highlight: string | null;
@@ -317,8 +350,11 @@ export type UploadResult = {
   content: string;
   attachments: Attachment[];
 };
-export type ReadStateResult = { roomSlug: string; lastReadMessageId: number };
-export type UnreadCountItem = { roomSlug: string; unreadCount: number };
+export type ReadStateResult = {
+  roomId: number;
+  lastReadMessageId: number | null;
+};
+export type UnreadCountItem = { roomId: number; unreadCount: number };
 
 export type UploadAttachmentsOptions = {
   onProgress?: (percent: number) => void;
@@ -331,6 +367,7 @@ export type RoomAttachmentItem = Attachment & {
   messageId: number;
   createdAt: string;
   username: string;
+  displayName?: string;
 };
 
 export type RoomAttachmentsResult = {
@@ -344,16 +381,17 @@ export type RoomAttachmentsResult = {
 
 export type GlobalSearchUser = {
   username: string;
+  displayName?: string;
   profileImage: string | null;
   avatarCrop: AvatarCrop | null;
   lastSeen: string | null;
 };
 
 export type GlobalSearchGroup = {
-  slug: string;
+  roomId: number;
   name: string;
   description: string;
-  username: string | null;
+  publicRef: string;
   memberCount: number;
   isPublic: boolean;
 };
@@ -361,9 +399,10 @@ export type GlobalSearchGroup = {
 export type GlobalSearchMessage = {
   id: number;
   username: string;
+  displayName?: string;
   content: string;
   createdAt: string;
-  roomSlug: string;
+  roomId: number;
   roomName: string;
   roomKind: RoomKind;
 };

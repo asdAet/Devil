@@ -56,16 +56,34 @@ export function ContextMenu({ items, x, y, onClose }: Props) {
   }, [reposition]);
 
   useEffect(() => {
-    const handleClick = () => onClose();
+    const handlePointerDown = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        onClose();
+        return;
+      }
+      if (ref.current?.contains(target)) return;
+      onClose();
+    };
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    document.addEventListener("click", handleClick);
-    document.addEventListener("contextmenu", handleClick);
+    const supportsPointer =
+      typeof window !== "undefined" && "PointerEvent" in window;
+    if (supportsPointer) {
+      document.addEventListener("pointerdown", handlePointerDown);
+    } else {
+      document.addEventListener("touchstart", handlePointerDown);
+      document.addEventListener("mousedown", handlePointerDown);
+    }
     document.addEventListener("keydown", handleKey);
     return () => {
-      document.removeEventListener("click", handleClick);
-      document.removeEventListener("contextmenu", handleClick);
+      if (supportsPointer) {
+        document.removeEventListener("pointerdown", handlePointerDown);
+      } else {
+        document.removeEventListener("touchstart", handlePointerDown);
+        document.removeEventListener("mousedown", handlePointerDown);
+      }
       document.removeEventListener("keydown", handleKey);
     };
   }, [onClose]);

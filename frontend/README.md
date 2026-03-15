@@ -25,5 +25,5 @@ npm run build
 - CSRF-cookie выдаётся через `GET /api/auth/csrf/`.
 - Сессия: `GET /api/auth/session/`.
 - Вход/регистрация: `POST /api/auth/login/`, `POST /api/auth/register/`.
-- Профиль: `GET/POST /api/auth/profile/`.
+- Профиль: `GET/POST /api/profile/`.
 - Чаты: `GET /api/chat/public-room/`, `GET /api/chat/rooms/<room>/`, `GET /api/chat/rooms/<room>/messages/`.

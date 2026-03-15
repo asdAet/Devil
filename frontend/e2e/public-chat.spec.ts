@@ -1,22 +1,10 @@
 ﻿import { expect, test, type Page } from "@playwright/test";
+import { ensureAuthenticated, registerWithRetry } from "./helpers/auth";
 
 async function register(page: Page, username: string, password: string) {
-  const email = `${username}@e2e.local`;
-  await page.goto("/register");
-  await page.getByTestId("auth-email-input").fill(email);
-  await page.getByTestId("auth-password-input").fill(password);
-  await page.getByTestId("auth-confirm-input").fill(password);
-
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes("/api/auth/register/") &&
-        response.request().method() === "POST",
-    ),
-    page.getByTestId("auth-submit-button").click(),
-  ]);
-
-  await expect(page).toHaveURL("/", { timeout: 10_000 });
+  await registerWithRetry(page, username, password);
+  await ensureAuthenticated(page, username, password);
+  return username;
 }
 
 test("public chat allows authenticated send and keeps guest read-only mode", async ({
@@ -27,23 +15,27 @@ test("public chat allows authenticated send and keeps guest read-only mode", asy
   const password = "pass12345";
   const text = `hello-${Date.now()}`;
 
-  await register(page, username, password);
+  const login = await register(page, username, password);
 
   await page.goto("/rooms/public");
+  const authCallout = page.getByTestId("chat-auth-callout");
+  if (await authCallout.isVisible().catch(() => false)) {
+    await ensureAuthenticated(page, login, password);
+    await page.goto("/rooms/public");
+  }
+
   const joinCallout = page.getByTestId("group-join-callout");
-  if (await joinCallout.isVisible()) {
+  if (await joinCallout.isVisible().catch(() => false)) {
     await joinCallout
-      .getByRole("button", { name: "РџСЂРёСЃРѕРµРґРёРЅРёС‚СЊСЃСЏ" })
+      .getByRole("button", { name: /Присоединиться|Join/i })
       .click();
   }
 
   const input = page.getByTestId("chat-message-input");
   await expect(input).toBeVisible({ timeout: 30_000 });
 
-  // while (true) {
   await input.fill(text);
   await page.getByTestId("chat-send-button").click();
-  // }
 
   await expect(
     page.getByRole("article").filter({ hasText: text }).first(),

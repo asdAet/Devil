@@ -1,6 +1,7 @@
 import type { AvatarCrop } from "../../shared/api/users";
 
 export type Group = {
+  roomId: number;
   slug: string;
   name: string;
   description: string;
@@ -15,6 +16,7 @@ export type Group = {
 };
 
 export type GroupListItem = {
+  roomId: number;
   slug: string;
   name: string;
   description: string;
@@ -50,7 +52,7 @@ export type GroupInvite = {
 
 export type InvitePreview = {
   code: string;
-  groupSlug: string;
+  groupId: number;
   groupName: string;
   groupDescription: string;
   memberCount: number;

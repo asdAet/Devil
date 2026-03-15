@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import IntegrityError, OperationalError, transaction
 
 from roles.models import Membership, Role
+from users.identity import user_public_username
 
 from .models import Room
 
@@ -37,7 +38,7 @@ def parse_pair_key_users(pair_key: str | None) -> tuple[int, int] | None:
         return None
 
 
-# ── Membership helpers ──────────────────────────────────────────────────
+# -- Membership helpers --------------------------------------------------
 
 def ensure_membership(room: Room, user, role_name: str | None = None) -> Membership:
     """Get or create a Membership, optionally assigning a role by name.
@@ -96,38 +97,20 @@ def ensure_direct_memberships(room: Room, initiator, peer) -> None:
             membership.save(update_fields=["is_banned", "ban_reason", "banned_by"])
 
 
-# ── Backward-compatible aliases ─────────────────────────────────────────
-
-def ensure_role(room: Room, user, role: str, granted_by=None):
-    """Backward-compatible wrapper: maps old role strings to new system."""
-    _OLD_TO_NEW = {
-        "owner": "Owner",
-        "admin": "Admin",
-        "member": "Member",
-        "viewer": "Viewer",
-    }
-    role_name = _OLD_TO_NEW.get(role, role)
-    return ensure_membership(room, user, role_name=role_name)
 
 
-def ensure_room_owner_role(room: Room):
-    """Backward-compatible alias for ensure_room_owner."""
-    return ensure_room_owner(room)
-
-
-def ensure_direct_roles(room: Room, initiator, peer, created: bool = False):
-    """Backward-compatible alias for ensure_direct_memberships."""
-    return ensure_direct_memberships(room, initiator, peer)
-
-
-# ── Direct room creation ───────────────────────────────────────────────
+# -- Direct room creation -----------------------------------------------
 
 def _create_or_get_direct_room(initiator, target, pair_key: str, slug: str):
+    initiator_ref = user_public_username(initiator) or f"user_{initiator.pk}"
+    target_ref = user_public_username(target) or f"user_{target.pk}"
+    room_display_name = f"{initiator_ref} - {target_ref}"[:50]
+
     room, created = Room.objects.get_or_create(
         direct_pair_key=pair_key,
         defaults={
             "slug": slug,
-            "name": f"{initiator.username} - {target.username}",
+            "name": room_display_name,
             "kind": Room.Kind.DIRECT,
             "created_by": initiator,
         },
@@ -141,7 +124,7 @@ def _create_or_get_direct_room(initiator, target, pair_key: str, slug: str):
         room.slug = slug
         changed_fields.append("slug")
     if not room.name:
-        room.name = f"{initiator.username} - {target.username}"
+        room.name = room_display_name
         changed_fields.append("name")
     if changed_fields:
         room.save(update_fields=changed_fields)
@@ -185,3 +168,5 @@ def direct_peer_for_user(room: Room, user):
     if not peer_membership:
         return None
     return peer_membership.user
+
+

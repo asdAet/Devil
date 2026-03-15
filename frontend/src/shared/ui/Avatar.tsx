@@ -24,6 +24,8 @@ const sizeClassMap: Record<AvatarSize, string> = {
   tiny: styles.tiny,
 };
 
+const failedAvatarSources = new Set<string>();
+
 /**
  * Унифицированный аватар пользователя с fallback-инициалами и online-бейджем.
  * @param props Параметры рендера аватара.
@@ -39,7 +41,10 @@ export function Avatar({
   loading = "lazy",
 }: AvatarProps) {
   const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
-  const shouldRenderImage = Boolean(profileImage) && brokenSrc !== profileImage;
+  const shouldRenderImage =
+    Boolean(profileImage) &&
+    brokenSrc !== profileImage &&
+    !failedAvatarSources.has(profileImage as string);
 
   return (
     <div
@@ -63,6 +68,7 @@ export function Avatar({
           decoding="async"
           onError={() => {
             if (profileImage) {
+              failedAvatarSources.add(profileImage);
               setBrokenSrc(profileImage);
             }
           }}

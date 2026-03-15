@@ -34,6 +34,10 @@ function ShellLayout({
   const { isOpen } = useInfoPanel();
   const location = useLocation();
   const isMainActive = location.pathname !== "/";
+  const isChatRoute =
+    location.pathname.startsWith("/rooms/") ||
+    location.pathname === "/direct" ||
+    location.pathname.startsWith("/direct/");
 
   return (
     <div
@@ -63,9 +67,15 @@ function ShellLayout({
             )}
           </div>
         )}
-        <div className={styles.mainInner}>{children}</div>
+        <div
+          className={[styles.mainInner, isChatRoute ? styles.mainInnerChat : ""]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {children}
+        </div>
       </div>
-      <InfoPanel currentUsername={user?.username ?? null} />
+      <InfoPanel currentUsername={user?.publicRef ?? user?.username ?? null} />
     </div>
   );
 }

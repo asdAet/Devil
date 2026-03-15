@@ -299,6 +299,7 @@ describe("ChatRoomPage", () => {
   it("shows online status for direct peer", () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -355,6 +356,53 @@ describe("ChatRoomPage", () => {
     ).not.toBeNull();
   });
 
+  it("highlights own messages for fallback public id identity", () => {
+    chatRoomMock.messages = [
+      {
+        id: 3,
+        username: "1234567890",
+        content: "mine",
+        profilePic: null,
+        createdAt: "2026-02-13T12:00:00.000Z",
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
+      },
+      {
+        id: 4,
+        username: "alice",
+        content: "other",
+        profilePic: null,
+        createdAt: "2026-02-13T12:01:00.000Z",
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
+      },
+    ];
+
+    const fallbackUser = {
+      ...user,
+      username: "",
+      publicRef: "1234567890",
+      publicId: "1234567890",
+    };
+
+    const { container } = render(
+      <ChatRoomPage slug="public" user={fallbackUser} onNavigate={vi.fn()} />,
+    );
+
+    expect(
+      container.querySelector('article[data-own-message="true"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('article[data-own-message="false"]'),
+    ).not.toBeNull();
+  });
+
   it("shows join CTA and hides input for public group non-member", async () => {
     chatRoomMock.details = {
       slug: "g-public-1",
@@ -387,6 +435,7 @@ describe("ChatRoomPage", () => {
   it("deduplicates mark-read for same last message id", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -449,7 +498,7 @@ describe("ChatRoomPage", () => {
     fireEvent.scroll(chatLog);
 
     await waitFor(() => {
-      expect(chatControllerMock.markRead).toHaveBeenCalledWith("dm_1", 2);
+      expect(chatControllerMock.markRead).toHaveBeenCalledWith("1", 2);
     });
     expect(chatControllerMock.markRead).toHaveBeenCalledTimes(1);
 
@@ -483,12 +532,12 @@ describe("ChatRoomPage", () => {
     fireEvent.scroll(chatLog);
 
     await waitFor(() => {
-      expect(chatControllerMock.markRead).toHaveBeenCalledWith("dm_1", 3);
+      expect(chatControllerMock.markRead).toHaveBeenCalledWith("1", 3);
     });
     expect(chatControllerMock.markRead).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects unsupported attachment type on client before upload request", () => {
+  it("accepts arbitrary attachment type on client", () => {
     const { container } = render(
       <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
     );
@@ -501,14 +550,16 @@ describe("ChatRoomPage", () => {
     });
     fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
-    expect(screen.getByText(/имеет неподдерживаемый тип/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/имеет неподдерживаемый тип/i),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Отправить сообщение" }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(chatControllerMock.uploadAttachments).not.toHaveBeenCalled();
   });
 
-  it("uploads only valid attachments from mixed selection and maps backend error by code", async () => {
+  it("uploads mixed attachment types and maps backend error by code", async () => {
     chatControllerMock.uploadAttachments.mockRejectedValueOnce({
       data: {
         code: "unsupported_type",
@@ -532,7 +583,9 @@ describe("ChatRoomPage", () => {
       target: { files: [invalidFile, validFile] },
     });
 
-    expect(screen.getByText(/имеет неподдерживаемый тип/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/имеет неподдерживаемый тип/i),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Отправить сообщение" }),
     ).toBeEnabled();
@@ -548,8 +601,8 @@ describe("ChatRoomPage", () => {
     expect(chatControllerMock.uploadAttachments).toHaveBeenCalledTimes(1);
     const filesArg = chatControllerMock.uploadAttachments.mock
       .calls[0][1] as File[];
-    expect(filesArg).toHaveLength(1);
-    expect(filesArg[0].name).toBe("ok.txt");
+    expect(filesArg).toHaveLength(2);
+    expect(filesArg.map((f) => f.name)).toEqual(["bad.exe", "ok.txt"]);
 
     expect(
       screen.getByText("Тип файла не поддерживается. Разрешены: text/plain."),
@@ -559,6 +612,7 @@ describe("ChatRoomPage", () => {
   it("keeps unread divider anchored while partially reading and after full read in current chat", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -666,6 +720,7 @@ describe("ChatRoomPage", () => {
   it("hides unread divider when current user sends a message", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -735,6 +790,7 @@ describe("ChatRoomPage", () => {
   it("does not show unread divider for incoming message when user is at bottom", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -829,6 +885,7 @@ describe("ChatRoomPage", () => {
   it("performs a single initial scroll to bottom when unread messages are absent", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -879,6 +936,7 @@ describe("ChatRoomPage", () => {
   it("does not jump to bottom while positioning to first unread on enter", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -945,6 +1003,7 @@ describe("ChatRoomPage", () => {
   it("does not inherit unread divider from previous slug while next chat is loading", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -1001,6 +1060,7 @@ describe("ChatRoomPage", () => {
   it("does not auto-reposition on non-append message updates", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "dm",
       kind: "direct",
       created: false,
@@ -1254,6 +1314,7 @@ describe("ChatRoomPage", () => {
   it("flushes pending read with sendBeacon on pagehide", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "DM",
       kind: "direct",
       created: false,
@@ -1284,7 +1345,7 @@ describe("ChatRoomPage", () => {
       string,
       FormData,
     ];
-    expect(url).toBe("/api/chat/rooms/dm_1/read/");
+    expect(url).toBe("/api/chat/rooms/1/read/");
     expect(payload).toBeInstanceOf(FormData);
     expect(payload.get("lastReadMessageId")).toBe("5");
   });
@@ -1292,6 +1353,7 @@ describe("ChatRoomPage", () => {
   it("falls back to fetch keepalive when sendBeacon is unavailable", async () => {
     chatRoomMock.details = {
       slug: "dm_1",
+      roomId: 1,
       name: "DM",
       kind: "direct",
       created: false,
@@ -1333,7 +1395,7 @@ describe("ChatRoomPage", () => {
 
     expect(sendBeaconSpy).toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/chat/rooms/dm_1/read/",
+      "/api/chat/rooms/1/read/",
       expect.objectContaining({
         method: "POST",
         keepalive: true,

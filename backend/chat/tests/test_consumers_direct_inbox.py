@@ -63,11 +63,11 @@ class DirectInboxConsumerTests(TransactionTestCase):
         connected, close_code = await communicator.connect()
         return communicator, connected, close_code
 
-    async def _connect_chat(self, room_slug: str, user):
+    async def _connect_chat(self, room_id: int, user):
         """Проверяет сценарий `_connect_chat`."""
         communicator = WebsocketCommunicator(
             application,
-            f'/ws/chat/{room_slug}/',
+            f'/ws/chat/{room_id}/',
             headers=[(b'host', b'localhost')],
         )
         communicator.scope['user'] = user
@@ -103,7 +103,7 @@ class DirectInboxConsumerTests(TransactionTestCase):
 
     def test_authenticated_user_receives_initial_unread_state(self):
         """Проверяет сценарий `test_authenticated_user_receives_initial_unread_state`."""
-        mark_unread(self.member.pk, self.direct_room.slug, ttl_seconds=60)
+        mark_unread(self.member.pk, self.direct_room.pk, ttl_seconds=60)
 
         async def run():
             """Проверяет сценарий `run`."""
@@ -113,8 +113,8 @@ class DirectInboxConsumerTests(TransactionTestCase):
             payload = json.loads(await communicator.receive_from(timeout=2))
             self.assertEqual(payload.get('type'), 'direct_unread_state')
             self.assertEqual(payload['unread']['dialogs'], 1)
-            self.assertIn(self.direct_room.slug, payload['unread']['slugs'])
-            self.assertEqual(payload['unread']['counts'].get(self.direct_room.slug), 1)
+            self.assertIn(self.direct_room.pk, payload['unread']['roomIds'])
+            self.assertEqual(payload['unread']['counts'].get(str(self.direct_room.pk)), 1)
 
             await communicator.disconnect()
 
@@ -122,8 +122,8 @@ class DirectInboxConsumerTests(TransactionTestCase):
 
     def test_mark_read_decreases_unread_dialogs(self):
         """Проверяет сценарий `test_mark_read_decreases_unread_dialogs`."""
-        mark_unread(self.member.pk, self.direct_room.slug, ttl_seconds=60)
-        mark_unread(self.member.pk, self.unrelated_room.slug, ttl_seconds=60)
+        mark_unread(self.member.pk, self.direct_room.pk, ttl_seconds=60)
+        mark_unread(self.member.pk, self.unrelated_room.pk, ttl_seconds=60)
 
         async def run():
             """Проверяет сценарий `run`."""
@@ -131,14 +131,14 @@ class DirectInboxConsumerTests(TransactionTestCase):
             self.assertTrue(connected)
             await communicator.receive_from(timeout=2)
 
-            await communicator.send_to(text_data=json.dumps({'type': 'mark_read', 'roomSlug': self.direct_room.slug}))
+            await communicator.send_to(text_data=json.dumps({'type': 'mark_read', 'roomId': self.direct_room.pk}))
             payload = json.loads(await communicator.receive_from(timeout=2))
 
             self.assertEqual(payload.get('type'), 'direct_mark_read_ack')
-            self.assertEqual(payload['roomSlug'], self.direct_room.slug)
+            self.assertEqual(payload['roomId'], self.direct_room.pk)
             self.assertEqual(payload['unread']['dialogs'], 1)
-            self.assertNotIn(self.direct_room.slug, payload['unread']['slugs'])
-            self.assertNotIn(self.direct_room.slug, payload['unread']['counts'])
+            self.assertNotIn(self.direct_room.pk, payload['unread']['roomIds'])
+            self.assertNotIn(str(self.direct_room.pk), payload['unread']['counts'])
 
             await communicator.disconnect()
 
@@ -153,7 +153,7 @@ class DirectInboxConsumerTests(TransactionTestCase):
             await communicator.receive_from(timeout=2)
 
             await communicator.send_to(
-                text_data=json.dumps({'type': 'set_active_room', 'roomSlug': self.unrelated_room.slug})
+                text_data=json.dumps({'type': 'set_active_room', 'roomId': self.unrelated_room.pk})
             )
             payload = json.loads(await communicator.receive_from(timeout=2))
             self.assertEqual(payload.get('type'), 'error')
@@ -172,10 +172,10 @@ class DirectInboxConsumerTests(TransactionTestCase):
             await inbox.receive_from(timeout=2)
 
             await inbox.send_to(
-                text_data=json.dumps({'type': 'set_active_room', 'roomSlug': self.direct_room.slug})
+                text_data=json.dumps({'type': 'set_active_room', 'roomId': self.direct_room.pk})
             )
 
-            chat, chat_connected, _ = await self._connect_chat(self.direct_room.slug, self.owner)
+            chat, chat_connected, _ = await self._connect_chat(self.direct_room.pk, self.owner)
             self.assertTrue(chat_connected)
 
             await chat.send_to(text_data=json.dumps({'message': 'hello member'}))
@@ -183,10 +183,10 @@ class DirectInboxConsumerTests(TransactionTestCase):
 
             inbox_payload = json.loads(await inbox.receive_from(timeout=2))
             self.assertEqual(inbox_payload.get('type'), 'direct_inbox_item')
-            self.assertEqual(inbox_payload['item']['slug'], self.direct_room.slug)
+            self.assertEqual(inbox_payload['item']['roomId'], self.direct_room.pk)
             self.assertEqual(inbox_payload['unread']['dialogs'], 1)
             self.assertTrue(inbox_payload['unread']['isUnread'])
-            self.assertEqual(inbox_payload['unread']['counts'].get(self.direct_room.slug), 1)
+            self.assertEqual(inbox_payload['unread']['counts'].get(str(self.direct_room.pk)), 1)
 
             await chat.disconnect()
             await inbox.disconnect()

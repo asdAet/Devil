@@ -31,6 +31,7 @@ const replyToSchema = z
   .object({
     id: z.number(),
     username: z.string().nullable(),
+    displayName: z.string().nullable().optional(),
     content: z.string(),
   })
   .passthrough();
@@ -52,9 +53,10 @@ const messageSchema = z
   .object({
     message: z.string(),
     username: z.string().min(1),
+    displayName: z.string().optional(),
     profile_pic: z.string().nullable().optional(),
     avatar_crop: avatarCropSchema.nullable().optional(),
-    room: z.string().optional(),
+    roomId: z.union([z.number(), z.string()]).optional(),
     id: z.number().optional(),
     createdAt: z.string().optional(),
     replyTo: replyToSchema.nullable().optional(),
@@ -66,6 +68,7 @@ const typingSchema = z
   .object({
     type: z.literal("typing"),
     username: z.string(),
+    displayName: z.string().optional(),
     userId: z.number(),
   })
   .passthrough();
@@ -95,6 +98,7 @@ const reactionAddSchema = z
     emoji: z.string(),
     userId: z.number(),
     username: z.string(),
+    displayName: z.string().optional(),
   })
   .passthrough();
 
@@ -105,6 +109,7 @@ const reactionRemoveSchema = z
     emoji: z.string(),
     userId: z.number(),
     username: z.string(),
+    displayName: z.string().optional(),
   })
   .passthrough();
 
@@ -113,8 +118,9 @@ const readReceiptSchema = z
     type: z.literal("read_receipt"),
     userId: z.number(),
     username: z.string(),
+    displayName: z.string().optional(),
     lastReadMessageId: z.number(),
-    roomSlug: z.string(),
+    roomId: z.union([z.number(), z.string()]),
   })
   .passthrough();
 
@@ -131,6 +137,7 @@ export type ChatWsEvent =
         id: number | null;
         content: string;
         username: string;
+        displayName: string;
         profilePic: string | null;
         avatarCrop: {
           x: number;
@@ -138,11 +145,12 @@ export type ChatWsEvent =
           width: number;
           height: number;
         } | null;
-        room: string | null;
+        roomId: number | null;
         createdAt: string | null;
         replyTo: {
           id: number;
           username: string | null;
+          displayName: string | null;
           content: string;
         } | null;
         attachments: {
@@ -160,6 +168,7 @@ export type ChatWsEvent =
   | {
       type: "typing";
       username: string;
+      displayName: string;
       userId: number;
     }
   | {
@@ -180,6 +189,7 @@ export type ChatWsEvent =
       emoji: string;
       userId: number;
       username: string;
+      displayName: string;
     }
   | {
       type: "reaction_remove";
@@ -187,13 +197,15 @@ export type ChatWsEvent =
       emoji: string;
       userId: number;
       username: string;
+      displayName: string;
     }
   | {
       type: "read_receipt";
       userId: number;
       username: string;
+      displayName: string;
       lastReadMessageId: number;
-      roomSlug: string;
+      roomId: number;
     }
   | { type: "unknown" };
 
@@ -237,7 +249,12 @@ export const decodeChatWsEvent = (raw: string): ChatWsEvent => {
   // Typed events (have a "type" field)
   const typed = safeDecode(typingSchema, payload);
   if (typed) {
-    return { type: "typing", username: typed.username, userId: typed.userId };
+    return {
+      type: "typing",
+      username: typed.username,
+      displayName: typed.displayName ?? typed.username,
+      userId: typed.userId,
+    };
   }
 
   const edit = safeDecode(messageEditSchema, payload);
@@ -268,6 +285,7 @@ export const decodeChatWsEvent = (raw: string): ChatWsEvent => {
       emoji: reactAdd.emoji,
       userId: reactAdd.userId,
       username: reactAdd.username,
+      displayName: reactAdd.displayName ?? reactAdd.username,
     };
   }
 
@@ -279,17 +297,23 @@ export const decodeChatWsEvent = (raw: string): ChatWsEvent => {
       emoji: reactRemove.emoji,
       userId: reactRemove.userId,
       username: reactRemove.username,
+      displayName: reactRemove.displayName ?? reactRemove.username,
     };
   }
 
   const receipt = safeDecode(readReceiptSchema, payload);
   if (receipt) {
+    const roomId = toNumberOrNull(receipt.roomId);
+    if (roomId === null) {
+      return { type: "unknown" };
+    }
     return {
       type: "read_receipt",
       userId: receipt.userId,
       username: receipt.username,
+      displayName: receipt.displayName ?? receipt.username,
       lastReadMessageId: receipt.lastReadMessageId,
-      roomSlug: receipt.roomSlug,
+      roomId,
     };
   }
 
@@ -302,11 +326,18 @@ export const decodeChatWsEvent = (raw: string): ChatWsEvent => {
         id: message.id ?? null,
         content: message.message,
         username: message.username,
+        displayName: message.displayName ?? message.username,
         profilePic: message.profile_pic ?? null,
         avatarCrop: message.avatar_crop ?? null,
-        room: message.room ?? null,
+        roomId: toNumberOrNull(message.roomId),
         createdAt: message.createdAt ?? null,
-        replyTo: message.replyTo ?? null,
+        replyTo: message.replyTo
+          ? {
+              ...message.replyTo,
+              displayName:
+                message.replyTo.displayName ?? message.replyTo.username,
+            }
+          : null,
         attachments: (message.attachments ?? []).map((a) => ({
           id: a.id,
           originalFilename: a.originalFilename,

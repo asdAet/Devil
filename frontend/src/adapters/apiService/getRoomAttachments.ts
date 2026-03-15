@@ -2,13 +2,15 @@ import type { AxiosInstance } from "axios";
 
 import { decodeRoomAttachmentsResponse } from "../../dto";
 import type { RoomAttachmentsResult } from "../../domain/interfaces/IApiService";
+import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 export async function getRoomAttachments(
   apiClient: AxiosInstance,
   slug: string,
   params?: { limit?: number; before?: number },
 ): Promise<RoomAttachmentsResult> {
-  const encodedSlug = encodeURIComponent(slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const searchParams = new URLSearchParams();
   if (typeof params?.limit === "number")
     searchParams.set("limit", String(params.limit));
@@ -16,7 +18,7 @@ export async function getRoomAttachments(
     searchParams.set("before", String(params.before));
   const query = searchParams.toString();
   const response = await apiClient.get<unknown>(
-    `/chat/rooms/${encodedSlug}/attachments/${query ? `?${query}` : ""}`,
+    `/chat/rooms/${encodedRoomRef}/attachments/${query ? `?${query}` : ""}`,
   );
   return decodeRoomAttachmentsResponse(response.data);
 }

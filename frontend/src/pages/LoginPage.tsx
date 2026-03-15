@@ -2,7 +2,7 @@
 import styles from "../styles/pages/LoginPage.module.css";
 
 type Props = {
-  onSubmit: (email: string, password: string) => void;
+  onSubmit: (identifier: string, password: string) => void;
   onGoogleAuth?: () => Promise<void> | void;
   googleAuthDisabledReason?: string | null;
   onNavigate: (path: string) => void;
@@ -21,7 +21,10 @@ export function LoginPage({
       mode="login"
       title="Вход"
       submitLabel="Войти"
-      onSubmit={onSubmit}
+      onSubmit={(payload) => {
+        if (!("identifier" in payload)) return;
+        onSubmit(payload.identifier, payload.password);
+      }}
       onGoogleAuth={onGoogleAuth}
       googleAuthDisabledReason={googleAuthDisabledReason}
       onNavigate={onNavigate}
