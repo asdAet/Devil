@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
 
 import styles from "../../styles/ui/Card.module.css";
 
@@ -7,7 +7,7 @@ type CardProps<T extends ElementType = "section"> = {
   wide?: boolean;
   className?: string;
   children: ReactNode;
-};
+} & Omit<ComponentPropsWithoutRef<T>, "as" | "className" | "children">;
 
 /**
  * Универсальный контейнер карточки.
@@ -19,10 +19,12 @@ export function Card<T extends ElementType = "section">({
   wide = false,
   className,
   children,
+  ...rest
 }: CardProps<T>) {
   const Component = as ?? "section";
   return (
     <Component
+      {...rest}
       className={[styles.card, wide ? styles.wide : "", className]
         .filter(Boolean)
         .join(" ")}
