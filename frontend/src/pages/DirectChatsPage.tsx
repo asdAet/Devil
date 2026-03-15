@@ -68,6 +68,7 @@ export function DirectChatsList({
   return (
     <Card
       as="section"
+      aria-label="Список личных чатов"
       className={[styles.directInbox, className].filter(Boolean).join(" ")}
     >
       {loading && <p className={styles.muted}>Загрузка диалогов...</p>}
