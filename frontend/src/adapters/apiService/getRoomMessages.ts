@@ -7,16 +7,16 @@ import { resolveRoomApiRef } from "./resolveRoomApiRef";
 /**
  * Загружает сообщения комнаты с пагинацией.
  * @param apiClient HTTP-клиент.
- * @param slug Идентификатор комнаты.
+ * @param roomId Идентификатор комнаты.
  * @param params Параметры пагинации.
  * @returns Нормализованный список сообщений.
  */
 export async function getRoomMessages(
   apiClient: AxiosInstance,
-  slug: string,
+  roomId: string,
   params?: { limit?: number; beforeId?: number },
 ): Promise<RoomMessagesResponse> {
-  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, roomId);
   const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const query = new URLSearchParams();
   if (params?.limit) {

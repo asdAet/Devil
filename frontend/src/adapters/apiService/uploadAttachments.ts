@@ -9,11 +9,11 @@ import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 export async function uploadAttachments(
   apiClient: AxiosInstance,
-  slug: string,
+  roomId: string,
   files: File[],
   options?: UploadAttachmentsOptions,
 ): Promise<UploadResult> {
-  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, roomId);
   const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const formData = new FormData();
   for (const file of files) {

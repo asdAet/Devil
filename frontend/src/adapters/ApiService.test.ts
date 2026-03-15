@@ -881,6 +881,80 @@ describe("ApiService", () => {
     expect(readRoomRef).toBe("777");
   });
 
+  it("resolves public room ref to numeric roomId for message mutation/search endpoints", async () => {
+    let editRoomRef = "";
+    let deleteRoomRef = "";
+    let addReactionRoomRef = "";
+    let removeReactionRoomRef = "";
+    let searchRoomRef = "";
+    let searchQuery = "";
+
+    server.use(
+      http.get("/api/chat/public-room/", () =>
+        HttpResponse.json({
+          roomId: 777,
+          name: "Public",
+          kind: "public",
+        }),
+      ),
+      http.patch("/api/chat/rooms/:slug/messages/:messageId/", ({ params }) => {
+        editRoomRef = String(params.slug);
+        return HttpResponse.json({
+          id: Number(params.messageId),
+          content: "edited",
+          editedAt: now,
+        });
+      }),
+      http.delete(
+        "/api/chat/rooms/:slug/messages/:messageId/",
+        ({ params }) => {
+          deleteRoomRef = String(params.slug);
+          return HttpResponse.json({ ok: true });
+        },
+      ),
+      http.post(
+        "/api/chat/rooms/:slug/messages/:messageId/reactions/",
+        ({ params }) => {
+          addReactionRoomRef = String(params.slug);
+          return HttpResponse.json({
+            messageId: Number(params.messageId),
+            emoji: "👍",
+            userId: 1,
+            username: "alice",
+          });
+        },
+      ),
+      http.delete(
+        "/api/chat/rooms/:slug/messages/:messageId/reactions/:emoji/",
+        ({ params }) => {
+          removeReactionRoomRef = String(params.slug);
+          return HttpResponse.json({ ok: true });
+        },
+      ),
+      http.get("/api/chat/rooms/:slug/messages/search/", ({ params, request }) => {
+        searchRoomRef = String(params.slug);
+        searchQuery = new URL(request.url).searchParams.get("q") ?? "";
+        return HttpResponse.json({
+          results: [],
+          pagination: { limit: 50, hasMore: false, nextBefore: null },
+        });
+      }),
+    );
+
+    await apiService.editMessage("public", 188, "edited");
+    await apiService.deleteMessage("public", 188);
+    await apiService.addReaction("public", 188, "👍");
+    await apiService.removeReaction("public", 188, "👍");
+    await apiService.searchMessages("public", "hello");
+
+    expect(editRoomRef).toBe("777");
+    expect(deleteRoomRef).toBe("777");
+    expect(addReactionRoomRef).toBe("777");
+    expect(removeReactionRoomRef).toBe("777");
+    expect(searchRoomRef).toBe("777");
+    expect(searchQuery).toBe("hello");
+  });
+
   it("normalizes role endpoint errors in extended matrix scenarios", async () => {
     server.use(
       http.get("/api/chat/rooms/:slug/roles/", () =>

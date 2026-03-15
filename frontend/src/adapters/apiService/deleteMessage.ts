@@ -1,10 +1,12 @@
 import type { AxiosInstance } from "axios";
+import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 export async function deleteMessage(
   apiClient: AxiosInstance,
-  slug: string,
+  roomId: string,
   messageId: number,
 ): Promise<void> {
-  const encodedSlug = encodeURIComponent(slug);
-  await apiClient.delete(`/chat/rooms/${encodedSlug}/messages/${messageId}/`);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, roomId);
+  const encodedRoomRef = encodeURIComponent(apiRoomRef);
+  await apiClient.delete(`/chat/rooms/${encodedRoomRef}/messages/${messageId}/`);
 }

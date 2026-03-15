@@ -6,10 +6,10 @@ import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 export async function markRead(
   apiClient: AxiosInstance,
-  slug: string,
+  roomId: string,
   messageId?: number,
 ): Promise<ReadStateResult> {
-  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, roomId);
   const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const body = messageId ? { lastReadMessageId: messageId } : {};
   const response = await apiClient.post<unknown>(

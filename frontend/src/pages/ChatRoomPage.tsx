@@ -286,6 +286,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const roomApiRef = useMemo(() => {
     return resolvedRoomId === null ? null : String(resolvedRoomId);
   }, [resolvedRoomId]);
+  const roomIdForRequests = roomApiRef ?? slug;
   const isOnline = useOnlineStatus();
   const { open: openInfoPanel } = useInfoPanel();
   const { setActiveRoom, markRead: markDirectRoomRead } = useDirectInbox();
@@ -692,7 +693,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     headerSearchTimerRef.current = window.setTimeout(() => {
       setHeaderSearchLoading(true);
       void chatController
-        .searchMessages(slug, query)
+        .searchMessages(roomIdForRequests, query)
         .then((result) => {
           setHeaderSearchResults(result.results);
         })
@@ -703,7 +704,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
           setHeaderSearchLoading(false);
         });
     }, 260);
-  }, [headerSearchQuery, isHeaderSearchOpen, slug]);
+  }, [headerSearchQuery, isHeaderSearchOpen, roomIdForRequests]);
 
   useEffect(() => {
     if (!typingUsers.size) return;
@@ -1442,7 +1443,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       setDraft("");
 
       void chatController
-        .editMessage(slug, editedId, editedContent)
+        .editMessage(roomIdForRequests, editedId, editedContent)
         .catch((err) => {
           debugLog("Edit failed", err);
           setRoomError("Не удалось отредактировать сообщение");
@@ -1468,7 +1469,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       uploadAbortRef.current = abortController;
       setUploadProgress(0);
       try {
-        await chatController.uploadAttachments(slug, queuedFiles, {
+        await chatController.uploadAttachments(roomIdForRequests, queuedFiles, {
           messageContent: cleaned,
           replyTo: replyTo?.id ?? null,
           onProgress: (pct) => setUploadProgress(pct),
@@ -1521,6 +1522,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     rateLimitActive,
     rateLimitSeconds,
     replyTo,
+    roomIdForRequests,
     send,
     setMessages,
     slug,
@@ -1558,7 +1560,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     );
     setDeleteConfirm(null);
 
-    void chatController.deleteMessage(slug, msgId).catch((err) => {
+    void chatController.deleteMessage(roomIdForRequests, msgId).catch((err) => {
       debugLog("Delete failed", err);
       setRoomError("Не удалось удалить сообщение");
       setMessages((prev) =>
@@ -1569,7 +1571,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
         ),
       );
     });
-  }, [deleteConfirm, setMessages, slug]);
+  }, [deleteConfirm, roomIdForRequests, setMessages]);
 
   const handleReact = useCallback(
     (msgId: number, emoji: string) => {
@@ -1577,15 +1579,15 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       const existing = msg?.reactions.find((r) => r.emoji === emoji);
       if (existing?.me) {
         void chatController
-          .removeReaction(slug, msgId, emoji)
+          .removeReaction(roomIdForRequests, msgId, emoji)
           .catch((err) => debugLog("Remove reaction failed", err));
       } else {
         void chatController
-          .addReaction(slug, msgId, emoji)
+          .addReaction(roomIdForRequests, msgId, emoji)
           .catch((err) => debugLog("Add reaction failed", err));
       }
     },
-    [messages, slug],
+    [messages, roomIdForRequests],
   );
 
   const handleAttach = useCallback(

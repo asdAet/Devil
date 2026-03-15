@@ -6,10 +6,10 @@ import { resolveRoomApiRef } from "./resolveRoomApiRef";
 
 export async function getRoomAttachments(
   apiClient: AxiosInstance,
-  slug: string,
+  roomId: string,
   params?: { limit?: number; before?: number },
 ): Promise<RoomAttachmentsResult> {
-  const apiRoomRef = await resolveRoomApiRef(apiClient, slug);
+  const apiRoomRef = await resolveRoomApiRef(apiClient, roomId);
   const encodedRoomRef = encodeURIComponent(apiRoomRef);
   const searchParams = new URLSearchParams();
   if (typeof params?.limit === "number")
