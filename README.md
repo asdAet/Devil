@@ -1,506 +1,197 @@
-# Devil
+# Devil Resting
 
-Devil — это платформа для чата в реальном времени, созданная с помощью Django + Channels + React + TypeScript.
-Этот файл README представляет собой единый источник инженерной информации для разработчиков, DevOps и технических специалистов .
+Актуальный README для текущего состояния проекта (backend + frontend + deploy).
 
-## Содержание
+## Что это
+`Devil Resting` — real-time чат-платформа на `Django + Channels + React + TypeScript`.
 
-- [1. Обзор проекта](#1-обзор-проекта)
-- [2. Ключевые особенности](#2-ключевые-особенности)
-- [3. Микроархитектура](#3-микроархитектура)
-- [4. Потоки взаимодействия](#4-потоки-взаимодействия)
-- [5. Структура репозитория](#5-структура-репозитория)
-- [6. Frontend Details](#6-frontend-details)
-- [7. Backend Details](#7-backend-details)
-- [8. Модель данных](#8-модель-данных)
-- [9. Справочник по REST API](#9-справочник-по-rest-api)
-- [10. Протокол WebSocket](#10-протокол-websocket)
-- [11. Конфигурация ENV](#11-конфигурация-env)
-- [12. Local Development](#12-local-development)
-- [13. Production Deployment](#13-production-deployment)
-- [14. Тестирование и качество](#14-тестирование-и-качество)
-- [15. Безопасность](#15-безопасность)
-- [16. Наблюдаемость и диагностика](#16-наблюдаемость-и-диагностика)
-- [17. Устранение неполадок](#17-устранение-неполадок)
-- [18. Известные ограничения и план действий](#18-известные-ограничения-и-план-действий)
+Проект поддерживает:
+- авторизацию (login/email + password);
+- Google OAuth;
+- публичные `@handle` и fallback `public_id`;
+- direct-чаты и групповые чаты;
+- роли/права в комнатах;
+- присутствие (online/guest);
+- вложения в сообщениях;
+- защищенную отдачу медиа через подписанные URL.
 
-## 1. Обзор проекта
+## Технологический стек
+- Backend: `Python 3.11`, `Django 4.1`, `Django REST Framework`, `Channels`, `Redis`, `PostgreSQL`.
+- Frontend: `React 19`, `TypeScript`, `Vite`, `React Router`, `Zod`, `Vitest`, `Playwright`.
+- Infra: `Docker Compose`, `Nginx`, TLS termination.
 
-Devil поддерживает общедоступные чаты, частные комнаты, прямые диалоги, присутствие в реальном времени, профили пользователей, подписанный доступ к мультимедиа и кэширование на стороне браузера.
+## Ключевая доменная модель (identity + public refs)
 
-Основной технический стек:
+### Внутренние идентификаторы
+- Все внутренние связи (membership, сообщения, read-state, permissions, WS transport) работают по внутренним ID.
+- Для комнат transport строго по `room_id`:
+  - REST: `/api/chat/rooms/{room_id}/...`
+  - WS: `/ws/chat/{room_id}/`
 
-- Backend: Django 4.1, Channels, PostgreSQL, Redis.
-- Frontend: React 19, TypeScript, React Router, Zod.
-- Инфраструктура: Docker Compose, Nginx с терминацией TLS.
+### Публичная идентичность
+- Пользователь:
+  - `UserIdentityCore.public_id` — положительный 10-значный numeric string.
+  - `PublicHandle.handle` (опционально) — публичный username.
+- Группа:
+  - `Room.public_id` — отрицательный 10-значный numeric string.
+  - `PublicHandle.handle` (опционально) — публичный username.
+- Глобальная уникальность `@handle` для users и groups обеспечивается таблицей `PublicHandle`.
 
-## 2. Ключевые особенности
+### Таблицы identity
+- `UserIdentityCore(user OneToOne, public_id unique, created_at, updated_at)`
+- `LoginIdentity(user OneToOne, login_normalized unique, password_hash, created_at, updated_at)`
+- `EmailIdentity(user OneToOne, email_normalized unique nullable, email_verified, created_at, updated_at)`
+- `OAuthIdentity(user FK, provider, provider_user_id, ..., unique(provider, provider_user_id))`
+- `PublicHandle(handle unique, user OneToOne nullable, room OneToOne nullable, XOR-check owner)`
 
-### Аутентификация и сессия
+### Public resolver
+`GET /api/public/resolve/{ref}` резолвит:
+- `@handle`
+- `handle`
+- `public_id`
 
-- `GET /api/auth/csrf/` для начальной загрузки CSRF.
-- `GET /api/auth/session/` для текущего состояния аутентификации.
-- `POST /api/auth/login/`, `POST /api/auth/register/`, `POST /api/auth/logout/`.
-- `GET /api/auth/password-rules/`.
+в канонический ответ вида:
+- `ownerType`: `user | group`
+- `ownerId`: внутренний ID
+- `publicRef`, `handle`, `publicId`
 
-### Комнаты и обмен сообщениями
-
-- Конечная точка публичной комнаты: `GET /api/chat/public-room/`.
-- Информация о комнате: `GET /api/chat/rooms/<slug>/`.
-- Сообщения комнаты с нумерацией страниц: `GET /api/chat/rooms/<slug>/messages/`.
-- Обмен сообщениями в реальном времени через WebSocket `/ws/chat/<slug>/`.
-
-### Прямые чаты
-
-- Запустите прямой чат: `POST /api/chat/direct/start/`.
-- Список прямых: `GET /api/chat/direct/chats/`.
-- Direct Inbox WS: `/ws/direct/inbox/`.
-
-### Присутствие
-
-- Конечная точка гостевой начальной загрузки: `GET /api/auth/presence-session/`.
-- Конечная точка присутствия WS: `/ws/presence/`.
-- Идентификация гостя основана на сеансовом ключе.
-
-### Профили и media
-
-- Чтение/обновление текущего профиля: `GET/POST /api/auth/profile/`.
-- Публичный профиль: `GET /api/auth/users/<username>/`.
-- Подписанная media конечная точка: `GET /api/auth/media/<path>?exp=<unix>&sig=<hmac>`.
-
-### Безопасность
-
-- Постоянное ограничение скорости на базе БД.
-- Ограничение частоты WebSocket‑подключений и отправки сообщений.
-- Регистратор аудита безопасности `security.audit`.
-- Защищенная доставка мультимедиа через X-Accel-Redirect.
-
-## 3. Микроархитектура
-
-### Схема системы
-
-```mermaid
-flowchart LR
-  Browser[Browser]
-  Frontend[React SPA]
-  SW[Service Worker]
-  Nginx[Nginx]
-  Django[Django API]
-  WS[Channels Consumers]
-  Redis[(Redis)]
-  Postgres[(PostgreSQL)]
-  Storage[(Static/Media Volumes)]
-
-  Browser --> Frontend
-  Frontend <--> SW
-  Frontend -->|HTTP /api| Nginx
-  Frontend -->|WS /ws| Nginx
-  Nginx --> Django
-  Nginx --> WS
-  Django <--> Postgres
-  WS <--> Postgres
-  Django <--> Redis
-  WS <--> Redis
-  Nginx --> Storage
-  Django -->|X-Accel-Redirect| Nginx
-```
-
-### Многоуровневый интерфейс
-
-```mermaid
-flowchart TD
-  UI[Pages and Widgets]
-  Hooks[Hooks]
-  Controllers[Controllers]
-  Adapters[HTTP Adapters]
-  DTO[DTO/Zod Boundary]
-  External[(HTTP/WS/Route/Storage/SW)]
-
-  UI --> Hooks
-  Hooks --> Controllers
-  Controllers --> Adapters
-  Adapters --> DTO
-  DTO --> External
-```
-
-### Многоуровневое бэкэнд
-
-```mermaid
-flowchart TD
-  Interfaces[REST Views + WS Consumers]
-  Security[security/rate_limit + security/audit]
-  Domain[access + utils + direct_inbox]
-  Models[ORM Models]
-  Stores[(PostgreSQL + Redis)]
-  Proxy[Nginx Protected Media]
-
-  Interfaces --> Security
-  Interfaces --> Domain
-  Security --> Models
-  Domain --> Models
-  Models --> Stores
-  Interfaces --> Proxy
-```
-
-## 4. Потоки взаимодействия
-
-### Вход в систему и порядок сеанса
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant Nginx
-  participant API as Django API
-
-  Client->>Nginx: GET /api/auth/csrf/
-  Nginx->>API: proxy
-  API-->>Client: csrfToken + cookie
-
-  Client->>Nginx: POST /api/auth/login/
-  Nginx->>API: proxy
-  API-->>Client: authenticated + user
-
-  Client->>Nginx: GET /api/auth/session/
-  Nginx->>API: proxy
-  API-->>Client: session state
-```
-
-### Поток сообщений чата WS
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant Nginx
-  participant Consumer as ChatConsumer
-  participant DB as PostgreSQL
-
-  Client->>Nginx: WS /ws/chat/<slug>/
-  Nginx->>Consumer: connect
-  Consumer-->>Client: accept
-
-  Client->>Consumer: {"message":"..."}
-  Consumer->>Consumer: validate + ACL + rate limit
-  Consumer->>DB: save message
-  Consumer-->>Client: broadcast chat_message
-```
-
-### Порядок запуска прямого чата
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant API as Chat API
-  participant DB as PostgreSQL
-
-  Client->>API: POST /api/chat/direct/start/
-  API->>DB: find/create direct Room
-  API->>DB: ensure ChatRole records
-  API-->>Client: {slug, kind, peer}
-```
-
-### Поток присутствия гостя
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant API as Users API
-  participant Presence as PresenceConsumer
-  participant Redis
-
-  Client->>API: GET /api/auth/presence-session/
-  API-->>Client: {ok:true} + session cookie
-
-  Client->>Presence: WS /ws/presence/?auth=0
-  Presence->>Redis: touch guest by session key
-  Presence-->>Client: guests and online state
-```
-
-### Подписанный медиапоток
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant API as Django API
-  participant Nginx
-
-  Client->>API: GET /api/auth/users/<username>/
-  API-->>Client: profileImage=/api/auth/media/...exp...sig...
-
-  Client->>API: GET /api/auth/media/<path>?exp=&sig=
-  API->>API: verify exp and signature
-  API-->>Nginx: X-Accel-Redirect /_protected_media/<path>
-  Nginx-->>Client: media bytes
-```
-
-## 5. Структура репозитория
+## Архитектура репозитория
 
 ```text
-Devil/
-- backend/
-  - chat/
-  - users/
-  - chat_app_django/
-  - requirements*.txt
-  - Dockerfile
-  - manage.py
-- frontend/
-  - src/
-    - app/
-    - pages/
-    - widgets/
-    - shared/
-    - adapters/
-    - controllers/
-    - dto/
-    - entities/
-    - sw.ts
-  - e2e/
-  - scripts/check-dto-boundary.mjs
-- deploy/
-  - nginx.conf
-  - nginx.Dockerfile
-- docker-compose.prod.yml
-- example.env
-- .github/workflows/test.yml
+backend/
+  auditlog/         # аудит
+  chat/             # chat REST API, WS-помощники, search, attachments
+  chat_app_django/  # settings, urls, asgi, health, meta API
+  direct_inbox/     # WS inbox для direct unread/state
+  friends/          # friend requests/blocking
+  groups/           # group domain + invites + moderation
+  messages/         # message entities + attachments + reads
+  presence/         # online/guest presence
+  roles/            # role/permission model и API
+  rooms/            # Room entity (public/private/direct/group)
+  users/            # auth/profile/identity/public resolve
+
+frontend/src/
+  adapters/         # HTTP API layer
+  app/              # app shell + routes
+  controllers/      # orchestration layer
+  domain/           # интерфейсы use-case
+  dto/              # Zod boundary (HTTP/WS/route/storage)
+  entities/         # доменные типы
+  hooks/            # react hooks
+  pages/            # route pages
+  shared/           # shared libs, auth, presence, ws, ui
+  widgets/          # composed UI blocks
+
+deploy/
+  nginx.conf
+  nginx.Dockerfile
 ```
 
-## 6. Frontend Details
+## API карта (основное)
 
-### Маршрутизация
+### Health / meta
+- `GET /api/health/live/`
+- `GET /api/health/ready/`
+- `GET /api/meta/client-config/` — runtime-лимиты/политики для frontend.
 
-Определено в `frontend/src/app/routes.tsx`:
+### Auth
+- `GET /api/auth/csrf/`
+- `GET /api/auth/session/`
+- `GET /api/auth/presence-session/`
+- `GET /api/auth/password-rules/`
+- `POST /api/auth/register/`
+  - payload: `{ login, password, passwordConfirm, name, username?, email? }`
+- `POST /api/auth/login/`
+  - payload: `{ identifier, password }`
+  - `identifier = login | email`
+- `POST /api/auth/oauth/google/`
+  - payload: `{ idToken?, accessToken?, username? }`
+  - минимум один токен обязателен.
+- `POST /api/auth/logout/`
+- `GET /api/auth/media/{path}?exp={unix}&sig={hmac}` — signed media access.
 
-- `/`
+### Profile / security / public
+- `GET /api/profile/`
+- `PATCH /api/profile/`
+- `PATCH /api/profile/handle/` — `{ username }`
+- `GET /api/settings/security/`
+- `PATCH /api/settings/security/`
+  - email/verify/password/unlink OAuth.
+- `GET /api/public/resolve/{ref}`
+
+### Chat
+- `GET /api/chat/public-room/`
+- `POST /api/chat/direct/start/` — `{ ref }`
+- `GET /api/chat/direct/chats/`
+- `GET /api/chat/search/global/?q=...`
+- `GET /api/chat/rooms/unread/`
+- `GET /api/chat/rooms/{room_id}/`
+- `GET /api/chat/rooms/{room_id}/messages/`
+- `POST /api/chat/rooms/{room_id}/attachments/`
+- `POST /api/chat/rooms/{room_id}/read/`
+- reactions/edit/delete/search messages
+- roles/overrides/permissions под `/api/chat/rooms/{room_id}/...`
+
+### Friends
+- `/api/friends/` + requests/block/unblock
+
+### Groups
+- `/api/groups/` CRUD/list
+- `/api/groups/{room_id}/...` members/moderation/invites/pins/ownership
+- `/api/invite/{code}/` preview
+- `/api/invite/{code}/join/`
+
+### Audit
+- `/api/admin/audit/events/`
+- `/api/admin/audit/actions/`
+- `/api/admin/audit/users/{user_id}/username-history/`
+
+## WebSocket endpoints
+- `ws(s)://<host>/ws/chat/{room_id}/`
+- `ws(s)://<host>/ws/direct/inbox/`
+- `ws(s)://<host>/ws/presence/`
+
+Замечания:
+- `chat` и `direct` требуют активной сессии и прав доступа.
+- `presence` работает и для гостя (через `presence-session` bootstrap).
+- frontend использует reconnect с backoff (`useReconnectingWebSocket`).
+
+## Frontend маршруты
+- `/` home
 - `/login`
 - `/register`
 - `/profile`
-- `/users/:username`
-- `/rooms/:slug`
+- `/settings`
+- `/friends`
+- `/groups`
+- `/invite/:code`
 - `/direct`
-- `/direct/:username` (каноническое перенаправление на `/direct/@username`)
+- `/direct/:ref`
+- `/users/:ref`
+- `/rooms/:roomRef`
 
-### Поставщики среды выполнения
+`roomRef` в UI: `public` или положительный room id.
 
-Оболочка приложения (frontend/src/app/App.tsx) оборачивает маршруты с помощью:
+## Вложения и типы файлов
+По умолчанию backend разрешает любые MIME-типы:
+- `CHAT_ATTACHMENT_ALLOW_ANY_TYPE=1`
 
-- `RuntimeConfigProvider`
-- `PresenceProvider`
-- `DirectInboxProvider`
+Если выключить (`0`), применяется allowlist `CHAT_ATTACHMENT_ALLOWED_TYPES`.
 
-### Общий пользовательский интерфейс и модули CSS
+Дополнительно:
+- максимальный размер одного файла: `CHAT_ATTACHMENT_MAX_SIZE_MB`
+- максимум файлов в сообщении: `CHAT_ATTACHMENT_MAX_PER_MESSAGE`
+- есть fallback-обработка неизвестных multipart-ключей.
 
-- Общие UI-примитивы в `frontend/src/shared/ui/*`.
-- Стили страниц и виджетов являются модулями CSS.
-- Глобальный CSS содержит только base/reset и дизайн‑токены.
+## Локальный запуск
 
-### Антикоррупционный уровень DTO
+## Требования
+- `Python 3.11+`
+- `Node.js 20+`
+- (опционально) `Redis`
 
-- Централизовано в `frontend/src/dto/*`.
-- Использует Zod для декодирования всех внешних входов.
-- Включает DTO для HTTP, WS, route params, storage и Service Worker сообщений.
-
-### Service Worker
-
-`frontend/src/sw.ts` настраивает стратегии Workbox:
-
-- Активы/статические/скрипты/стили/шрифты: `CacheFirst`.
-- Подписанный носитель `/api/auth/media/**`: `NetworkOnly`.
-- Auth mutation endpoints: `NetworkOnly`.
-- Сообщения: `NetworkFirst`.
-- Комната/детали/профиль/прямые списки: `StaleWhileRevalidate`.
-
-## 7. Backend Details
-
-### Настройки и конфигурация
-
-`backend/chat_app_django/settings.py` задает env-driven конфигурацию:
-
-- security defaults для production;
-- настройка DB/Redis/Channels;
-- лимиты chat/presence/direct;
-- параметры media signing.
-
-### Состав URL-адреса
-
-- Корневые URL-адреса: `backend/chat_app_django/urls.py`
-- URL-адреса пользовательских API: `backend/users/urls.py`
-- URL-адреса API чата: `backend/chat/api_urls.py`
-- Маршрутизация WS: `backend/chat/routing.py`
-
-### Конечная точка политики времени выполнения
-
-- `GET /api/meta/client-config/`
-- возвращает ограничения и политики времени выполнения интерфейса:
-  - `usernameMaxLength`
-  - `chatMessageMaxLength`
-  - `chatRoomSlugRegex`
-  - `mediaUrlTtlSeconds`
-  - `mediaMode`
-
-### Модель ролей доступа (ChatRole)
-
-Источник: `backend/chat/models.py` и `backend/chat/access.py`.
-
-| Роль      | Чтение комнаты | Отправка сообщений |
-| --------- | -------------- | ------------------ |
-| `owner`   | Да             | Да                 |
-| `admin`   | Да             | Да                 |
-| `member`  | Да             | Да                 |
-| `viewer`  | Да             | Нет                |
-| `blocked` | Нет            | Нет                |
-
-Правила применения:
-
-- `public`: читать могут все, писать только авторизованные пользователи.
-- `private`: доступ определяется ролью в `ChatRole`.
-- `direct`: кроме роли, пользователь должен входить в пару `direct_pair_key`.
-
-### Модули безопасности
-
-- `security/rate_limit.py`: ограничитель на базе БД с fail-closed поведением.
-- `security/audit.py`: события централизованного аудита безопасности.
-
-### Выдача media
-
-- Генерация и проверка подписанных URL: `backend/chat/utils.py`.
-- Media endpoint: `backend/users/api.py`.
-- Внутренний Nginx location `/_protected_media/` отдает байты файлов.
-
-## 8. Модель данных
-
-Основные субъекты:
-
-- `Пользователь` (модель аутентификации Django)
-- `Профиль` (аватар, биография, последнее посещение)
-- `Комната` (`публичная`/`частная`/`прямая`)
-- `ChatRole` (роль доступа к комнате)
-- `Message` (сообщение в чате)
-- `SecurityRateLimitBucket` (постоянное состояние ограничителя)
-
-Ключевые ограничения:
-
-- `Room.slug` уникален.
-- `Room.direct_pair_key` уникален для пар прямого чата.
-- `ChatRole(комната, пользователь)` уникальный.
-
-## 9. Справочник по REST API
-
-### Здоровье и мета
-
-| Метод | Конечная точка             | Авторизация | Цель                              |
-| ----- | -------------------------- | ----------- | --------------------------------- |
-| GET   | `/api/health/live/`        | Нет         | Проверка жизнеспособности         |
-| GET   | `/api/health/ready/`       | Нет         | Проверка готовности (db/cache)    |
-| GET   | `/api/meta/client-config/` | Нет         | Runtime‑конфигурация для frontend |
-
-### Аутентификация и профиль
-
-| Метод | Конечная точка                     | Авторизация | Цель                      |
-| ----- | ---------------------------------- | ----------- | ------------------------- |
-| GET   | `/api/auth/csrf/`                  | Нет         | Получить CSRF токен       |
-| GET   | `/api/auth/session/`               | Нет         | Состояние сессии          |
-| GET   | `/api/auth/presence-session/`      | Нет         | Bootstrap guest session   |
-| POST  | `/api/auth/login/`                 | Нет         | Вход                      |
-| POST  | `/api/auth/register/`              | Нет         | Регистрация               |
-| POST  | `/api/auth/logout/`                | Да          | Выход                     |
-| GET   | `/api/auth/password-rules/`        | Нет         | Политика паролей          |
-| GET   | `/api/auth/profile/`               | Да          | Чтение своего профиля     |
-| POST  | `/api/auth/profile/`               | Да          | Обновление своего профиля |
-| GET   | `/api/auth/users/<username>/`      | Нет         | Публичный профиль         |
-| GET   | `/api/auth/media/<path>?exp=&sig=` | Подписано   | Защищенный доступ к media |
-
-### Чат и Директ
-
-| Метод | Конечная точка                     | Авторизация | Цель                           |
-| ----- | ---------------------------------- | ----------- | ------------------------------ |
-| GET   | `/api/chat/public-room/`           | Нет         | Метаданные публичной комнаты   |
-| GET   | `/api/chat/rooms/<slug>/`          | Условно     | Метаданные комнаты с ACL       |
-| GET   | `/api/chat/rooms/<slug>/messages/` | Условно     | Сообщения комнаты с пагинацией |
-| POST  | `/api/chat/direct/start/`          | Да          | Создать/открыть direct комнату |
-| GET   | `/api/chat/direct/chats/`          | Да          | Список direct‑диалогов         |
-
-## 10. Протокол WebSocket
-
-### Конечные точки
-
-- `/ws/chat/<slug>/`
-- `/ws/direct/inbox/`
-- `/ws/presence/`
-
-### События чата
-
-Клиент -> сервер:
-
-- `{ "message": "..." }`
-
-Сервер -> клиент:
-
-- `{ "сообщение", "имя пользователя", "profile_pic", "комната" }`
-- `{ "ошибка": "message_too_long" }`
-- `{ "ошибка": "запрещено" }`
-- `{ "ошибка": "rate_limited" }`
-
-### События Direct Inbox
-
-Клиент -> сервер:
-
-- `пинг`
-- `set_active_room`
-- `mark_read`
-
-Сервер -> клиент:
-
-- `direct_unread_state`
-- `direct_inbox_item`
-- `direct_mark_read_ack`
-- `ошибка`
-- `пинг` (сердцебиение)
-
-### События присутствия
-
-Клиент -> сервер:
-
-- `пинг` (прикосновение)
-
-Сервер -> клиент:
-
-- обновления `онлайн + гости` (авторизация пользователей)
-- количество `гостей` (гостей)
-- `пинг` (сердцебиение)
-
-### Важные коды закрытия
-
-- `4401` несанкционированный
-- `4403` запрещено
-- `4404` не найден / неверный пул
-- `4429` слишком много запросов
-- Тайм-аут простоя присутствия `4000`
-- `4001` тайм-аут простоя чата
-- `4002` тайм-аут простоя прямого почтового ящика
-
-## 11. Конфигурация ENV
-
-Источник истины: example.env и backend/chat_app_django/settings.py.
-
-Основные группы:
-
-- секреты и флаги отладки
-- хосты/CORS/CSRF/HTTPS
-- база данных и Redis
-- ограничения авторизации/чата/присутствия/прямых
-- Медиа-подпись и ограничения на загрузку
-
-Важные настройки по умолчанию в производстве:
-
-- `DJANGO_DEBUG=0`
-- `DJANGO_RELAX_PASSWORDS=0`
-- включены secure cookie для HTTPS.
-- media работает в режиме signed_only.
-- если Cloudflare не используется, оставляйте `DJANGO_TRUSTED_PROXY_RANGES` только для ваших реальных прокси/внутренних сетей.
-
-## 12. Local Development
-
-### Серверная часть (PowerShell)
+## Backend
 
 ```powershell
 cd backend
@@ -509,62 +200,35 @@ python -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 python manage.py migrate
-python manage.py runserver
+python manage.py runserver 127.0.0.1:8000
 ```
 
-### Бэкенд (Bash)
+Примечание: в `DEBUG` допускается in-memory channel layer, если Redis не задан.
 
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-python manage.py migrate
-python manage.py runserver
-```
-
-### Интерфейс (PowerShell)
+## Frontend
 
 ```powershell
 cd frontend
 npm ci
-npm run dev
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-### Фронтенд (Bash)
+Vite proxy:
+- `/api` -> `http://localhost:8000`
+- `/ws` -> `ws://localhost:8000`
 
-```bash
-cd frontend
-npm ci
-npm run dev
+## Тесты и качество
+
+## Backend
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+coverage run --rcfile=.coveragerc -m pytest
+coverage report --rcfile=.coveragerc
 ```
 
-## 13. Production Deployment
-
-### Docker Compose
-
-```bash
-docker compose -f docker-compose.prod.yml up --build
-```
-
-### Nginx
-
-- `/api/` и `/ws/` проксируются в backend.
-- `/static/` обслуживается из статического тома.
-- `/media/` заблокирован в производстве.
-- `/_protected_media/` является только внутренним.
-
-### TLS
-
-Nginx ожидает сертификаты в:
-
-- `deploy/certs/fullchain.pem`
-- `deploy/certs/privkey.pem`
-
-## 14. Тестирование и качество
-
-### Пакет качества внешнего интерфейса
+## Frontend
 
 ```powershell
 cd frontend
@@ -575,73 +239,92 @@ npm run test:coverage
 npm run build
 ```
 
-### Пакет качества серверной части
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-coverage run --rcfile=.coveragerc -m pytest
-coverage report --rcfile=.coveragerc --fail-under=90
-```
-
-### E2E
+## E2E
 
 ```powershell
 cd frontend
+npx playwright install --with-deps chromium webkit
 npm run test:e2e
 ```
 
-Файл CI: `.github/workflows/test.yml`.
-Вакансии:
+CI pipeline: `.github/workflows/test.yml`.
 
-- backend-тесты
-- фронтенд-блок
-- e2e (зависит от предыдущих мест работы)
+## Конфигурация окружения
 
-## 15. Безопасность
+`example.env` существует, но в текущем репозитории комментарии в нем повреждены кодировкой.
+Ориентируйтесь на `backend/chat_app_django/settings.py` как источник истины.
 
-Реализованные элементы управления:
+Минимум для production:
+- `DJANGO_SECRET_KEY`
+- `POSTGRES_PASSWORD` (и DB параметры)
+- `DJANGO_ALLOWED_HOSTS`
+- `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_CORS_ALLOWED_ORIGINS`
+- `REDIS_URL` (или явно разрешить in-memory, не рекомендуется)
+- TLS-сертификаты для nginx
 
-- постоянные сегменты ограничения скорости в БД;
-- Регулирование подключения WebSocket;
-- ограничение скорости сообщений в чате;
-- подписанный URL-адрес носителя со сроком действия и HMAC;
-- безопасные файлы cookie и перенаправление SSL в производстве;
-- централизованный журнал аудита событий безопасности.
+Часто используемые переменные:
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `AUTH_RATE_LIMIT`, `AUTH_RATE_WINDOW`
+- `WS_CONNECT_RATE_LIMIT`, `WS_CONNECT_RATE_WINDOW`
+- `CHAT_MESSAGE_MAX_LENGTH`
+- `CHAT_ATTACHMENT_MAX_SIZE_MB`, `CHAT_ATTACHMENT_MAX_PER_MESSAGE`, `CHAT_ATTACHMENT_ALLOW_ANY_TYPE`
+- `DJANGO_MEDIA_URL_TTL_SECONDS`, `DJANGO_MEDIA_SIGNING_KEY`
 
-## 16. Наблюдаемость и диагностика
+## Production deployment
 
-- Конечные точки здоровья:
-  - `/api/health/live/`
-  - `/api/health/ready/`
-- Структурированные логи через конфигурацию Django logging.
-- События безопасности через logger `security.audit`.
+`docker-compose.prod.yml` поднимает:
+- `backend` (Daphne)
+- `nginx`
+- `redis`
+- `postgres`
 
-## 17. Устранение неполадок
+Запуск:
 
-### Браузер запрашивает `/media/...` и получает 404
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
 
-Это ожидается в режиме только для подписи.
-Используйте URL-адреса мультимедиа из полезных данных API (`/api/auth/media/...`).
+Nginx:
+- проксирует `/api/` и `/ws/` в backend;
+- отдает frontend SPA из `/usr/share/nginx/html`;
+- `/media/` закрыт снаружи;
+- `/_protected_media/` используется только internal redirect.
 
-### WebSocket закрывается с `4429`
+TLS-файлы должны лежать в `deploy/certs/`:
+- `fullchain.pem`
+- `privkey.pem`
 
-Сработало ограничение скорости.
-Проверьте `WS_CONNECT_RATE_LIMIT` и `WS_CONNECT_RATE_WINDOW`.
+## Частые проблемы
 
-### CSRF-ошибки
-
+## Google OAuth не работает
 Проверьте:
+- заполнен ли `GOOGLE_OAUTH_CLIENT_ID`;
+- совпадают ли Authorized origins в Google Cloud;
+- нет ли блокировщиков (`ERR_BLOCKED_BY_CLIENT`, FedCM/OneTap блокировки);
+- запускается ли frontend по origin, разрешенному в OAuth-клиенте.
 
-- Токен CSRF в заголовках запросов;
-- доверенные источники и настройки CORS;
-- безопасное поведение файлов cookie для текущего протокола.
+## WS 403 / reconnect loop
+Проверьте:
+- авторизацию (cookie-сессия);
+- права доступа к комнате;
+- корректный `room_id` в URL;
+- `ALLOWED_HOSTS`, CORS/CSRF и proxy headers в проде.
 
-## 18. Известные ограничения и план действий
+## Медиа не открывается
+Проверьте:
+- URL должен быть подписан (`exp` + `sig`);
+- TTL не истек;
+- файл физически существует в storage.
 
-Планируемые улучшения:
+## Attachment upload 400
+Проверьте:
+- количество файлов (`CHAT_ATTACHMENT_MAX_PER_MESSAGE`);
+- размер файла (`CHAT_ATTACHMENT_MAX_SIZE_MB`);
+- MIME-policy (`CHAT_ATTACHMENT_ALLOW_ANY_TYPE`/allowlist).
 
-- дальнейшая декомпозиция крупных модулей;
-- расширен охват аудита безопасности;
-- более богатые сценарии регрессии e2e;
-- дополнительные метрики наблюдаемости.
+## Что важно помнить при разработке
+- Внутренний transport чатов строго `room_id`-based.
+- `@username` не участвует в auth.
+- Публичные ссылки должны идти через `PublicHandle`/`public_id` и `/api/public/resolve/{ref}`.
+- Frontend DTO boundary (Zod) обязателен для внешних данных.
