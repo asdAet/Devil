@@ -251,9 +251,6 @@ CI pipeline: `.github/workflows/test.yml`.
 
 ## Конфигурация окружения
 
-`example.env` существует, но в текущем репозитории комментарии в нем повреждены кодировкой.
-Ориентируйтесь на `backend/chat_app_django/settings.py` как источник истины.
-
 Минимум для production:
 - `DJANGO_SECRET_KEY`
 - `POSTGRES_PASSWORD` (и DB параметры)
