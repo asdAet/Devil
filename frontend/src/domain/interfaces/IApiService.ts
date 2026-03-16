@@ -168,14 +168,14 @@ export interface IApiService {
 
   // --- Phase 4: Friends ---
   getFriends(): Promise<Friend[]>;
-  sendFriendRequest(username: string): Promise<SendFriendRequestResponse>;
+  sendFriendRequest(publicRef: string): Promise<SendFriendRequestResponse>;
   getIncomingRequests(): Promise<FriendRequest[]>;
   getOutgoingRequests(): Promise<FriendRequest[]>;
   acceptFriendRequest(friendshipId: number): Promise<void>;
   declineFriendRequest(friendshipId: number): Promise<void>;
   cancelOutgoingFriendRequest(friendshipId: number): Promise<void>;
   removeFriend(userId: number): Promise<void>;
-  blockUser(username: string): Promise<void>;
+  blockUser(publicRef: string): Promise<void>;
   unblockUser(userId: number): Promise<void>;
   getBlockedUsers(): Promise<BlockedUser[]>;
 
@@ -331,10 +331,12 @@ export type ReactionResult = {
   messageId: number;
   emoji: string;
   userId: number;
+  publicRef: string;
   username: string;
 };
 export type SearchResultItem = {
   id: number;
+  publicRef: string;
   username: string;
   displayName?: string;
   content: string;
@@ -366,6 +368,7 @@ export type UploadAttachmentsOptions = {
 export type RoomAttachmentItem = Attachment & {
   messageId: number;
   createdAt: string;
+  publicRef: string;
   username: string;
   displayName?: string;
 };
@@ -380,6 +383,7 @@ export type RoomAttachmentsResult = {
 };
 
 export type GlobalSearchUser = {
+  publicRef: string;
   username: string;
   displayName?: string;
   profileImage: string | null;
@@ -398,6 +402,7 @@ export type GlobalSearchGroup = {
 
 export type GlobalSearchMessage = {
   id: number;
+  publicRef: string;
   username: string;
   displayName?: string;
   content: string;

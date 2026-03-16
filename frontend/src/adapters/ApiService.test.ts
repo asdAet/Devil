@@ -10,6 +10,7 @@ const friendItem = {
   id: 10,
   user: {
     id: 22,
+    publicRef: "alice",
     username: "alice",
     profileImage: null,
     avatarCrop: null,
@@ -381,15 +382,15 @@ describe("ApiService", () => {
   });
 
   it("supports friends endpoints", async () => {
-    let sentUsername = "";
+    let sentRef = "";
 
     server.use(
       http.get("/api/friends/", () =>
         HttpResponse.json({ items: [friendItem] }),
       ),
       http.post("/api/friends/requests/", async ({ request }) => {
-        const payload = (await request.json()) as { username?: string };
-        sentUsername = payload.username ?? "";
+        const payload = (await request.json()) as { ref?: string };
+        sentRef = payload.ref ?? "";
         return HttpResponse.json({ item: friendItem });
       }),
       http.get("/api/friends/requests/incoming/", () =>
@@ -434,7 +435,7 @@ describe("ApiService", () => {
     await apiService.unblockUser(22);
 
     expect(await apiService.getBlockedUsers()).toHaveLength(1);
-    expect(sentUsername).toBe("alice");
+    expect(sentRef).toBe("alice");
   });
 
   it("supports group core and moderation endpoints", async () => {
@@ -774,6 +775,7 @@ describe("ApiService", () => {
         return HttpResponse.json({
           users: [
             {
+              publicRef: "alice",
               username: "alice",
               profileImage: null,
               avatarCrop: null,
@@ -793,6 +795,7 @@ describe("ApiService", () => {
           messages: [
             {
               id: 44,
+              publicRef: "alice",
               username: "alice",
               content: "hello",
               createdAt: now,
@@ -819,6 +822,7 @@ describe("ApiService", () => {
               height: null,
               messageId: 44,
               createdAt: now,
+              publicRef: "alice",
               username: "alice",
             },
           ],
@@ -920,6 +924,7 @@ describe("ApiService", () => {
             messageId: Number(params.messageId),
             emoji: "👍",
             userId: 1,
+            publicRef: "alice",
             username: "alice",
           });
         },

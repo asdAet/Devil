@@ -395,9 +395,9 @@ class ApiService implements IApiService {
     return this.runWithDecode(async () => getFriends(this.apiClient));
   }
 
-  public async sendFriendRequest(username: string) {
+  public async sendFriendRequest(publicRef: string) {
     return this.runWithDecode(async () =>
-      sendFriendRequest(this.apiClient, username),
+      sendFriendRequest(this.apiClient, publicRef),
     );
   }
 
@@ -431,8 +431,8 @@ class ApiService implements IApiService {
     return this.runWithDecode(async () => removeFriend(this.apiClient, userId));
   }
 
-  public async blockUser(username: string) {
-    return this.runWithDecode(async () => blockUser(this.apiClient, username));
+  public async blockUser(publicRef: string) {
+    return this.runWithDecode(async () => blockUser(this.apiClient, publicRef));
   }
 
   public async unblockUser(userId: number) {
@@ -731,5 +731,6 @@ class ApiService implements IApiService {
 }
 
 export const apiService = new ApiService();
+
 
 

@@ -2,7 +2,7 @@ import type { AxiosInstance } from "axios";
 
 import { decodeEditMessageResponse } from "../../dto";
 import type { EditMessageResult } from "../../domain/interfaces/IApiService";
-import { resolveRoomApiRef } from "./resolveRoomApiRef";
+import { resolveRoomId } from "./resolveRoomId";
 
 export async function editMessage(
   apiClient: AxiosInstance,
@@ -10,7 +10,7 @@ export async function editMessage(
   messageId: number,
   content: string,
 ): Promise<EditMessageResult> {
-  const resolvedRoomId = await resolveRoomApiRef(apiClient, roomId);
+  const resolvedRoomId = await resolveRoomId(apiClient, roomId);
   const encodedRoomId = encodeURIComponent(resolvedRoomId);
   const response = await apiClient.patch<unknown>(
     `/chat/rooms/${encodedRoomId}/messages/${messageId}/`,

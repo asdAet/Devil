@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import { resolveRoomApiRef } from "./resolveRoomApiRef";
+import { resolveRoomId } from "./resolveRoomId";
 
 export async function removeReaction(
   apiClient: AxiosInstance,
@@ -7,7 +7,7 @@ export async function removeReaction(
   messageId: number,
   emoji: string,
 ): Promise<void> {
-  const apiRoomRef = await resolveRoomApiRef(apiClient, roomId);
+  const apiRoomRef = await resolveRoomId(apiClient, roomId);
   const encodedRoomRef = encodeURIComponent(apiRoomRef);
   await apiClient.delete(
     `/chat/rooms/${encodedRoomRef}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/`,
