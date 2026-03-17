@@ -580,6 +580,87 @@ describe("ChatRoomPage", () => {
     expect(chatControllerMock.uploadAttachments).not.toHaveBeenCalled();
   });
 
+  it("queues pasted files from clipboard items", () => {
+    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+
+    const input = screen.getByLabelText("Сообщение");
+    const pastedFile = new File(["clip"], "clipboard.bin", {
+      type: "application/octet-stream",
+    });
+
+    fireEvent.paste(input, {
+      clipboardData: {
+        items: [
+          {
+            kind: "file",
+            type: "application/octet-stream",
+            getAsFile: () => pastedFile,
+          },
+        ],
+        files: [pastedFile],
+      },
+    });
+
+    expect(screen.getByText("Вложения: 1")).toBeInTheDocument();
+    expect(screen.getByText("clipboard.bin")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Отправить сообщение" }),
+    ).toBeEnabled();
+  });
+
+  it("queues pasted files from clipboard fallback files list", () => {
+    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+
+    const input = screen.getByLabelText("Сообщение");
+    const pastedFile = new File(["mobile"], "mobile-clipboard.txt", {
+      type: "text/plain",
+    });
+
+    fireEvent.paste(input, {
+      clipboardData: {
+        items: [
+          {
+            kind: "string",
+            type: "text/plain",
+            getAsFile: () => null,
+          },
+        ],
+        files: [pastedFile],
+      },
+    });
+
+    expect(screen.getByText("Вложения: 1")).toBeInTheDocument();
+    expect(screen.getByText("mobile-clipboard.txt")).toBeInTheDocument();
+  });
+
+  it("shows drop overlay and queues dropped files", () => {
+    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+
+    const chatRoot = screen.getByTestId("chat-page-root");
+    const droppedFile = new File(["drop"], "drag-drop.txt", {
+      type: "text/plain",
+    });
+
+    fireEvent.dragEnter(chatRoot, {
+      dataTransfer: {
+        types: ["Files"],
+        files: [droppedFile],
+      },
+    });
+    expect(screen.getByTestId("chat-drop-overlay")).toBeInTheDocument();
+
+    fireEvent.drop(chatRoot, {
+      dataTransfer: {
+        types: ["Files"],
+        files: [droppedFile],
+      },
+    });
+
+    expect(screen.queryByTestId("chat-drop-overlay")).toBeNull();
+    expect(screen.getByText("Вложения: 1")).toBeInTheDocument();
+    expect(screen.getByText("drag-drop.txt")).toBeInTheDocument();
+  });
+
   it("uploads mixed attachment types and maps backend error by code", async () => {
     chatControllerMock.uploadAttachments.mockRejectedValueOnce({
       data: {

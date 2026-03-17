@@ -1,10 +1,10 @@
 ﻿import type { UserProfile } from "../../entities/user/types";
 import { useDirectInbox } from "../../shared/directInbox";
-import { usePresence } from "../../shared/presence";
 import {
   buildUserProfilePath,
   normalizePublicRef,
 } from "../../shared/lib/publicRef";
+import { usePresence } from "../../shared/presence";
 import { Avatar, Button } from "../../shared/ui";
 import styles from "./TopBar.module.css";
 
@@ -86,7 +86,9 @@ export function TopBar({ user, onNavigate }: Props) {
             className={styles.avatarLink}
             aria-label="Открыть профиль"
             onClick={() =>
-              onNavigate(profileRef ? buildUserProfilePath(profileRef) : "/profile")
+              onNavigate(
+                profileRef ? buildUserProfilePath(profileRef) : "/profile",
+              )
             }
             type="button"
           >
@@ -122,4 +124,3 @@ export function TopBar({ user, onNavigate }: Props) {
     </header>
   );
 }
-

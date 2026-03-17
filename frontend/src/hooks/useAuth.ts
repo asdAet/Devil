@@ -7,13 +7,13 @@ import type {
   UpdateProfileRequestDto as UpdateProfileDto,
 } from "../dto";
 import type { UserProfile as UserProfileDto } from "../entities/user/types";
-import { debugLog } from "../shared/lib/debug";
 import type { ApiError } from "../shared/api/types";
 import {
   clearAllUserCaches,
   invalidateSelfProfile,
   invalidateUserProfile,
 } from "../shared/cache/cacheManager";
+import { debugLog } from "../shared/lib/debug";
 
 export type AuthState = {
   user: UserProfileDto | null;

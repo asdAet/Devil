@@ -44,9 +44,11 @@ class RateLimitServiceTests(TestCase):
         )
         retry_after = DbRateLimiter.retry_after_seconds(key)
         self.assertIsNotNone(retry_after)
+        if retry_after is None:
+            self.fail("retry_after should be an integer value")
         self.assertIsInstance(retry_after, int)
-        self.assertGreaterEqual(int(retry_after), 1)
-        self.assertLessEqual(int(retry_after), 5)
+        self.assertGreaterEqual(retry_after, 1)
+        self.assertLessEqual(retry_after, 5)
 
     def test_retry_after_seconds_returns_none_for_missing_or_expired_bucket(self):
         self.assertIsNone(DbRateLimiter.retry_after_seconds("rl:test:missing"))

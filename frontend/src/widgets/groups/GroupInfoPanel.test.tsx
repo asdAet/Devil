@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import {
   act,
   fireEvent,
@@ -8,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Group } from "../../entities/group/types";

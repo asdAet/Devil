@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeUnreadCountsResponse } from "../../dto";
 import type { UnreadCountItem } from "../../domain/interfaces/IApiService";
+import { decodeUnreadCountsResponse } from "../../dto";
 
 export async function getUnreadCounts(
   apiClient: AxiosInstance,

@@ -1,12 +1,11 @@
 import type { ImgHTMLAttributes } from "react";
 
+import styles from "../../styles/ui/AvatarMedia.module.css";
 import type { AvatarCrop } from "../api/users";
 import {
   buildAvatarCropImageStyle,
   normalizeAvatarCrop,
 } from "../lib/avatarCrop";
-
-import styles from "../../styles/ui/AvatarMedia.module.css";
 
 type AvatarMediaProps = {
   src: string;

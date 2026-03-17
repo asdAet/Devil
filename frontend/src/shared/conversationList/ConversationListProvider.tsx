@@ -1,25 +1,25 @@
 ﻿/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 
+import { chatController } from "../../controllers/ChatController";
+import { groupController } from "../../controllers/GroupController";
 import type { GlobalSearchResult } from "../../domain/interfaces/IApiService";
 import type { ConversationItem } from "../../entities/conversation/types";
 import type { GroupListItem } from "../../entities/group/types";
 import type { UserProfile } from "../../entities/user/types";
-import { chatController } from "../../controllers/ChatController";
-import { groupController } from "../../controllers/GroupController";
 import { useDirectInbox } from "../directInbox";
+import { debugLog } from "../lib/debug";
 import { normalizePublicRef } from "../lib/publicRef";
 import { usePresence } from "../presence";
-import { debugLog } from "../lib/debug";
 import { useUnreadOverrides } from "../unreadOverrides/store";
 import { CONVERSATION_LIST_REFRESH_EVENT } from "./events";
 

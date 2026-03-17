@@ -1,10 +1,10 @@
 import { apiService } from "../adapters/ApiService";
+import type { SendFriendRequestResponse } from "../dto/http/friends";
 import type {
   BlockedUser,
   Friend,
   FriendRequest,
 } from "../entities/friend/types";
-import type { SendFriendRequestResponse } from "../dto/http/friends";
 
 class FriendsController {
   public async getFriends(): Promise<Friend[]> {

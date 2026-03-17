@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeReactionResponse } from "../../dto";
 import type { ReactionResult } from "../../domain/interfaces/IApiService";
+import { decodeReactionResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 export async function addReaction(

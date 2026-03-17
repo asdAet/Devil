@@ -1,10 +1,10 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeUploadResponse } from "../../dto";
 import type {
   UploadAttachmentsOptions,
   UploadResult,
 } from "../../domain/interfaces/IApiService";
+import { decodeUploadResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 export async function uploadAttachments(

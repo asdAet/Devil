@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeSearchResponse } from "../../dto";
 import type { SearchResult } from "../../domain/interfaces/IApiService";
+import { decodeSearchResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 export async function searchMessages(

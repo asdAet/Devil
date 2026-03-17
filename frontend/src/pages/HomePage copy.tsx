@@ -1,32 +1,19 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { decodeChatWsEvent } from "../dto";
-
 import type { Message } from "../entities/message/types";
-
 import type { UserProfile } from "../entities/user/types";
-
-import type { ApiError } from "../shared/api/types";
-
 import { useChatActions } from "../hooks/useChatActions";
-
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
-
 import { usePublicRoom } from "../hooks/usePublicRoom";
-
 import { useReconnectingWebSocket } from "../hooks/useReconnectingWebSocket";
-
-import { usePresence } from "../shared/presence";
-
+import type { ApiError } from "../shared/api/types";
 import { debugLog } from "../shared/lib/debug";
 import { buildUserProfilePath, normalizePublicRef } from "../shared/lib/publicRef";
-
 import { sanitizeText } from "../shared/lib/sanitize";
-
 import { getWebSocketBase } from "../shared/lib/ws";
-
+import { usePresence } from "../shared/presence";
 import { Avatar, Button, Card, Toast } from "../shared/ui";
-
 import styles from "../styles/pages/HomePage.module.css";
 
 type Props = {

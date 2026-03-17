@@ -1,14 +1,14 @@
-﻿import { useEffect, useRef, useState, type ChangeEvent } from "react";
+﻿import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
 import type { UserProfile } from "../entities/user/types";
 import type { AvatarCrop } from "../shared/api/users";
 import { useUsernameMaxLength } from "../shared/config/limits";
-import { normalizePublicRef } from "../shared/lib/publicRef";
 import {
   avatarFallback,
   formatLastSeen,
   formatRegistrationDate,
 } from "../shared/lib/format";
+import { normalizePublicRef } from "../shared/lib/publicRef";
 import { usePresence } from "../shared/presence";
 import {
   AvatarCropModal,
@@ -72,9 +72,8 @@ export function ProfilePage({ user, onSave, onNavigate }: Props) {
   const hasInvalidUsernameChars =
     trimmedUsername.length > 0 && !USERNAME_ALLOWED_RE.test(trimmedUsername);
   const isUsernameValid =
-    (trimmedUsername.length === 0 ||
-      (trimmedUsername.length <= usernameMaxLength &&
-        !hasInvalidUsernameChars));
+    trimmedUsername.length === 0 ||
+    (trimmedUsername.length <= usernameMaxLength && !hasInvalidUsernameChars);
   const isBioValid = form.bio.length <= 1000;
 
   const clearFieldError = (field: string) => {
@@ -444,5 +443,3 @@ export function ProfilePage({ user, onSave, onNavigate }: Props) {
     </>
   );
 }
-
-

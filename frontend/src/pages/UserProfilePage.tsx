@@ -1,16 +1,15 @@
 ﻿import {
-  useEffect,
-  useRef,
-  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
+  useEffect,
+  useRef,
+  useState,
   type WheelEvent as ReactWheelEvent,
 } from "react";
 
 import type { UserProfile } from "../entities/user/types";
 import { useUserProfile } from "../hooks/useUserProfile";
-import { usePresence } from "../shared/presence";
 import {
   avatarFallback,
   formatFullName,
@@ -22,6 +21,7 @@ import {
   formatPublicRef,
   normalizePublicRef,
 } from "../shared/lib/publicRef";
+import { usePresence } from "../shared/presence";
 import { AvatarMedia, Button, Card, Panel } from "../shared/ui";
 import styles from "../styles/pages/UserProfilePage.module.css";
 
@@ -49,11 +49,10 @@ export function UserProfilePage({
 }: Props) {
   const { user, loading, error } = useUserProfile(username);
   const { online: presenceOnline, status: presenceStatus } = usePresence();
-  const currentPublicRef = normalizePublicRef(
-    currentUser?.publicRef || "",
-  );
+  const currentPublicRef = normalizePublicRef(currentUser?.publicRef || "");
   const routePublicRef = normalizePublicRef(username);
-  const isSelfRoute = Boolean(currentPublicRef) && currentPublicRef === routePublicRef;
+  const isSelfRoute =
+    Boolean(currentPublicRef) && currentPublicRef === routePublicRef;
   const profileUser = isSelfRoute ? currentUser : user;
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -286,7 +285,8 @@ export function UserProfilePage({
   const profilePublicRef = normalizePublicRef(
     profileUser.publicRef || routePublicRef,
   );
-  const isSelf = Boolean(currentPublicRef) && currentPublicRef === profilePublicRef;
+  const isSelf =
+    Boolean(currentPublicRef) && currentPublicRef === profilePublicRef;
   const fullName =
     formatFullName(
       profileUser.name,
@@ -294,14 +294,13 @@ export function UserProfilePage({
     ) || "Без имени";
   const publicHandle = (profileUser.username || "").trim();
   const publicRef = (profileUser.publicRef || routePublicRef).trim();
-  const avatarIdentity = profileUser.name || publicHandle || publicRef || "user";
+  const avatarIdentity =
+    profileUser.name || publicHandle || publicRef || "user";
   const normalizedTargetRef = normalizeActorRef(publicRef);
   const isUserOnline =
     presenceStatus === "online" &&
     presenceOnline.some(
-      (entry) =>
-        normalizeActorRef(entry.publicRef) ===
-        normalizedTargetRef,
+      (entry) => normalizeActorRef(entry.publicRef) === normalizedTargetRef,
     );
 
   return (
@@ -391,7 +390,9 @@ export function UserProfilePage({
         <div>
           <h2>{fullName}</h2>
           {publicRef && (
-            <p className={styles.usernameHandle}>{formatPublicRef(publicRef)}</p>
+            <p className={styles.usernameHandle}>
+              {formatPublicRef(publicRef)}
+            </p>
           )}
           {profileUser.bio?.trim() ? (
             <div data-testid="profile-bio-section">
@@ -457,6 +458,3 @@ export function UserProfilePage({
     </Card>
   );
 }
-
-
-

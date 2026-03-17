@@ -1,7 +1,7 @@
 ﻿import type { AxiosInstance } from "axios";
 
-import { buildOAuthGoogleRequestDto, decodeSessionResponse } from "../../dto";
 import type { SessionResponse } from "../../domain/interfaces/IApiService";
+import { buildOAuthGoogleRequestDto, decodeSessionResponse } from "../../dto";
 
 /**
  * Выполняет вход/регистрацию через Google OAuth.

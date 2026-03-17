@@ -1,7 +1,7 @@
 ﻿import type { AxiosInstance } from "axios";
 
-import { decodeSessionResponse } from "../../dto";
 import type { SessionResponse } from "../../domain/interfaces/IApiService";
+import { decodeSessionResponse } from "../../dto";
 
 /**
  * Загружает текущую сессию пользователя.

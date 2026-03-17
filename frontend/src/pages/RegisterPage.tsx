@@ -1,5 +1,5 @@
-﻿import { AuthForm } from "../widgets/auth/AuthForm";
-import styles from "../styles/pages/RegisterPage.module.css";
+﻿import styles from "../styles/pages/RegisterPage.module.css";
+import { AuthForm } from "../widgets/auth/AuthForm";
 
 type Props = {
   onSubmit: (payload: {

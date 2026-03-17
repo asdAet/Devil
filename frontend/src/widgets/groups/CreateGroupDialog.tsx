@@ -1,4 +1,4 @@
-import { useCallback, useState, type KeyboardEvent } from "react";
+import { type KeyboardEvent, useCallback, useState } from "react";
 
 import { groupController } from "../../controllers/GroupController";
 import styles from "../../styles/groups/GroupsPage.module.css";

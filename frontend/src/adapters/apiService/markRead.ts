@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeReadStateResponse } from "../../dto";
 import type { ReadStateResult } from "../../domain/interfaces/IApiService";
+import { decodeReadStateResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 export async function markRead(

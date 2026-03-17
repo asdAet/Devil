@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect } from "react";
 
 type Props = {
   open: boolean;

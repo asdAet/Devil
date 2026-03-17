@@ -4,16 +4,16 @@ import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { usePasswordRules } from "../hooks/usePasswordRules";
 import type { ApiError } from "../shared/api/types";
-import { debugLog } from "../shared/lib/debug";
-import { PresenceProvider } from "../shared/presence";
-import { DirectInboxProvider } from "../shared/directInbox";
-import { RuntimeConfigProvider } from "../shared/config/RuntimeConfigProvider";
-import { useRuntimeConfig } from "../shared/config/RuntimeConfigContext";
 import { GoogleOAuthError, signInWithGoogle } from "../shared/auth/googleIdentity";
+import { useRuntimeConfig } from "../shared/config/RuntimeConfigContext";
+import { RuntimeConfigProvider } from "../shared/config/RuntimeConfigProvider";
+import { DirectInboxProvider } from "../shared/directInbox";
+import { debugLog } from "../shared/lib/debug";
 import { buildUserProfilePath } from "../shared/lib/publicRef";
+import { PresenceProvider } from "../shared/presence";
+import shellStyles from "../styles/layout/AppShell.module.css";
 import { AppShell } from "../widgets/layout/AppShell";
 import { AppRoutes } from "./routes";
-import shellStyles from "../styles/layout/AppShell.module.css";
 
 type ProfileFieldErrors = Record<string, string[]>;
 type ProfileSaveResult =

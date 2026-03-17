@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-
 import Cropper, { type Area, type MediaSize } from "react-easy-crop";
 
+import styles from "../../styles/ui/AvatarCropModal.module.css";
 import type { AvatarCrop } from "../api/users";
 import { Button } from "./Button";
-
-import styles from "../../styles/ui/AvatarCropModal.module.css";
 
 type AvatarCropModalProps = {
   open: boolean;

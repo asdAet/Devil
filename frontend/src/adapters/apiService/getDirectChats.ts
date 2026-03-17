@@ -1,7 +1,7 @@
 ﻿import type { AxiosInstance } from "axios";
 
-import { decodeDirectChatsResponse } from "../../dto";
 import type { DirectChatsResponse } from "../../domain/interfaces/IApiService";
+import { decodeDirectChatsResponse } from "../../dto";
 
 /**
  * Загружает список direct-чатов текущего пользователя.

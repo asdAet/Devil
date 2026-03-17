@@ -1,9 +1,9 @@
 ﻿import { useEffect, useMemo } from "react";
 
 import type { UserProfile } from "../entities/user/types";
-import { buildDirectPath, normalizePublicRef } from "../shared/lib/publicRef";
-import { formatTimestamp } from "../shared/lib/format";
 import { useDirectInbox } from "../shared/directInbox";
+import { formatTimestamp } from "../shared/lib/format";
+import { buildDirectPath, normalizePublicRef } from "../shared/lib/publicRef";
 import { usePresence } from "../shared/presence";
 import { Avatar, Button, Card, Panel, Toast } from "../shared/ui";
 import styles from "../styles/pages/DirectChatsPage.module.css";

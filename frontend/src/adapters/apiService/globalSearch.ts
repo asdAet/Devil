@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeGlobalSearchResponse } from "../../dto";
 import type { GlobalSearchResult } from "../../domain/interfaces/IApiService";
+import { decodeGlobalSearchResponse } from "../../dto";
 
 export async function globalSearch(
   apiClient: AxiosInstance,

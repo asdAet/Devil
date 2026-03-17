@@ -1,11 +1,6 @@
 ﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
-  DirectChatsResponseDto,
-  DirectStartResponseDto,
-  RoomMessagesDto,
-} from "../dto";
-import type {
   GlobalSearchResult,
   ReadStateResult,
   RoomAttachmentsResult,
@@ -13,6 +8,11 @@ import type {
   UnreadCountItem,
   UploadResult,
 } from "../domain/interfaces/IApiService";
+import type {
+  DirectChatsResponseDto,
+  DirectStartResponseDto,
+  RoomMessagesDto,
+} from "../dto";
 import type { RoomDetails as RoomDetailsDto } from "../entities/room/types";
 
 const apiMocks = vi.hoisted(() => ({

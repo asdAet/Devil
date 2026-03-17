@@ -1,7 +1,7 @@
 ﻿import type { AxiosInstance } from "axios";
 
-import { buildRegisterRequestDto, decodeSessionResponse } from "../../dto";
 import type { SessionResponse } from "../../domain/interfaces/IApiService";
+import { buildRegisterRequestDto, decodeSessionResponse } from "../../dto";
 
 /**
  * Выполняет регистрацию пользователя.

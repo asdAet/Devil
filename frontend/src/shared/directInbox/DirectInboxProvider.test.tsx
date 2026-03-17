@@ -60,12 +60,12 @@ vi.mock("../../hooks/useReconnectingWebSocket", () => ({
   },
 }));
 
-import { DirectInboxProvider } from "./DirectInboxProvider";
-import { useDirectInbox } from "./useDirectInbox";
 import {
   resetUnreadOverrides,
   setUnreadOverride,
 } from "../unreadOverrides/store";
+import { DirectInboxProvider } from "./DirectInboxProvider";
+import { useDirectInbox } from "./useDirectInbox";
 
 const user = {
   publicRef: "demo",

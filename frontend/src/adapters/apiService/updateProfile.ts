@@ -1,10 +1,10 @@
 ﻿import type { AxiosInstance } from "axios";
 
+import type { UpdateProfileInput } from "../../domain/interfaces/IApiService";
 import {
   buildUpdateProfileRequestDto,
   decodeProfileEnvelopeResponse,
 } from "../../dto";
-import type { UpdateProfileInput } from "../../domain/interfaces/IApiService";
 import type { UserProfile } from "../../entities/user/types";
 
 /**

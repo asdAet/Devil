@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeGroupResponse } from "../../dto";
 import type { UpdateGroupInput } from "../../domain/interfaces/IApiService";
+import { decodeGroupResponse } from "../../dto";
 import type { Group } from "../../entities/group/types";
 
 const appendScalar = (formData: FormData, key: string, value: unknown) => {

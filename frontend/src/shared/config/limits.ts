@@ -1,5 +1,5 @@
-import { useRuntimeConfig } from "./RuntimeConfigContext";
 import { getRuntimeConfig } from "./runtimeConfig";
+import { useRuntimeConfig } from "./RuntimeConfigContext";
 
 const DEFAULT_ROOM_SLUG_REGEX = "^[A-Za-z0-9_-]{3,50}$";
 

@@ -367,7 +367,9 @@ export function UserProfilePanel({ publicRef, currentPublicRef }: Props) {
         />
         <h4 className={styles.peerName}>{fullName}</h4>
         {targetPublicRef && (
-          <p className={styles.usernameHandle}>{formatPublicRef(targetPublicRef)}</p>
+          <p className={styles.usernameHandle}>
+            {formatPublicRef(targetPublicRef)}
+          </p>
         )}
         <p className={styles.meta}>{presenceLabel}</p>
 

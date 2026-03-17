@@ -1,95 +1,94 @@
-import axios, { AxiosHeaders } from "axios";
 import type { AxiosError, AxiosInstance } from "axios";
+import axios, { AxiosHeaders } from "axios";
 
-import type { ApiError } from "../shared/api/types";
-import { decodeAuthErrorPayload } from "../dto";
-import { parseJson, DtoDecodeError } from "../dto";
-import {
-  readCsrfFromCookie,
-  readCsrfFromSessionStorage,
-  writeCsrfToSessionStorage,
-} from "../dto";
 import type {
   IApiService,
   UpdateGroupInput,
   UpdateProfileInput,
 } from "../domain/interfaces/IApiService";
-
+import { decodeAuthErrorPayload } from "../dto";
+import { DtoDecodeError,parseJson } from "../dto";
+import {
+  readCsrfFromCookie,
+  readCsrfFromSessionStorage,
+  writeCsrfToSessionStorage,
+} from "../dto";
+import type { ApiError } from "../shared/api/types";
+import { acceptFriendRequest } from "./apiService/acceptFriendRequest";
+import { addReaction } from "./apiService/addReaction";
+import { approveJoinRequest } from "./apiService/approveJoinRequest";
+import { banMember } from "./apiService/banMember";
+import { blockUser } from "./apiService/blockUser";
+import { cancelOutgoingFriendRequest } from "./apiService/cancelOutgoingFriendRequest";
+import { createGroup } from "./apiService/createGroup";
+import { createInvite } from "./apiService/createInvite";
+import { createRoomOverride } from "./apiService/createRoomOverride";
+import { createRoomRole } from "./apiService/createRoomRole";
+import { declineFriendRequest } from "./apiService/declineFriendRequest";
+import { deleteGroup } from "./apiService/deleteGroup";
+import { deleteMessage } from "./apiService/deleteMessage";
+import { deleteRoomOverride } from "./apiService/deleteRoomOverride";
+import { deleteRoomRole } from "./apiService/deleteRoomRole";
+import { editMessage } from "./apiService/editMessage";
 import { ensureCsrf as ensureCsrfRequest } from "./apiService/ensureCsrf";
 import { ensurePresenceSession } from "./apiService/ensurePresenceSession";
+import { getBannedMembers } from "./apiService/getBannedMembers";
+import { getBlockedUsers } from "./apiService/getBlockedUsers";
 import { getClientConfig } from "./apiService/getClientConfig";
-import { getSession } from "./apiService/getSession";
-import { login } from "./apiService/login";
-import { oauthGoogle } from "./apiService/oauthGoogle";
-import { register } from "./apiService/register";
-import { logout } from "./apiService/logout";
-import { updateProfile } from "./apiService/updateProfile";
+import { getDirectChats } from "./apiService/getDirectChats";
+import { getFriends } from "./apiService/getFriends";
+import { getGroupDetails } from "./apiService/getGroupDetails";
+import { getGroupMembers } from "./apiService/getGroupMembers";
+import { getIncomingRequests } from "./apiService/getIncomingRequests";
+import { getInvitePreview } from "./apiService/getInvitePreview";
+import { getInvites } from "./apiService/getInvites";
+import { getJoinRequests } from "./apiService/getJoinRequests";
+import { getMemberRoles } from "./apiService/getMemberRoles";
+import { getMyGroups } from "./apiService/getMyGroups";
+import { getMyPermissions } from "./apiService/getMyPermissions";
+import { getOutgoingRequests } from "./apiService/getOutgoingRequests";
 import { getPasswordRules } from "./apiService/getPasswordRules";
+import { getPinnedMessages } from "./apiService/getPinnedMessages";
+import { getPublicGroups } from "./apiService/getPublicGroups";
 import { getPublicRoom } from "./apiService/getPublicRoom";
+import { getRoomAttachments } from "./apiService/getRoomAttachments";
 import { getRoomDetails } from "./apiService/getRoomDetails";
 import { getRoomMessages } from "./apiService/getRoomMessages";
-import { getUserProfile } from "./apiService/getUserProfile";
-import { startDirectChat } from "./apiService/startDirectChat";
-import { getDirectChats } from "./apiService/getDirectChats";
-import { getUnreadCounts } from "./apiService/getUnreadCounts";
-import { editMessage } from "./apiService/editMessage";
-import { deleteMessage } from "./apiService/deleteMessage";
-import { addReaction } from "./apiService/addReaction";
-import { removeReaction } from "./apiService/removeReaction";
-import { searchMessages } from "./apiService/searchMessages";
-import { uploadAttachments } from "./apiService/uploadAttachments";
-import { markRead } from "./apiService/markRead";
-import { getFriends } from "./apiService/getFriends";
-import { sendFriendRequest } from "./apiService/sendFriendRequest";
-import { getIncomingRequests } from "./apiService/getIncomingRequests";
-import { getOutgoingRequests } from "./apiService/getOutgoingRequests";
-import { acceptFriendRequest } from "./apiService/acceptFriendRequest";
-import { declineFriendRequest } from "./apiService/declineFriendRequest";
-import { cancelOutgoingFriendRequest } from "./apiService/cancelOutgoingFriendRequest";
-import { removeFriend } from "./apiService/removeFriend";
-import { blockUser } from "./apiService/blockUser";
-import { unblockUser } from "./apiService/unblockUser";
-import { getBlockedUsers } from "./apiService/getBlockedUsers";
-import { createGroup } from "./apiService/createGroup";
-import { getPublicGroups } from "./apiService/getPublicGroups";
-import { getMyGroups } from "./apiService/getMyGroups";
-import { getGroupDetails } from "./apiService/getGroupDetails";
-import { updateGroup } from "./apiService/updateGroup";
-import { deleteGroup } from "./apiService/deleteGroup";
-import { joinGroup } from "./apiService/joinGroup";
-import { leaveGroup } from "./apiService/leaveGroup";
-import { getGroupMembers } from "./apiService/getGroupMembers";
-import { kickMember } from "./apiService/kickMember";
-import { banMember } from "./apiService/banMember";
-import { unbanMember } from "./apiService/unbanMember";
-import { muteMember } from "./apiService/muteMember";
-import { unmuteMember } from "./apiService/unmuteMember";
-import { getBannedMembers } from "./apiService/getBannedMembers";
-import { createInvite } from "./apiService/createInvite";
-import { getInvites } from "./apiService/getInvites";
-import { revokeInvite } from "./apiService/revokeInvite";
-import { getInvitePreview } from "./apiService/getInvitePreview";
-import { joinViaInvite } from "./apiService/joinViaInvite";
-import { getJoinRequests } from "./apiService/getJoinRequests";
-import { approveJoinRequest } from "./apiService/approveJoinRequest";
-import { rejectJoinRequest } from "./apiService/rejectJoinRequest";
-import { getPinnedMessages } from "./apiService/getPinnedMessages";
-import { pinMessage } from "./apiService/pinMessage";
-import { unpinMessage } from "./apiService/unpinMessage";
-import { transferOwnership } from "./apiService/transferOwnership";
-import { getRoomRoles } from "./apiService/getRoomRoles";
-import { createRoomRole } from "./apiService/createRoomRole";
-import { updateRoomRole } from "./apiService/updateRoomRole";
-import { deleteRoomRole } from "./apiService/deleteRoomRole";
-import { getMemberRoles } from "./apiService/getMemberRoles";
-import { setMemberRoles } from "./apiService/setMemberRoles";
 import { getRoomOverrides } from "./apiService/getRoomOverrides";
-import { createRoomOverride } from "./apiService/createRoomOverride";
-import { updateRoomOverride } from "./apiService/updateRoomOverride";
-import { deleteRoomOverride } from "./apiService/deleteRoomOverride";
-import { getMyPermissions } from "./apiService/getMyPermissions";
+import { getRoomRoles } from "./apiService/getRoomRoles";
+import { getSession } from "./apiService/getSession";
+import { getUnreadCounts } from "./apiService/getUnreadCounts";
+import { getUserProfile } from "./apiService/getUserProfile";
 import { globalSearch } from "./apiService/globalSearch";
-import { getRoomAttachments } from "./apiService/getRoomAttachments";
+import { joinGroup } from "./apiService/joinGroup";
+import { joinViaInvite } from "./apiService/joinViaInvite";
+import { kickMember } from "./apiService/kickMember";
+import { leaveGroup } from "./apiService/leaveGroup";
+import { login } from "./apiService/login";
+import { logout } from "./apiService/logout";
+import { markRead } from "./apiService/markRead";
+import { muteMember } from "./apiService/muteMember";
+import { oauthGoogle } from "./apiService/oauthGoogle";
+import { pinMessage } from "./apiService/pinMessage";
+import { register } from "./apiService/register";
+import { rejectJoinRequest } from "./apiService/rejectJoinRequest";
+import { removeFriend } from "./apiService/removeFriend";
+import { removeReaction } from "./apiService/removeReaction";
+import { revokeInvite } from "./apiService/revokeInvite";
+import { searchMessages } from "./apiService/searchMessages";
+import { sendFriendRequest } from "./apiService/sendFriendRequest";
+import { setMemberRoles } from "./apiService/setMemberRoles";
+import { startDirectChat } from "./apiService/startDirectChat";
+import { transferOwnership } from "./apiService/transferOwnership";
+import { unbanMember } from "./apiService/unbanMember";
+import { unblockUser } from "./apiService/unblockUser";
+import { unmuteMember } from "./apiService/unmuteMember";
+import { unpinMessage } from "./apiService/unpinMessage";
+import { updateGroup } from "./apiService/updateGroup";
+import { updateProfile } from "./apiService/updateProfile";
+import { updateRoomOverride } from "./apiService/updateRoomOverride";
+import { updateRoomRole } from "./apiService/updateRoomRole";
+import { uploadAttachments } from "./apiService/uploadAttachments";
 
 const API_BASE = "/api";
 const CSRF_STORAGE_KEY = "csrfToken";
@@ -152,7 +151,7 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
     const status = axiosError.response?.status ?? 0;
     const data = normalizeErrorPayload(axiosError.response?.data);
     const message =
-      extractErrorMessage(data) || axiosError.message || "Ошибка запроса";
+      extractErrorMessage(data) || axiosError.message || "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ";
     return { status, message, data };
   }
 
@@ -168,7 +167,7 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
   if (error instanceof DtoDecodeError) {
     return {
       status: 502,
-      message: "Некорректный ответ сервера",
+      message: "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
       data: {
         source: error.source,
         issues: error.issues,
@@ -176,7 +175,7 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
     };
   }
 
-  return { status: 0, message: "Ошибка запроса" };
+  return { status: 0, message: "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ" };
 };
 
 class ApiService implements IApiService {

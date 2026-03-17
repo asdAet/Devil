@@ -1,18 +1,18 @@
 ﻿import {
+  type UIEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type UIEvent,
 } from "react";
 import { useLocation } from "react-router-dom";
 
 import { chatController } from "../controllers/ChatController";
 import { friendsController } from "../controllers/FriendsController";
 import { groupController } from "../controllers/GroupController";
-import { decodeChatWsEvent } from "../dto";
 import type { SearchResultItem } from "../domain/interfaces/IApiService";
+import { decodeChatWsEvent } from "../dto";
 import type { Message } from "../entities/message/types";
 import type { UserProfile } from "../entities/user/types";
 import { useChatRoom } from "../hooks/useChatRoom";
@@ -21,251 +21,62 @@ import { useReconnectingWebSocket } from "../hooks/useReconnectingWebSocket";
 import { useRoomPermissions } from "../hooks/useRoomPermissions";
 import { useTypingIndicator } from "../hooks/useTypingIndicator";
 import {
-  useChatAttachmentMaxPerMessage,
-  useChatAttachmentMaxSizeMb,
-  useChatMessageMaxLength,
-} from "../shared/config/limits";
-import {
   invalidateDirectChats,
   invalidateRoomMessages,
 } from "../shared/cache/cacheManager";
 import { useReadTracker } from "../shared/chat/readTracker";
+import {
+  useChatAttachmentMaxPerMessage,
+  useChatAttachmentMaxSizeMb,
+  useChatMessageMaxLength,
+} from "../shared/config/limits";
 import { useDirectInbox } from "../shared/directInbox";
 import { useInfoPanel } from "../shared/layout/useInfoPanel";
-import { normalizeAvatarCrop } from "../shared/lib/avatarCrop";
 import { debugLog } from "../shared/lib/debug";
-import {
-  formatDayLabel,
-  formatLastSeen,
-  formatTimestamp,
-} from "../shared/lib/format";
+import { formatLastSeen, formatTimestamp } from "../shared/lib/format";
 import { sanitizeText } from "../shared/lib/sanitize";
+import { getWebSocketBase } from "../shared/lib/ws";
+import { usePresence } from "../shared/presence";
+import { Avatar, Button, Modal, Panel, Toast } from "../shared/ui";
 import {
   clearUnreadOverride,
   setUnreadOverride,
 } from "../shared/unreadOverrides/store";
-import { getWebSocketBase } from "../shared/lib/ws";
-import { usePresence } from "../shared/presence";
-import { Avatar, Button, Modal, Panel, Toast } from "../shared/ui";
 import styles from "../styles/pages/ChatRoomPage.module.css";
 import { MessageBubble } from "../widgets/chat/MessageBubble";
 import { MessageInput } from "../widgets/chat/MessageInput";
 import { TypingIndicator } from "../widgets/chat/TypingIndicator";
-
-type ReadReceipt = {
-  userId: number;
-  publicRef: string;
-  username: string;
-  displayName?: string;
-  lastReadMessageId: number;
-};
+import { useFileDropZone } from "./chatRoomPage/useFileDropZone";
+import type {
+  InitialPositioningPhase,
+  InitialPositioningTarget,
+  ReadReceipt,
+} from "./chatRoomPage/utils";
+import {
+  buildTimeline,
+  clearPendingReadFromStorage,
+  extractApiErrorMessage,
+  formatGroupTypingLabel,
+  isOwnMessage,
+  MARK_READ_DEBOUNCE_MS,
+  MAX_HISTORY_JUMP_ATTEMPTS,
+  MAX_HISTORY_NO_PROGRESS_ATTEMPTS,
+  normalizeActorRef,
+  normalizeReadMessageId,
+  parseRoomIdRef,
+  readPendingReadFromStorage,
+  resolveCsrfToken,
+  resolveCurrentActorRef,
+  resolveMessageActorRef,
+  sameAvatarCrop,
+  TYPING_TIMEOUT_MS,
+  writePendingReadToStorage,
+} from "./chatRoomPage/utils";
 
 type Props = {
   slug: string;
   user: UserProfile | null;
   onNavigate: (path: string) => void;
-};
-
-type InitialPositioningPhase = "pending" | "positioning" | "settled";
-type InitialPositioningTarget = "unread" | "bottom";
-
-const TYPING_TIMEOUT_MS = 5_000;
-const MAX_HISTORY_JUMP_ATTEMPTS = 60;
-const MAX_HISTORY_NO_PROGRESS_ATTEMPTS = 2;
-const MARK_READ_DEBOUNCE_MS = 180;
-const PENDING_READ_STORAGE_PREFIX = "chat.pendingRead.";
-const CSRF_SESSION_STORAGE_KEY = "csrfToken";
-
-const normalizeActorRef = (value: string | null | undefined): string => {
-  if (!value) return "";
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return "";
-  return normalized.startsWith("@") ? normalized.slice(1) : normalized;
-};
-
-const resolveCurrentActorRef = (user: UserProfile | null): string => {
-  if (!user) return "";
-  return (
-    normalizeActorRef(user.publicRef) ||
-    normalizeActorRef(user.username) ||
-    normalizeActorRef(user.publicId) ||
-    ""
-  );
-};
-
-const resolveMessageActorRef = (message: Pick<Message, "publicRef" | "username">): string =>
-  normalizeActorRef(message.publicRef);
-
-const isOwnMessage = (
-  message: Message,
-  currentActorRef: string,
-) => Boolean(currentActorRef && resolveMessageActorRef(message) === currentActorRef);
-
-const normalizeReadMessageId = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value))
-    return Math.max(0, Math.trunc(value));
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return Math.max(0, Math.trunc(parsed));
-  }
-  return 0;
-};
-
-const parseRoomIdRef = (value: unknown): number | null => {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value) || value <= 0) return null;
-    return Math.trunc(value);
-  }
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!/^\d+$/.test(normalized)) return null;
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Math.trunc(parsed);
-};
-
-const pendingReadStorageKey = (roomSlug: string) =>
-  `${PENDING_READ_STORAGE_PREFIX}${roomSlug}`;
-
-const readPendingReadFromStorage = (roomSlug: string): number => {
-  if (typeof window === "undefined") return 0;
-  try {
-    return normalizeReadMessageId(
-      window.sessionStorage.getItem(pendingReadStorageKey(roomSlug)),
-    );
-  } catch {
-    return 0;
-  }
-};
-
-const writePendingReadToStorage = (
-  roomSlug: string,
-  lastReadMessageId: number,
-): void => {
-  if (typeof window === "undefined") return;
-  try {
-    const normalized = normalizeReadMessageId(lastReadMessageId);
-    if (normalized < 1) {
-      window.sessionStorage.removeItem(pendingReadStorageKey(roomSlug));
-      return;
-    }
-    window.sessionStorage.setItem(
-      pendingReadStorageKey(roomSlug),
-      String(normalized),
-    );
-  } catch {
-    // Storage can be unavailable in private mode or restricted contexts.
-  }
-};
-
-const clearPendingReadFromStorage = (roomSlug: string): void => {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.removeItem(pendingReadStorageKey(roomSlug));
-  } catch {
-    // noop
-  }
-};
-
-const readCookieValue = (cookie: string, name: string): string | null => {
-  const chunks = cookie.split(";").map((entry) => entry.trim());
-  const match = chunks.find((entry) => entry.startsWith(`${name}=`));
-  if (!match) return null;
-  const value = match.slice(name.length + 1).trim();
-  return value || null;
-};
-
-const resolveCsrfToken = (): string | null => {
-  if (
-    typeof document !== "undefined" &&
-    typeof document.cookie === "string" &&
-    document.cookie.length > 0
-  ) {
-    const fromCookie = readCookieValue(document.cookie, "csrftoken");
-    if (fromCookie) return fromCookie;
-  }
-
-  if (typeof window !== "undefined") {
-    try {
-      const fromStorage = window.sessionStorage.getItem(
-        CSRF_SESSION_STORAGE_KEY,
-      );
-      if (fromStorage && fromStorage.trim()) return fromStorage.trim();
-    } catch {
-      // noop
-    }
-  }
-
-  return null;
-};
-
-const extractApiErrorMessage = (error: unknown, fallback: string) => {
-  if (!error || typeof error !== "object") return fallback;
-  const candidate = error as {
-    message?: string;
-    data?: {
-      error?: string;
-      detail?: string;
-      code?: string;
-      details?: {
-        maxPerMessage?: number;
-        maxSize?: number;
-        allowedTypes?: string[];
-      };
-    };
-  };
-  const code = candidate.data?.code;
-  const details = candidate.data?.details;
-  if (code === "no_files") {
-    return "Файлы не переданы. Выберите вложение и повторите отправку.";
-  }
-  if (code === "too_many_files") {
-    const maxPerMessage = details?.maxPerMessage;
-    return typeof maxPerMessage === "number"
-      ? `Слишком много файлов. Максимум ${maxPerMessage} на сообщение.`
-      : "Слишком много файлов в одном сообщении.";
-  }
-  if (code === "file_too_large") {
-    const maxSize = details?.maxSize;
-    if (typeof maxSize === "number" && maxSize > 0) {
-      const maxMb = Math.ceil(maxSize / (1024 * 1024));
-      return `Файл превышает лимит размера (${maxMb} МБ).`;
-    }
-    return "Файл превышает максимально допустимый размер.";
-  }
-  if (code === "unsupported_type") {
-    if (
-      Array.isArray(details?.allowedTypes) &&
-      details.allowedTypes.length > 0
-    ) {
-      return `Тип файла не поддерживается. Разрешены: ${details.allowedTypes.join(", ")}.`;
-    }
-    return "Тип файла не поддерживается.";
-  }
-  if (code === "invalid_reply_to") {
-    return "Сообщение для ответа недоступно. Обновите чат и попробуйте снова.";
-  }
-  if (candidate.data?.error) return candidate.data.error;
-  if (candidate.data?.detail) return candidate.data.detail;
-  if (candidate.message && !candidate.message.includes("status code"))
-    return candidate.message;
-  return fallback;
-};
-
-const sameAvatarCrop = (
-  left: Message["avatarCrop"],
-  right: Message["avatarCrop"],
-) => {
-  const normalizedLeft = normalizeAvatarCrop(left ?? null);
-  const normalizedRight = normalizeAvatarCrop(right ?? null);
-  if (!normalizedLeft && !normalizedRight) return true;
-  if (!normalizedLeft || !normalizedRight) return false;
-  return (
-    normalizedLeft.x === normalizedRight.x &&
-    normalizedLeft.y === normalizedRight.y &&
-    normalizedLeft.width === normalizedRight.width &&
-    normalizedLeft.height === normalizedRight.height
-  );
 };
 
 export function ChatRoomPage({ slug, user, onNavigate }: Props) {
@@ -1106,8 +917,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
               ...prev,
               {
                 id: messageId,
-                publicRef:
-                  decoded.message.publicRef || "",
+                publicRef: decoded.message.publicRef || "",
                 username: decoded.message.username,
                 displayName:
                   decoded.message.displayName ?? decoded.message.username,
@@ -1127,9 +937,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
           if (
             !isAtBottomRef.current &&
-            normalizeActorRef(
-              decoded.message.publicRef || "",
-            ) !== currentActorRef
+            normalizeActorRef(decoded.message.publicRef || "") !==
+              currentActorRef
           ) {
             setNewMsgCount((count) => count + 1);
             if (readStateEnabled && unreadDividerAnchorRef.current === null) {
@@ -1156,13 +965,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
           break;
         }
         case "typing":
-          if (
-            normalizeActorRef(decoded.publicRef || "") !==
-            currentActorRef
-          ) {
-            const typingActorRef = normalizeActorRef(
-              decoded.publicRef,
-            );
+          if (normalizeActorRef(decoded.publicRef || "") !== currentActorRef) {
+            const typingActorRef = normalizeActorRef(decoded.publicRef);
             if (!typingActorRef) break;
             setTypingUsers((prev) => {
               const next = new Map(prev);
@@ -1206,8 +1010,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 (r) => r.emoji === decoded.emoji,
               );
               const isMe =
-                normalizeActorRef(decoded.publicRef || "") ===
-                currentActorRef;
+                normalizeActorRef(decoded.publicRef || "") === currentActorRef;
               if (existing) {
                 return {
                   ...msg,
@@ -1233,8 +1036,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
             prev.map((msg) => {
               if (msg.id !== decoded.messageId) return msg;
               const isMe =
-                normalizeActorRef(decoded.publicRef || "") ===
-                currentActorRef;
+                normalizeActorRef(decoded.publicRef || "") === currentActorRef;
               return {
                 ...msg,
                 reactions: msg.reactions
@@ -1441,7 +1243,9 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     if (!raw.trim() && !hasQueuedFiles) return;
 
     if (rateLimitActive) {
-      setRoomError("Йоу, не так быстро, Вы отправляете сообщения слишком быстро!");
+      setRoomError(
+        "Йоу, не так быстро, Вы отправляете сообщения слишком быстро!",
+      );
       return;
     }
     if (raw.length > maxMessageLength) {
@@ -1780,43 +1584,10 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const loadError = error ? "Не удалось загрузить комнату" : null;
   const visibleError = roomError || loadError;
 
-  const timeline = useMemo(() => {
-    type TimelineItem =
-      | { type: "day"; key: string; label: string }
-      | { type: "message"; message: Message }
-      | { type: "unread" };
-    const items: TimelineItem[] = [];
-    const nowDate = new Date();
-    let lastKey: string | null = null;
-    let unreadInserted = false;
-    const unreadDividerId = unreadDividerRenderTarget.messageId;
-
-    if (unreadDividerRenderTarget.insertAtTop) {
-      items.push({ type: "unread" });
-      unreadInserted = true;
-    }
-
-    for (const msg of messages) {
-      if (!unreadInserted && unreadDividerId && msg.id === unreadDividerId) {
-        items.push({ type: "unread" });
-        unreadInserted = true;
-      }
-      const date = new Date(msg.createdAt);
-      if (!Number.isNaN(date.getTime())) {
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-        if (key !== lastKey) {
-          const label = formatDayLabel(date, nowDate);
-          if (label) {
-            items.push({ type: "day", key, label });
-            lastKey = key;
-          }
-        }
-      }
-      items.push({ type: "message", message: msg });
-    }
-
-    return items;
-  }, [messages, unreadDividerRenderTarget]);
+  const timeline = useMemo(
+    () => buildTimeline(messages, unreadDividerRenderTarget),
+    [messages, unreadDividerRenderTarget],
+  );
 
   const activeTypingUsers = useMemo(
     () =>
@@ -1829,9 +1600,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const directPeerIsTyping = Boolean(
     details?.kind === "direct" &&
     details.peer?.publicRef &&
-    typingUsers.has(
-      normalizeActorRef(details.peer?.publicRef || ""),
-    ),
+    typingUsers.has(normalizeActorRef(details.peer?.publicRef || "")),
   );
 
   const roomTitle =
@@ -1839,15 +1608,10 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       ? (details.peer?.displayName ?? details.peer?.username ?? details.name)
       : (details?.name ?? slug);
 
-  const groupTypingLabel = useMemo(() => {
-    if (details?.kind !== "group" || activeTypingUsers.length === 0)
-      return null;
-    if (activeTypingUsers.length === 1)
-      return `${activeTypingUsers[0]} печатает...`;
-    if (activeTypingUsers.length === 2)
-      return `${activeTypingUsers[0]} и ${activeTypingUsers[1]} печатают...`;
-    return `${activeTypingUsers[0]} и ещё ${activeTypingUsers.length - 1} печатают...`;
-  }, [activeTypingUsers, details?.kind]);
+  const groupTypingLabel = useMemo(
+    () => formatGroupTypingLabel(details?.kind, activeTypingUsers),
+    [activeTypingUsers, details?.kind],
+  );
 
   const isBlocked = Boolean(details?.blocked);
   const isBlockedByMe = Boolean(details?.blockedByMe);
@@ -1860,6 +1624,20 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const canSendMessages = Boolean(
     user && !isBlocked && (!isGroupRoom || canWriteToRoom),
   );
+  const {
+    active: isDropTargetActive,
+    bindings: fileDropBindings,
+    reset: resetFileDropZone,
+  } = useFileDropZone({
+    enabled: canSendMessages,
+    onFilesDrop: handleAttach,
+  });
+
+  useEffect(() => {
+    if (canSendMessages) return;
+    if (!isDropTargetActive) return;
+    resetFileDropZone();
+  }, [canSendMessages, isDropTargetActive, resetFileDropZone]);
 
   const roomSubtitle =
     details?.kind === "direct"
@@ -1867,11 +1645,9 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
         ? "Был(а) в сети давно"
         : directPeerIsTyping
           ? "Печатает..."
-            : details.peer?.publicRef &&
+          : details.peer?.publicRef &&
               onlineUsernames.has(
-                normalizeActorRef(
-                  details.peer?.publicRef || "",
-                ),
+                normalizeActorRef(details.peer?.publicRef || ""),
               )
             ? "В сети"
             : `Был(а) в сети: ${formatLastSeen(details.peer?.lastSeen ?? null) || "—"}`
@@ -1885,8 +1661,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     let maxId = 0;
     for (const receipt of readReceipts.values()) {
       if (
-        normalizeActorRef(receipt.publicRef) !==
-          currentActorRef &&
+        normalizeActorRef(receipt.publicRef) !== currentActorRef &&
         receipt.lastReadMessageId > maxId
       ) {
         maxId = receipt.lastReadMessageId;
@@ -1912,7 +1687,27 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   }
 
   return (
-    <div className={styles.chat}>
+    <div
+      className={[styles.chat, isDropTargetActive ? styles.chatDragActive : ""]
+        .filter(Boolean)
+        .join(" ")}
+      data-testid="chat-page-root"
+      {...fileDropBindings}
+    >
+      {isDropTargetActive && (
+        <div
+          className={styles.dropOverlay}
+          role="status"
+          aria-live="polite"
+          data-testid="chat-drop-overlay"
+        >
+          <div className={styles.dropOverlayContent}>
+            <strong>Отпустите файл, чтобы прикрепить</strong>
+            <span>Можно перетащить сразу несколько файлов</span>
+          </div>
+        </div>
+      )}
+
       {!isOnline && (
         <Toast variant="warning" role="status">
           Нет подключения к интернету. Мы восстановим соединение автоматически.
@@ -1958,9 +1753,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 profileImage={details.peer.profileImage}
                 avatarCrop={details.peer.avatarCrop}
                 online={onlineUsernames.has(
-                  normalizeActorRef(
-                    details.peer.publicRef,
-                  ),
+                  normalizeActorRef(details.peer.publicRef),
                 )}
                 size="small"
               />
@@ -2195,7 +1988,10 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 </div>
               ) : (
                 (() => {
-                  const ownMessage = isOwnMessage(item.message, currentActorRef);
+                  const ownMessage = isOwnMessage(
+                    item.message,
+                    currentActorRef,
+                  );
                   const canModerateMessage = Boolean(
                     user && canManageMessagesToRoom && !ownMessage,
                   );
@@ -2380,7 +2176,3 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     </div>
   );
 }
-
-
-
-
