@@ -1,9 +1,9 @@
 import { apiService } from "../adapters/ApiService";
 import type {
-  Role,
   MemberRoles,
-  PermissionOverride,
   MyPermissions,
+  PermissionOverride,
+  Role,
 } from "../entities/role/types";
 
 class RolesController {

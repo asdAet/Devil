@@ -1,9 +1,9 @@
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
-  type ReactNode,
 } from "react";
 
 import styles from "../../styles/ui/ContextMenu.module.css";

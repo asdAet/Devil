@@ -5,10 +5,13 @@ import type { UserProfile } from "../../entities/user/types";
 import { useConversationList } from "../../shared/conversationList/ConversationListProvider";
 import { useDirectInbox } from "../../shared/directInbox";
 import { formatFullName } from "../../shared/lib/format";
-import { buildUserProfilePath, formatPublicRef } from "../../shared/lib/publicRef";
+import {
+  buildUserProfilePath,
+  formatPublicRef,
+} from "../../shared/lib/publicRef";
 import { Avatar, Button } from "../../shared/ui";
-import { ConversationList } from "../sidebar/ConversationList";
 import styles from "../../styles/layout/Sidebar.module.css";
+import { ConversationList } from "../sidebar/ConversationList";
 
 type Props = {
   user: UserProfile | null;
@@ -193,7 +196,9 @@ export function Sidebar({ user, onNavigate, onLogout }: Props) {
                 <div className={styles.userIdentity}>
                   <span className={styles.drawerUserName}>{fullName}</span>
                   {publicRef && (
-                    <span className={styles.userHandle}>{formatPublicRef(publicRef)}</span>
+                    <span className={styles.userHandle}>
+                      {formatPublicRef(publicRef)}
+                    </span>
                   )}
                 </div>
               </div>
@@ -330,7 +335,9 @@ export function Sidebar({ user, onNavigate, onLogout }: Props) {
             <div className={styles.userIdentity}>
               <span className={styles.userName}>{fullName}</span>
               {publicRef && (
-                <span className={styles.userHandle}>{formatPublicRef(publicRef)}</span>
+                <span className={styles.userHandle}>
+                  {formatPublicRef(publicRef)}
+                </span>
               )}
             </div>
           </button>

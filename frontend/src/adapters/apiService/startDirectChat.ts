@@ -1,7 +1,7 @@
 ﻿import type { AxiosInstance } from "axios";
 
-import { decodeDirectStartResponse } from "../../dto";
 import type { DirectStartResponse } from "../../domain/interfaces/IApiService";
+import { decodeDirectStartResponse } from "../../dto";
 
 /**
  * Создает или возвращает direct-чат по публичному ref.

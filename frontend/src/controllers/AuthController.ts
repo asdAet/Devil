@@ -2,8 +2,8 @@
 import type {
   LoginRequestDto as LoginDto,
   RegisterRequestDto as RegisterDto,
-  UpdateProfileRequestDto as UpdateProfileDto,
   SessionResponseDto as SessionDto,
+  UpdateProfileRequestDto as UpdateProfileDto,
 } from "../dto";
 import type { UserProfile as UserProfileDto } from "../entities/user/types";
 

@@ -1,7 +1,7 @@
 ﻿import type { AxiosInstance } from "axios";
 
-import { buildLoginRequestDto, decodeSessionResponse } from "../../dto";
 import type { SessionResponse } from "../../domain/interfaces/IApiService";
+import { buildLoginRequestDto, decodeSessionResponse } from "../../dto";
 
 /**
  * Выполняет логин пользователя.

@@ -1,10 +1,9 @@
 import { useState } from "react";
 
+import styles from "../../styles/ui/Avatar.module.css";
 import type { AvatarCrop } from "../api/users";
 import { avatarFallback } from "../lib/format";
 import { AvatarMedia } from "./AvatarMedia";
-
-import styles from "../../styles/ui/Avatar.module.css";
 
 type AvatarSize = "default" | "small" | "tiny";
 

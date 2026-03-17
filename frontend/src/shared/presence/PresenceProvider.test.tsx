@@ -36,8 +36,8 @@ vi.mock("../../adapters/ApiService", () => ({
   },
 }));
 
-import { usePresence } from "./usePresence";
 import { PresenceProvider } from "./PresenceProvider";
+import { usePresence } from "./usePresence";
 
 function PresenceProbe() {
   const presence = usePresence();

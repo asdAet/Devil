@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
-import { clientsClaim } from "workbox-core";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
+import { clientsClaim } from "workbox-core";
 import { ExpirationPlugin } from "workbox-expiration";
 import { precacheAndRoute } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
@@ -11,6 +11,7 @@ import {
   NetworkOnly,
   StaleWhileRevalidate,
 } from "workbox-strategies";
+
 import { decodeSwCacheMessage } from "./dto";
 import {
   CACHE_LIMITS,

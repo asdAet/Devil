@@ -2,15 +2,15 @@
 import { useLocation } from "react-router-dom";
 
 import {
-  useConversationList,
   type FilterTab,
+  useConversationList,
 } from "../../shared/conversationList/ConversationListProvider";
 import {
   buildDirectPath,
   buildUserProfilePath,
   formatPublicRef,
 } from "../../shared/lib/publicRef";
-import { Spinner, EmptyState, Avatar } from "../../shared/ui";
+import { Avatar, EmptyState, Spinner } from "../../shared/ui";
 import styles from "../../styles/sidebar/ConversationList.module.css";
 import { ConversationListItem } from "./ConversationListItem";
 
@@ -38,7 +38,12 @@ export function ConversationList({ onNavigate }: Props) {
   const location = useLocation();
 
   const getItemPath = useCallback(
-    (item: { type: string; slug: string; name: string; directRef?: string }) => {
+    (item: {
+      type: string;
+      slug: string;
+      name: string;
+      directRef?: string;
+    }) => {
       if (item.type === "direct") {
         return buildDirectPath(item.directRef ?? item.name);
       }
@@ -48,7 +53,12 @@ export function ConversationList({ onNavigate }: Props) {
   );
 
   const isItemActive = useCallback(
-    (item: { type: string; slug: string; name: string; directRef?: string }) => {
+    (item: {
+      type: string;
+      slug: string;
+      name: string;
+      directRef?: string;
+    }) => {
       const path = getItemPath(item);
       return (
         location.pathname === path || location.pathname.startsWith(path + "/")
@@ -108,7 +118,9 @@ export function ConversationList({ onNavigate }: Props) {
                   key={`u-${user.publicRef}`}
                   type="button"
                   className={styles.globalItem}
-                  onClick={() => onNavigate(buildUserProfilePath(user.publicRef))}
+                  onClick={() =>
+                    onNavigate(buildUserProfilePath(user.publicRef))
+                  }
                 >
                   <Avatar
                     username={user.displayName ?? user.username}
@@ -138,7 +150,9 @@ export function ConversationList({ onNavigate }: Props) {
                   type="button"
                   className={styles.globalItem}
                   onClick={() =>
-                    onNavigate(`/rooms/${encodeURIComponent(String(group.roomId))}`)
+                    onNavigate(
+                      `/rooms/${encodeURIComponent(String(group.roomId))}`,
+                    )
                   }
                 >
                   <Avatar username={group.name} size="tiny" />
@@ -168,12 +182,12 @@ export function ConversationList({ onNavigate }: Props) {
                       `/rooms/${encodeURIComponent(String(message.roomId))}?message=${message.id}`,
                     )
                   }
-                  >
-                    <div className={styles.globalMeta}>
-                      <span className={styles.globalPrimary}>
-                        {(message.displayName ?? message.username)} •{" "}
-                        {message.roomName || String(message.roomId)}
-                      </span>
+                >
+                  <div className={styles.globalMeta}>
+                    <span className={styles.globalPrimary}>
+                      {message.displayName ?? message.username} •{" "}
+                      {message.roomName || String(message.roomId)}
+                    </span>
                     <span className={styles.globalSecondary}>
                       {message.content}
                     </span>

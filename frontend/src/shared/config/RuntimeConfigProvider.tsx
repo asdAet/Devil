@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { apiService } from "../../adapters/ApiService";
 import type { ClientRuntimeConfig } from "../../domain/interfaces/IApiService";
 import { debugLog } from "../lib/debug";
-import { RuntimeConfigContext } from "./RuntimeConfigContext";
 import { getRuntimeConfig, setRuntimeConfig } from "./runtimeConfig";
+import { RuntimeConfigContext } from "./RuntimeConfigContext";
 
 type RuntimeConfigProviderProps = {
   children: ReactNode;

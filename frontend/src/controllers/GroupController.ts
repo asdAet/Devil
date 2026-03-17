@@ -1,15 +1,15 @@
 import { apiService } from "../adapters/ApiService";
+import type { UpdateGroupInput } from "../domain/interfaces/IApiService";
 import type {
+  BannedMember,
   Group,
+  GroupInvite,
   GroupListItem,
   GroupMember,
-  GroupInvite,
   InvitePreview,
   JoinRequest,
   PinnedMessage,
-  BannedMember,
 } from "../entities/group/types";
-import type { UpdateGroupInput } from "../domain/interfaces/IApiService";
 import { emitConversationListRefresh } from "../shared/conversationList/events";
 
 class GroupController {

@@ -1,10 +1,10 @@
 ﻿/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useState,
-  type ReactNode,
 } from "react";
 
 type InfoPanelContent = "profile" | "group" | "search" | "direct" | null;

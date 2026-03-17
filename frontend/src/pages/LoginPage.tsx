@@ -1,5 +1,5 @@
-﻿import { AuthForm } from "../widgets/auth/AuthForm";
-import styles from "../styles/pages/LoginPage.module.css";
+﻿import styles from "../styles/pages/LoginPage.module.css";
+import { AuthForm } from "../widgets/auth/AuthForm";
 
 type Props = {
   onSubmit: (identifier: string, password: string) => void;

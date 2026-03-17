@@ -1,10 +1,10 @@
 ﻿import {
-  useCallback,
-  useRef,
-  useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
+  useCallback,
+  useRef,
+  useState,
 } from "react";
 
 import type {
@@ -14,13 +14,13 @@ import type {
 } from "../../entities/message/types";
 import { formatTimestamp } from "../../shared/lib/format";
 import { normalizePublicRef } from "../../shared/lib/publicRef";
+import type { ContextMenuItem } from "../../shared/ui";
 import {
   AudioAttachmentPlayer,
   Avatar,
   ContextMenu,
   ImageLightbox,
 } from "../../shared/ui";
-import type { ContextMenuItem } from "../../shared/ui";
 import styles from "../../styles/chat/MessageBubble.module.css";
 
 type Props = {
@@ -554,7 +554,8 @@ export function MessageBubble({
                     );
                   }
                   const contentTypeLabel =
-                    att.contentType && att.contentType !== "application/octet-stream"
+                    att.contentType &&
+                    att.contentType !== "application/octet-stream"
                       ? att.contentType
                       : "неизвестный тип";
                   const fileMeta = `${formatFileSize(att.fileSize)} • ${contentTypeLabel}`;
@@ -588,7 +589,9 @@ export function MessageBubble({
                           <span className={styles.attachFileName}>
                             {att.originalFilename}
                           </span>
-                          <span className={styles.attachFileSize}>{fileMeta}</span>
+                          <span className={styles.attachFileSize}>
+                            {fileMeta}
+                          </span>
                         </span>
                       </a>
                     );
@@ -619,7 +622,9 @@ export function MessageBubble({
                         <span className={styles.attachFileName}>
                           {att.originalFilename}
                         </span>
-                        <span className={styles.attachFileSize}>{fileMeta}</span>
+                        <span className={styles.attachFileSize}>
+                          {fileMeta}
+                        </span>
                       </span>
                     </div>
                   );
@@ -674,7 +679,3 @@ export function MessageBubble({
     </>
   );
 }
-
-
-
-

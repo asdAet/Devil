@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import type { BlockedUser } from "../../entities/friend/types";
 import { decodeBlockedListResponse } from "../../dto/http/friends";
+import type { BlockedUser } from "../../entities/friend/types";
 
 export async function getBlockedUsers(
   apiClient: AxiosInstance,

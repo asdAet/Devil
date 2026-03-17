@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
 
 import { useInfoPanel } from "../../shared/layout/useInfoPanel";
+import styles from "../../styles/layout/InfoPanel.module.css";
 import { ChatSearch } from "../chat/ChatSearch";
 import { DirectInfoPanel } from "../chat/DirectInfoPanel";
 import { UserProfilePanel } from "../chat/UserProfilePanel";
 import { GroupInfoPanel } from "../groups/GroupInfoPanel";
-import styles from "../../styles/layout/InfoPanel.module.css";
 
 const TITLES: Record<string, string> = {
   profile: "Профиль",

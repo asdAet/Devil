@@ -1,10 +1,11 @@
 ﻿import {
+  type ChangeEvent,
+  type ClipboardEvent,
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
-  type ChangeEvent,
-  type KeyboardEvent,
 } from "react";
 
 import type { Message } from "../../entities/message/types";
@@ -73,6 +74,27 @@ const IconClose = () => (
   </svg>
 );
 
+const extractFilesFromClipboard = (
+  clipboardData: DataTransfer | null,
+): File[] => {
+  if (!clipboardData) return [];
+
+  const filesFromItems: File[] = [];
+  const clipboardItems = clipboardData.items;
+  if (clipboardItems && clipboardItems.length > 0) {
+    for (let index = 0; index < clipboardItems.length; index += 1) {
+      const item = clipboardItems[index];
+      if (!item || item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (file) filesFromItems.push(file);
+    }
+  }
+
+  if (filesFromItems.length > 0) return filesFromItems;
+  if (!clipboardData.files || clipboardData.files.length === 0) return [];
+  return Array.from(clipboardData.files);
+};
+
 export function MessageInput({
   draft,
   onDraftChange,
@@ -122,6 +144,17 @@ export function MessageInput({
   const uploading = uploadProgress !== null && uploadProgress !== undefined;
   const hasQueuedFiles = pendingFiles.length > 0;
   const canSend = Boolean(draft.trim() || hasQueuedFiles);
+
+  const handlePaste = useCallback(
+    (e: ClipboardEvent<HTMLTextAreaElement>) => {
+      if (!onAttach || disabled || rateLimitActive || uploading) return;
+      const files = extractFilesFromClipboard(e.clipboardData);
+      if (!files.length) return;
+      e.preventDefault();
+      onAttach(files);
+    },
+    [disabled, onAttach, rateLimitActive, uploading],
+  );
 
   const previewItems = useMemo(
     () =>
@@ -296,6 +329,7 @@ export function MessageInput({
           data-testid="chat-message-input"
           value={draft}
           onChange={handleChange}
+          onPaste={handlePaste}
           onKeyDown={handleKeyDown}
           placeholder="Сообщение..."
           aria-label="Сообщение"

@@ -1,7 +1,7 @@
 import { createContext } from "react";
 
-import type { OnlineUser } from "../api/users";
 import type { WebSocketStatus } from "../../hooks/useReconnectingWebSocket";
+import type { OnlineUser } from "../api/users";
 
 export type PresenceContextValue = {
   online: OnlineUser[];

@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeRoomMessagesResponse } from "../../dto";
 import type { RoomMessagesResponse } from "../../domain/interfaces/IApiService";
+import { decodeRoomMessagesResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 /**

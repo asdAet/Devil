@@ -4,11 +4,11 @@ import type { UserProfile } from "../entities/user/types";
 import { useFriends } from "../hooks/useFriends";
 import { buildDirectPath, normalizePublicRef } from "../shared/lib/publicRef";
 import { usePresence } from "../shared/presence";
-import { Avatar, Spinner, EmptyState } from "../shared/ui";
+import { Avatar, EmptyState, Spinner } from "../shared/ui";
+import styles from "../styles/friends/FriendsPage.module.css";
 import { AddFriendDialog } from "../widgets/friends/AddFriendDialog";
 import { FriendListItem } from "../widgets/friends/FriendListItem";
 import { FriendRequestItem } from "../widgets/friends/FriendRequestItem";
-import styles from "../styles/friends/FriendsPage.module.css";
 
 type Tab = "friends" | "online" | "incoming" | "outgoing" | "blocked";
 
@@ -283,7 +283,9 @@ export function FriendsPage({ user, onNavigate }: Props) {
                   online={false}
                 />
                 <div className={styles.itemInfo}>
-                  <div className={styles.itemName}>{b.displayName ?? b.username}</div>
+                  <div className={styles.itemName}>
+                    {b.displayName ?? b.username}
+                  </div>
                   <div className={styles.itemMeta}>Заблокирован</div>
                 </div>
                 <div className={styles.itemActions}>
@@ -311,6 +313,3 @@ export function FriendsPage({ user, onNavigate }: Props) {
     </div>
   );
 }
-
-
-

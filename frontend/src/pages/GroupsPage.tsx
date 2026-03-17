@@ -2,10 +2,10 @@ import { useCallback, useState } from "react";
 
 import type { UserProfile } from "../entities/user/types";
 import { useGroupList } from "../hooks/useGroupList";
-import { Spinner, EmptyState } from "../shared/ui";
+import { EmptyState, Spinner } from "../shared/ui";
+import styles from "../styles/groups/GroupsPage.module.css";
 import { CreateGroupDialog } from "../widgets/groups/CreateGroupDialog";
 import { GroupListItem } from "../widgets/groups/GroupListItem";
-import styles from "../styles/groups/GroupsPage.module.css";
 
 type Props = {
   user: UserProfile | null;

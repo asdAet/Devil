@@ -1,20 +1,16 @@
 ﻿import {
+  type ChangeEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
 } from "react";
 
 import { chatController } from "../../controllers/ChatController";
 import { groupController } from "../../controllers/GroupController";
 import { rolesController } from "../../controllers/RolesController";
 import type { RoomAttachmentItem } from "../../domain/interfaces/IApiService";
-import {
-  combinePermissionFlags,
-  flagsFromMask,
-} from "../../entities/role/bitmask";
 import type {
   BannedMember,
   Group,
@@ -23,14 +19,18 @@ import type {
   JoinRequest,
 } from "../../entities/group/types";
 import {
+  combinePermissionFlags,
+  flagsFromMask,
+} from "../../entities/role/bitmask";
+import {
   Perm,
   type PermissionOverride,
   type Role,
 } from "../../entities/role/types";
 import { useRoomPermissions } from "../../hooks/useRoomPermissions";
+import type { AvatarCrop } from "../../shared/api/users";
 import { useInfoPanel } from "../../shared/layout/useInfoPanel";
 import { formatPublicRef, isHandleRef } from "../../shared/lib/publicRef";
-import type { AvatarCrop } from "../../shared/api/users";
 import { Avatar, AvatarCropModal, Modal, Spinner } from "../../shared/ui";
 import styles from "../../styles/groups/GroupInfoPanel.module.css";
 
@@ -225,23 +225,23 @@ export function GroupInfoPanel({ slug }: Props) {
       ),
     [members],
   );
-  const isSelfMember = useCallback(
-    (member: GroupMember) => {
-      if (member.isSelf) return true;
-      return false;
+  const isSelfMember = useCallback((member: GroupMember) => {
+    if (member.isSelf) return true;
+    return false;
+  }, []);
+
+  const resolveMemberDisplayName = useCallback(
+    (member: GroupMember): string => {
+      const trimmedDisplayName = member.displayName?.trim();
+      if (trimmedDisplayName) return trimmedDisplayName;
+
+      const trimmedNickname = member.nickname?.trim();
+      if (trimmedNickname) return trimmedNickname;
+
+      return member.username;
     },
     [],
   );
-
-  const resolveMemberDisplayName = useCallback((member: GroupMember): string => {
-    const trimmedDisplayName = member.displayName?.trim();
-    if (trimmedDisplayName) return trimmedDisplayName;
-
-    const trimmedNickname = member.nickname?.trim();
-    if (trimmedNickname) return trimmedNickname;
-
-    return member.username;
-  }, []);
 
   const resolveMemberTag = useCallback((member: GroupMember): string | null => {
     const rawRef = member.publicRef?.trim();
@@ -1190,7 +1190,9 @@ export function GroupInfoPanel({ slug }: Props) {
               >
                 <button
                   type="button"
-                  className={[styles.memberMain, styles.memberMainBtn].join(" ")}
+                  className={[styles.memberMain, styles.memberMainBtn].join(
+                    " ",
+                  )}
                   onClick={() => openMemberProfile(member)}
                 >
                   <Avatar
@@ -1857,7 +1859,9 @@ export function GroupInfoPanel({ slug }: Props) {
               >
                 <button
                   type="button"
-                  className={[styles.memberMain, styles.memberMainBtn].join(" ")}
+                  className={[styles.memberMain, styles.memberMainBtn].join(
+                    " ",
+                  )}
                   onClick={() => openMemberProfile(member)}
                 >
                   <Avatar

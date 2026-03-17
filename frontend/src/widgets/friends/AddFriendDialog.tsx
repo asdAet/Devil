@@ -1,4 +1,4 @@
-import { useCallback, useState, type KeyboardEvent } from "react";
+import { type KeyboardEvent, useCallback, useState } from "react";
 
 import styles from "../../styles/friends/FriendsPage.module.css";
 
@@ -18,7 +18,10 @@ export function AddFriendDialog({ onSubmit, onClose }: Props) {
   const handleSubmit = useCallback(async () => {
     const trimmed = publicRef.trim();
     if (!trimmed) return;
-    if (!HANDLE_PUBLIC_REF_RE.test(trimmed) && !USER_PUBLIC_ID_RE.test(trimmed)) {
+    if (
+      !HANDLE_PUBLIC_REF_RE.test(trimmed) &&
+      !USER_PUBLIC_ID_RE.test(trimmed)
+    ) {
       setError("Укажите @username или публичный id");
       return;
     }
@@ -88,4 +91,3 @@ export function AddFriendDialog({ onSubmit, onClose }: Props) {
     </div>
   );
 }
-

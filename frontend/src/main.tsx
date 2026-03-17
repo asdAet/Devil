@@ -1,7 +1,9 @@
+import "./index.css";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Workbox } from "workbox-window";
-import "./index.css";
+
 import App from "./App";
 
 /**

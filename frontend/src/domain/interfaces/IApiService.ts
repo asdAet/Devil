@@ -1,25 +1,25 @@
-import type { Attachment, Message } from "../../entities/message/types";
+import type { SendFriendRequestResponse } from "../../dto/http/friends";
 import type {
   BlockedUser,
   Friend,
   FriendRequest,
 } from "../../entities/friend/types";
-import type { SendFriendRequestResponse } from "../../dto/http/friends";
 import type {
+  BannedMember,
   Group,
+  GroupInvite,
   GroupListItem,
   GroupMember,
-  GroupInvite,
   InvitePreview,
   JoinRequest,
   PinnedMessage,
-  BannedMember,
 } from "../../entities/group/types";
+import type { Attachment, Message } from "../../entities/message/types";
 import type {
-  Role,
   MemberRoles,
-  PermissionOverride,
   MyPermissions,
+  PermissionOverride,
+  Role,
 } from "../../entities/role/types";
 import type {
   DirectChatListItem,

@@ -5,13 +5,13 @@ import type { UserProfile } from "../entities/user/types";
 import { ChatRoomPage } from "../pages/ChatRoomPage";
 import { DirectChatByUsernamePage } from "../pages/DirectChatByUsernamePage";
 import { DirectChatsPage } from "../pages/DirectChatsPage";
+import { FriendsPage } from "../pages/FriendsPage";
+import { GroupsPage } from "../pages/GroupsPage";
 import { HomePage } from "../pages/HomePage";
+import { InvitePreviewPage } from "../pages/InvitePreviewPage";
 import { LoginPage } from "../pages/LoginPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RegisterPage } from "../pages/RegisterPage";
-import { FriendsPage } from "../pages/FriendsPage";
-import { GroupsPage } from "../pages/GroupsPage";
-import { InvitePreviewPage } from "../pages/InvitePreviewPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UserProfilePage } from "../pages/UserProfilePage";
 

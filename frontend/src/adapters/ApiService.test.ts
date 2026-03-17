@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it } from "vitest";
 
-import { apiService, normalizeAxiosError } from "./ApiService";
 import { server } from "../test/setup";
+import { apiService, normalizeAxiosError } from "./ApiService";
 
 const now = "2026-01-01T00:00:00.000Z";
 

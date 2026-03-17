@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeEditMessageResponse } from "../../dto";
 import type { EditMessageResult } from "../../domain/interfaces/IApiService";
+import { decodeEditMessageResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 export async function editMessage(

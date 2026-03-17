@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 
-import { decodeRoomAttachmentsResponse } from "../../dto";
 import type { RoomAttachmentsResult } from "../../domain/interfaces/IApiService";
+import { decodeRoomAttachmentsResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 export async function getRoomAttachments(

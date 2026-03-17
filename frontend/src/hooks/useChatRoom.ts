@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { chatController } from "../controllers/ChatController";
 import type { RoomMessagesDto } from "../dto";
 import type { Message } from "../entities/message/types";
 import type { RoomDetails as RoomDetailsDto } from "../entities/room/types";
 import type { UserProfile as UserProfileDto } from "../entities/user/types";
-import { chatController } from "../controllers/ChatController";
 import { useChatMessageMaxLength } from "../shared/config/limits";
 import { debugLog } from "../shared/lib/debug";
 import { sanitizeText } from "../shared/lib/sanitize";
