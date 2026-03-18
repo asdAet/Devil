@@ -254,16 +254,35 @@ def is_chat_attachment_media_path(path: str | None) -> bool:
     return normalized.startswith("chat_attachments/") or normalized.startswith("chat_thumbnails/")
 
 
+def _parse_positive_room_id(room_id: int | str | None) -> int | None:
+    if isinstance(room_id, bool):
+        return None
+
+    if isinstance(room_id, int):
+        parsed = room_id
+    elif isinstance(room_id, str):
+        raw = room_id.strip()
+        if not raw:
+            return None
+        try:
+            parsed = int(raw)
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if parsed < 1:
+        return None
+    return parsed
+
+
 def _room_scoped_media_url_path(image_name: str | None, room_id: int | str | None) -> str | None:
     normalized = normalize_media_path(image_name)
     if not normalized or not is_chat_attachment_media_path(normalized):
         return None
 
-    try:
-        room = int(room_id)  
-    except (TypeError, ValueError):
-        return None
-    if room < 1:
+    room = _parse_positive_room_id(room_id)
+    if room is None:
         return None
 
     encoded_path = quote(normalized, safe="/")
