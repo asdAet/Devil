@@ -192,9 +192,16 @@ def _public_room():
 
 
 def _parse_positive_int(raw_value: str | None, param_name: str) -> int:
+    if raw_value is None:
+        raise ValueError(f"Некорректный параметр '{param_name}': должно быть целое число")
+
+    candidate = raw_value.strip()
+    if not candidate:
+        raise ValueError(f"Некорректный параметр '{param_name}': должно быть целое число")
+
     try:
-        parsed = int(raw_value)  
-    except (TypeError, ValueError):
+        parsed = int(candidate)
+    except ValueError:
         raise ValueError(f"Некорректный параметр '{param_name}': должно быть целое число")
     if parsed < 1:
         raise ValueError(f"Некорректный параметр '{param_name}': должно быть >= 1")
