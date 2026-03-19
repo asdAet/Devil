@@ -463,7 +463,7 @@
   }
 }
 
-/* ---- legacy selectors kept for compatibility ---- */
+/* ---- compatibility selectors ---- */
 
 .spinner {
   width: 10px;

@@ -1,4 +1,5 @@
-﻿import {
+import {
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
@@ -12,12 +13,10 @@ import type {
   ReactionSummary,
   ReplyTo,
 } from "../../entities/message/types";
-import {
-  isImageAttachment,
-  resolveImagePreviewUrl,
-} from "../../shared/lib/attachmentMedia";
+import { resolveAttachmentTypeLabel } from "../../shared/lib/attachmentTypeLabel";
 import { formatTimestamp } from "../../shared/lib/format";
 import { normalizePublicRef } from "../../shared/lib/publicRef";
+import { useChatAttachmentMaxPerMessage } from "../../shared/config/limits";
 import type { ContextMenuItem } from "../../shared/ui";
 import {
   AudioAttachmentPlayer,
@@ -26,6 +25,12 @@ import {
   ImageLightbox,
 } from "../../shared/ui";
 import styles from "../../styles/chat/MessageBubble.module.css";
+import {
+  buildAttachmentRenderItems,
+  resolveImageAspectRatio,
+  resolveMediaGridVariant,
+  splitAttachmentRenderItems,
+} from "./lib/attachmentLayout";
 
 type Props = {
   message: Message;
@@ -63,6 +68,13 @@ const isVideoType = (ct: string) => ct.startsWith("video/");
 const isAudioType = (ct: string) => ct.startsWith("audio/");
 const normalizeActorRef = (value: string) =>
   normalizePublicRef(value).toLowerCase();
+const MEDIA_GRID_VARIANT_CLASS_MAP = {
+  single: styles.mediaGridSingle,
+  two: styles.mediaGridTwo,
+  three: styles.mediaGridThree,
+  four: styles.mediaGridFour,
+  many: styles.mediaGridMany,
+} as const;
 
 const MOBILE_MENU_IGNORE_SELECTOR =
   'a,button,input,textarea,select,video,audio,img,[role="button"],[data-message-menu-ignore="true"]';
@@ -450,6 +462,16 @@ export function MessageBubble({
     }
   }
   const isDeleted = message.isDeleted;
+  const maxVisibleImageAttachments = useChatAttachmentMaxPerMessage();
+  const attachmentItems = buildAttachmentRenderItems(message.attachments);
+  const attachmentBuckets = splitAttachmentRenderItems(
+    attachmentItems,
+    maxVisibleImageAttachments,
+  );
+  const mediaGridVariant = resolveMediaGridVariant(
+    attachmentBuckets.visibleImages.length,
+  );
+  const mediaGridVariantClass = MEDIA_GRID_VARIANT_CLASS_MAP[mediaGridVariant];
 
   return (
     <>
@@ -518,129 +540,179 @@ export function MessageBubble({
 
             {!isDeleted && message.attachments.length > 0 && (
               <div className={styles.attachments}>
-                {message.attachments.map((att) => {
-                  const imageSrc = resolveImagePreviewUrl({
-                    url: att.url,
-                    thumbnailUrl: att.thumbnailUrl,
-                    contentType: att.contentType,
-                    fileName: att.originalFilename,
-                  });
-                  if (
-                    isImageAttachment(att.contentType, att.originalFilename) &&
-                    imageSrc
-                  ) {
-                    return (
-                      <img
-                        key={att.id}
-                        src={imageSrc}
-                        alt={att.originalFilename}
-                        className={styles.attachImage}
-                        loading="lazy"
-                        onClick={() => setLightboxSrc(att.url!)}
-                      />
-                    );
-                  }
-                  if (isVideoType(att.contentType) && att.url) {
-                    return (
-                      <video
-                        key={att.id}
-                        src={att.url}
-                        controls
-                        preload="metadata"
-                        className={styles.attachVideo}
-                      >
-                        <track kind="captions" />
-                      </video>
-                    );
-                  }
-                  if (isAudioType(att.contentType) && att.url) {
-                    return (
-                      <AudioAttachmentPlayer
-                        key={att.id}
-                        src={att.url}
-                        title={att.originalFilename}
-                        subtitle={formatFileSize(att.fileSize)}
-                        downloadName={att.originalFilename}
-                        compact
-                      />
-                    );
-                  }
-                  const contentTypeLabel =
-                    att.contentType &&
-                    att.contentType !== "application/octet-stream"
-                      ? att.contentType
-                      : "неизвестный тип";
-                  const fileMeta = `${formatFileSize(att.fileSize)} • ${contentTypeLabel}`;
+                {attachmentBuckets.visibleImages.length > 0 && (
+                  <div
+                    className={[
+                      styles.mediaGrid,
+                      mediaGridVariantClass,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    data-testid="message-media-grid"
+                    data-count={attachmentBuckets.visibleImages.length}
+                  >
+                    {attachmentBuckets.visibleImages.map(
+                      ({ attachment, imageSrc }, index) => {
+                        const isSingleTile =
+                          attachmentBuckets.visibleImages.length === 1;
+                        const isOverflowTile =
+                          attachmentBuckets.hiddenImageCount > 0 &&
+                          index === attachmentBuckets.visibleImages.length - 1;
 
-                  if (att.url) {
-                    return (
-                      <a
-                        key={att.id}
-                        href={att.url}
-                        className={styles.attachFile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={att.originalFilename}
-                      >
-                        <span className={styles.attachFileIcon}>
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                        return (
+                          <button
+                            key={attachment.id}
+                            type="button"
+                            className={[
+                              styles.mediaTile,
+                              isOverflowTile ? styles.mediaTileOverflow : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            data-message-menu-ignore="true"
+                            style={
+                              isSingleTile
+                                ? ({
+                                    aspectRatio:
+                                      resolveImageAspectRatio(
+                                        attachment,
+                                      ).toString(),
+                                  } satisfies CSSProperties)
+                                : undefined
+                            }
+                            onClick={() =>
+                              attachment.url && setLightboxSrc(attachment.url)
+                            }
+                            aria-label={`Открыть изображение ${attachment.originalFilename}`}
                           >
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                        </span>
-                        <span className={styles.attachFileInfo}>
-                          <span className={styles.attachFileName}>
-                            {att.originalFilename}
-                          </span>
-                          <span className={styles.attachFileSize}>
-                            {fileMeta}
-                          </span>
-                        </span>
-                      </a>
-                    );
-                  }
+                            <img
+                              src={imageSrc}
+                              alt={attachment.originalFilename}
+                              className={[
+                                styles.attachImage,
+                                isSingleTile ? styles.attachImageSingle : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              loading="lazy"
+                            />
+                            {isOverflowTile && (
+                              <span className={styles.mediaMoreCount}>
+                                +{attachmentBuckets.hiddenImageCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
 
-                  return (
-                    <div
-                      key={att.id}
-                      className={styles.attachFile}
-                      data-message-menu-ignore="true"
-                    >
-                      <span className={styles.attachFileIcon}>
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                {attachmentBuckets.others.length > 0 && (
+                  <div className={styles.fileAttachments}>
+                    {attachmentBuckets.others.map(({ attachment: att }) => {
+                      if (isVideoType(att.contentType) && att.url) {
+                        return (
+                          <video
+                            key={att.id}
+                            src={att.url}
+                            controls
+                            preload="metadata"
+                            className={styles.attachVideo}
+                          >
+                            <track kind="captions" />
+                          </video>
+                        );
+                      }
+                      if (isAudioType(att.contentType) && att.url) {
+                        return (
+                          <AudioAttachmentPlayer
+                            key={att.id}
+                            src={att.url}
+                            title={att.originalFilename}
+                            subtitle={formatFileSize(att.fileSize)}
+                            downloadName={att.originalFilename}
+                            compact
+                          />
+                        );
+                      }
+                      const contentTypeLabel = resolveAttachmentTypeLabel(
+                        att.contentType,
+                        att.originalFilename,
+                      );
+                      const fileMeta = `${formatFileSize(att.fileSize)} • ${contentTypeLabel}`;
+
+                      if (att.url) {
+                        return (
+                          <a
+                            key={att.id}
+                            href={att.url}
+                            className={styles.attachFile}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={att.originalFilename}
+                          >
+                            <span className={styles.attachFileIcon}>
+                              <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                            </span>
+                            <span className={styles.attachFileInfo}>
+                              <span className={styles.attachFileName}>
+                                {att.originalFilename}
+                              </span>
+                              <span className={styles.attachFileSize}>
+                                {fileMeta}
+                              </span>
+                            </span>
+                          </a>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={att.id}
+                          className={styles.attachFile}
+                          data-message-menu-ignore="true"
                         >
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                        </svg>
-                      </span>
-                      <span className={styles.attachFileInfo}>
-                        <span className={styles.attachFileName}>
-                          {att.originalFilename}
-                        </span>
-                        <span className={styles.attachFileSize}>
-                          {fileMeta}
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
+                          <span className={styles.attachFileIcon}>
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </span>
+                          <span className={styles.attachFileInfo}>
+                            <span className={styles.attachFileName}>
+                              {att.originalFilename}
+                            </span>
+                            <span className={styles.attachFileSize}>
+                              {fileMeta}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -691,3 +763,4 @@ export function MessageBubble({
     </>
   );
 }
+

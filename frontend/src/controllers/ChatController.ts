@@ -24,28 +24,15 @@ let directChatsInFlight: Promise<DirectChatsResponseDto> | null = null;
 const roomDetailsInFlight = new Map<string, Promise<RoomDetailsDto>>();
 const roomMessagesInFlight = new Map<string, Promise<RoomMessagesDto>>();
 
-/**
- * ��������� ������� `buildRoomMessagesKey`.
- * @param roomId ������� �������� `roomId`.
- * @returns ��������� ���������� `buildRoomMessagesKey`.
- */
-
+/** Формирует ключ in-flight кэша для `getRoomMessages`. */
 const buildRoomMessagesKey = (roomId: string, params?: RoomMessagesParams) => {
   const limit = params?.limit ?? "";
   const beforeId = params?.beforeId ?? "";
   return `${roomId}|limit=${limit}|before=${beforeId}`;
 };
 
-/**
- * ��������� ���������� ������ `ChatController`.
- */
-
+/** Контроллер чата с дедупликацией in-flight запросов. */
 class ChatController {
-  /**
-   * ��������� ����� `getPublicRoom`.
-   * @returns ��������� ���������� `getPublicRoom`.
-   */
-
   public async getPublicRoom(): Promise<RoomDetailsDto> {
     if (publicRoomInFlight) {
       return publicRoomInFlight;
@@ -57,12 +44,6 @@ class ChatController {
 
     return publicRoomInFlight;
   }
-
-  /**
-   * ��������� ����� `getRoomDetails`.
-   * @param roomId ������� �������� `roomId`.
-   * @returns ��������� ���������� `getRoomDetails`.
-   */
 
   public async getRoomDetails(roomId: string): Promise<RoomDetailsDto> {
     const inFlight = roomDetailsInFlight.get(roomId);
@@ -77,12 +58,6 @@ class ChatController {
     roomDetailsInFlight.set(roomId, request);
     return request;
   }
-
-  /**
-   * ��������� ����� `getRoomMessages`.
-   * @param roomId ������� �������� `roomId`.
-   * @returns ��������� ���������� `getRoomMessages`.
-   */
 
   public async getRoomMessages(
     roomId: string,
@@ -102,23 +77,12 @@ class ChatController {
     return request;
   }
 
-  /**
-   * ��������� ����� `startDirectChat`.
-   * @param publicRef ������� �������� `publicRef`.
-   * @returns ��������� ���������� `startDirectChat`.
-   */
-
   public async startDirectChat(
     publicRef: string,
   ): Promise<DirectStartResponseDto> {
     const response = await apiService.startDirectChat(publicRef);
     return response;
   }
-
-  /**
-   * ��������� ����� `getDirectChats`.
-   * @returns ��������� ���������� `getDirectChats`.
-   */
 
   public async getDirectChats(): Promise<DirectChatsResponseDto> {
     if (directChatsInFlight) {
@@ -131,6 +95,7 @@ class ChatController {
 
     return directChatsInFlight;
   }
+
   public async getUnreadCounts(): Promise<UnreadCountItem[]> {
     return apiService.getUnreadCounts();
   }

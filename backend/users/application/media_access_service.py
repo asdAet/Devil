@@ -11,7 +11,6 @@ from django.db.models import Q
 
 from messages.models import MessageAttachment
 from roles.access import can_read
-from roles.models import Membership
 from rooms.models import Room
 
 
@@ -88,14 +87,6 @@ def resolve_attachment_media_access(
 
     room = Room.objects.filter(pk=room_id).first()
     if room is None:
-        raise MediaAccessNotFoundError
-
-    has_active_membership = Membership.objects.filter(
-        room_id=room_id,
-        user=user,
-        is_banned=False,
-    ).exists()
-    if not has_active_membership:
         raise MediaAccessNotFoundError
 
     if not can_read(room, user):

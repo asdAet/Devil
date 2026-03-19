@@ -128,7 +128,7 @@ class MediaAccessServiceTests(TestCase):
                 user=self.outsider,
             )
 
-    def test_resolve_attachment_media_access_denies_non_member_in_public_room(self):
+    def test_resolve_attachment_media_access_allows_authenticated_reader_in_public_room(self):
         public_room = Room.objects.create(
             slug="service_media_public_01",
             name="service media public",
@@ -137,9 +137,9 @@ class MediaAccessServiceTests(TestCase):
         )
         attachment = self._attachment_for_room(public_room, author=self.owner)
 
-        with self.assertRaises(MediaAccessNotFoundError):
-            resolve_attachment_media_access(
-                normalized_path=attachment.file.name,
-                room_id_raw=public_room.pk,
-                user=self.outsider,
-            )
+        result = resolve_attachment_media_access(
+            normalized_path=attachment.file.name,
+            room_id_raw=public_room.pk,
+            user=self.outsider,
+        )
+        self.assertEqual(result.room_id, public_room.pk)

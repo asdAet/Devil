@@ -49,9 +49,13 @@ from users.identity import (
     resolve_public_ref,
     room_public_ref,
     user_display_name,
-    user_profile_avatar_source,
     user_public_ref,
     user_public_username,
+)
+from users.avatar_service import (
+    resolve_group_avatar_url_from_request,
+    resolve_user_avatar_source,
+    resolve_user_avatar_url_from_request,
 )
 from users.models import PublicHandle
 
@@ -90,10 +94,7 @@ def _build_attachment_url(request, attachment_file, room_id: int | None):
 
 
 def _serialize_peer(request, user, *, is_blocked: bool = False):
-    profile_pic = None
-    avatar_source = user_profile_avatar_source(user)
-    if avatar_source:
-        profile_pic = _build_profile_pic_url(request, avatar_source)
+    profile_pic = resolve_user_avatar_url_from_request(request, user)
 
     profile = getattr(user, "profile", None)
     last_seen = getattr(profile, "last_seen", None)
@@ -159,17 +160,7 @@ def _serialize_group_avatar_for_room(request, room: Room) -> tuple[str | None, d
     if room.kind != Room.Kind.GROUP:
         return None, None
 
-    avatar_url = None
-    image = getattr(room, "avatar", None)
-    image_name = getattr(image, "name", "") if image else ""
-    if image_name:
-        avatar_url = _build_profile_pic_url(request, image)
-    else:
-        fallback_name = str(getattr(settings, "GROUP_DEFAULT_AVATAR", "default.jpg") or "").strip()
-        if fallback_name:
-            avatar_url = build_profile_url_from_request(request, fallback_name)
-
-    return avatar_url, serialize_avatar_crop(room)
+    return resolve_group_avatar_url_from_request(request, room), serialize_avatar_crop(room)
 
 
 def _public_room():
@@ -785,7 +776,6 @@ def upload_attachments(request, room_id: int):
         if collected or not request.FILES:
             return collected
 
-        # Fallback for legacy/custom clients that send unknown multipart keys.
         for key in request.FILES.keys():
             for uploaded in request.FILES.getlist(key):
                 marker = id(uploaded)
@@ -826,6 +816,19 @@ def upload_attachments(request, room_id: int):
         "audio/mp3": "audio/mpeg",
         "audio/x-mp3": "audio/mpeg",
         "audio/x-mpeg": "audio/mpeg",
+        "application/x-zip-compressed": "application/zip",
+        "application/x-rar-compressed": "application/vnd.rar",
+    }
+    extension_content_type_overrides = {
+        ".jar": "application/java-archive",
+        ".zip": "application/zip",
+        ".rar": "application/vnd.rar",
+        ".7z": "application/x-7z-compressed",
+    }
+    generic_content_types = {
+        "",
+        "application/octet-stream",
+        "application/x-compressed",
     }
 
     def _canonical_content_type(content_type: str, *, file_name: str = "") -> str:
@@ -861,11 +864,22 @@ def upload_attachments(request, room_id: int):
     def _resolve_content_type(uploaded_file) -> str:
         file_name = getattr(uploaded_file, "name", "") or ""
         raw_content_type = (getattr(uploaded_file, "content_type", "") or "").strip().lower()
-        guessed_content_type, _ = mimetypes.guess_type(file_name)
-        if raw_content_type and raw_content_type != "application/octet-stream":
-            return _canonical_content_type(raw_content_type, file_name=file_name)
+        lower_name = file_name.strip().lower()
+        guessed_content_type = ""
+        for extension, mapped_content_type in extension_content_type_overrides.items():
+            if lower_name.endswith(extension):
+                guessed_content_type = mapped_content_type
+                break
+        if not guessed_content_type:
+            guessed_content_type, _ = mimetypes.guess_type(file_name)
+            guessed_content_type = (guessed_content_type or "").strip().lower()
+
+        if raw_content_type:
+            canonical_raw_content_type = _canonical_content_type(raw_content_type, file_name=file_name)
+            if canonical_raw_content_type not in generic_content_types:
+                return canonical_raw_content_type
         if guessed_content_type:
-            return _canonical_content_type(guessed_content_type.lower(), file_name=file_name)
+            return _canonical_content_type(guessed_content_type, file_name=file_name)
         if raw_content_type:
             return _canonical_content_type(raw_content_type, file_name=file_name)
         return _canonical_content_type("application/octet-stream", file_name=file_name)
@@ -909,7 +923,7 @@ def upload_attachments(request, room_id: int):
 
     user = request.user
     profile = getattr(user, "profile", None)
-    avatar_source = (user_profile_avatar_source(user) or "").strip()
+    avatar_source = (resolve_user_avatar_source(user) or "").strip()
     if len(avatar_source) > 255:
         avatar_source = ""
     message_kwargs = {

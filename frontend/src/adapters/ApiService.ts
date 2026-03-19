@@ -7,7 +7,7 @@ import type {
   UpdateProfileInput,
 } from "../domain/interfaces/IApiService";
 import { decodeAuthErrorPayload } from "../dto";
-import { DtoDecodeError,parseJson } from "../dto";
+import { DtoDecodeError, parseJson } from "../dto";
 import {
   readCsrfFromCookie,
   readCsrfFromSessionStorage,
@@ -151,7 +151,7 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
     const status = axiosError.response?.status ?? 0;
     const data = normalizeErrorPayload(axiosError.response?.data);
     const message =
-      extractErrorMessage(data) || axiosError.message || "������ �������";
+      extractErrorMessage(data) || axiosError.message || "Ошибка сервера";
     return { status, message, data };
   }
 
@@ -167,7 +167,7 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
   if (error instanceof DtoDecodeError) {
     return {
       status: 502,
-      message: "������������ ����� �������",
+      message: "Некорректный ответ сервера",
       data: {
         source: error.source,
         issues: error.issues,
@@ -175,7 +175,7 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
     };
   }
 
-  return { status: 0, message: "������ �������" };
+  return { status: 0, message: "Ошибка сети" };
 };
 
 class ApiService implements IApiService {

@@ -114,10 +114,10 @@ def normalize_media_path(image_name: str | None) -> str | None:
     if not image_name:
         return None
 
-    # Accept plain, encoded and double-encoded paths from legacy clients/cache.
     raw = image_name.strip()
     if not raw:
         return None
+    # Accept plain, encoded and double-encoded paths.
     for _ in range(2):
         decoded = unquote(raw)
         if decoded == raw:

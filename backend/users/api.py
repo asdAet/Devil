@@ -24,7 +24,6 @@ from rooms.models import Room
 from chat_app_django.http_utils import error_response, parse_request_payload
 from chat_app_django.ip_utils import get_client_ip_from_request
 from chat_app_django.media_utils import (
-    build_profile_url_from_request,
     is_chat_attachment_media_path,
     is_valid_media_signature,
     normalize_media_path,
@@ -41,6 +40,7 @@ from users.application.media_access_service import (
     resolve_attachment_media_access,
     resolve_media_content_type,
 )
+from users.avatar_service import resolve_user_avatar_url_from_request
 from users.forms import ProfileUpdateForm
 from users.identity import (
     ensure_profile,
@@ -51,7 +51,6 @@ from users.identity import (
     room_public_ref,
     user_public_handle,
     user_public_id,
-    user_profile_avatar_source,
     user_public_ref,
 )
 
@@ -101,13 +100,7 @@ def _resolve_email(user) -> str:
 
 def _serialize_user(request, user):
     profile = ensure_profile(user)
-    profile_image = None
-    avatar_source = user_profile_avatar_source(user)
-    if avatar_source:
-        if avatar_source.startswith("http://") or avatar_source.startswith("https://"):
-            profile_image = avatar_source
-        else:
-            profile_image = build_profile_url_from_request(request, avatar_source)
+    profile_image = resolve_user_avatar_url_from_request(request, user)
 
     last_seen = getattr(profile, "last_seen", None)
     handle = user_public_handle(user)

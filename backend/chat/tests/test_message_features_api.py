@@ -431,7 +431,7 @@ class ChatMessageFeatureApiTests(TestCase):
         self.client.force_login(self.owner)
         upload_file = SimpleUploadedFile(
             "note.txt",
-            b"legacy key file",
+            b"compat key file",
             content_type="text/plain",
         )
         response = self.client.post(
@@ -445,7 +445,7 @@ class ChatMessageFeatureApiTests(TestCase):
         self.client.force_login(self.owner)
         upload_file = SimpleUploadedFile(
             "note-array.txt",
-            b"legacy array key file",
+            b"compat array key file",
             content_type="text/plain",
         )
         response = self.client.post(
@@ -459,7 +459,7 @@ class ChatMessageFeatureApiTests(TestCase):
         self.client.force_login(self.owner)
         upload_file = SimpleUploadedFile(
             "note-compat.txt",
-            b"legacy attachments key file",
+            b"compat attachments key file",
             content_type="text/plain",
         )
         response = self.client.post(
@@ -555,6 +555,72 @@ class ChatMessageFeatureApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         payload = response.json()
         self.assertEqual(payload["attachments"][0]["contentType"], "image/svg+xml")
+
+    @override_settings(
+        CHAT_ATTACHMENT_ALLOW_ANY_TYPE=False,
+        CHAT_ATTACHMENT_ALLOWED_TYPES=["application/zip"],
+    )
+    def test_attachment_upload_normalizes_zip_alias_from_windows_mime(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "mods.zip",
+            b"PK\x03\x04",
+            content_type="application/x-zip-compressed",
+        )
+
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.pk}/attachments/",
+            data={"files": [upload_file]},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["attachments"][0]["contentType"], "application/zip")
+
+    @override_settings(
+        CHAT_ATTACHMENT_ALLOW_ANY_TYPE=False,
+        CHAT_ATTACHMENT_ALLOWED_TYPES=["application/vnd.rar"],
+    )
+    def test_attachment_upload_guesses_rar_from_extension_for_x_compressed(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "modpack.rar",
+            b"Rar!\x1a\x07\x00",
+            content_type="application/x-compressed",
+        )
+
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.pk}/attachments/",
+            data={"files": [upload_file]},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["attachments"][0]["contentType"], "application/vnd.rar")
+
+    @override_settings(
+        CHAT_ATTACHMENT_ALLOW_ANY_TYPE=False,
+        CHAT_ATTACHMENT_ALLOWED_TYPES=["application/java-archive"],
+    )
+    def test_attachment_upload_guesses_jar_from_extension_for_octet_stream(self):
+        self.client.force_login(self.owner)
+        upload_file = SimpleUploadedFile(
+            "cannedgoods-1.20.1-1.jar",
+            b"PK\x03\x04",
+            content_type="application/octet-stream",
+        )
+
+        response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.pk}/attachments/",
+            data={"files": [upload_file]},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(
+            payload["attachments"][0]["contentType"],
+            "application/java-archive",
+        )
 
     def test_mark_read_is_monotonic_and_persisted_in_room_details(self):
         first_message = Message.objects.create(

@@ -18,6 +18,7 @@ from messages.models import Message, MessageAttachment
 from rooms.models import Room
 from rooms.services import ensure_membership
 from users.application import auth_service
+from users.avatar_service import user_password_default_avatar_path
 from users.identity import user_public_ref
 from users.models import MAX_PROFILE_IMAGE_SIDE
 
@@ -53,6 +54,14 @@ class ProfileApiTests(TestCase):
         image.save(buff, format="PNG")
         buff.seek(0)
         return SimpleUploadedFile(filename, buff.read(), content_type="image/png")
+
+    @staticmethod
+    def _svg_upload(filename: str = "avatar.svg") -> SimpleUploadedFile:
+        payload = (
+            b"<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'>"
+            b"<rect width='20' height='20' fill='red'/></svg>"
+        )
+        return SimpleUploadedFile(filename, payload, content_type="image/svg+xml")
 
     def _assert_signed_profile_image(self, url: str):
         parsed = urlparse(url)
@@ -165,7 +174,7 @@ class ProfileApiTests(TestCase):
         self.assertEqual(self.client.get(expired_url).status_code, 403)
 
     @override_settings(DEBUG=True)
-    def test_signed_media_endpoint_accepts_double_encoded_path_for_legacy_clients(self):
+    def test_signed_media_endpoint_accepts_double_encoded_path(self):
         self.user.profile.image = self._image_upload()
         self.user.profile.save(update_fields=["image"])
 
@@ -175,13 +184,13 @@ class ProfileApiTests(TestCase):
         if signed_url is None:
             self.fail("Expected signed media url")
 
-        parsed = urlparse(signed_url)
-        encoded_path = parsed.path.removeprefix("/api/auth/media/")
+        encoded_path = quote(media_path, safe="/")
         double_encoded_path = quote(encoded_path, safe="/")
-        legacy_url = f"/api/auth/media/{double_encoded_path}?{parsed.query}"
+        parsed = urlparse(signed_url)
+        compat_url = f"/api/auth/media/{double_encoded_path}?{parsed.query}"
 
-        valid_response = self.client.get(legacy_url)
-        self.assertEqual(valid_response.status_code, 200)
+        response = self.client.get(compat_url)
+        self.assertEqual(response.status_code, 200)
 
     def test_profile_update_rejects_oversized_image(self):
         api_client = APIClient()
@@ -193,6 +202,55 @@ class ProfileApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("image", response.json().get("errors", {}))
+
+    def test_profile_update_accepts_custom_avatar_upload(self):
+        api_client = APIClient()
+        api_client.force_authenticate(user=self.user)
+
+        response = api_client.patch(
+            "/api/profile/",
+            {"image": self._image_upload(filename="new_avatar.png", size=(64, 64))},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json().get("user", {})
+        profile_image = payload.get("profileImage")
+        self.assertTrue(profile_image)
+        self._assert_signed_profile_image(str(profile_image))
+
+        parsed = urlparse(str(profile_image))
+        media_path = parsed.path.removeprefix("/api/auth/media/")
+        self.assertNotEqual(media_path, user_password_default_avatar_path())
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.profile.avatar_url, "")
+        self.assertNotEqual(self.user.profile.image.name, user_password_default_avatar_path())
+
+    def test_profile_update_accepts_svg_avatar_and_serves_svg_content_type(self):
+        api_client = APIClient()
+        api_client.force_authenticate(user=self.user)
+
+        response = api_client.patch(
+            "/api/profile/",
+            {"image": self._svg_upload()},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json().get("user", {})
+        profile_image = str(payload.get("profileImage") or "")
+        self.assertTrue(profile_image)
+        self._assert_signed_profile_image(profile_image)
+
+        media_response = self.client.get(profile_image)
+        self.assertEqual(media_response.status_code, 200)
+        self.assertEqual(
+            media_response.headers.get("Content-Type", "").split(";")[0],
+            "image/svg+xml",
+        )
+        media_response.close()
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.profile.image.name.endswith(".svg"))
 
 
 class AttachmentMediaAccessTests(TestCase):
@@ -410,7 +468,7 @@ class AttachmentMediaAccessTests(TestCase):
         )
         self.assertEqual(deleted_message.status_code, 404)
 
-    def test_public_room_attachment_access_requires_active_membership(self):
+    def test_public_room_attachment_access_allows_authenticated_reader_without_membership(self):
         public_room = Room.objects.create(
             slug="media_room_public_03",
             name="media public",
@@ -423,7 +481,8 @@ class AttachmentMediaAccessTests(TestCase):
         outsider_response = self.client.get(
             f"/api/auth/media/{attachment.file.name}?roomId={public_room.pk}",
         )
-        self.assertEqual(outsider_response.status_code, 404)
+        self.assertEqual(outsider_response.status_code, 200)
+        outsider_response.close()
 
         ensure_membership(public_room, self.outsider)
         member_response = self.client.get(
