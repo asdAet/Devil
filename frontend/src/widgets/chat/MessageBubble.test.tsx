@@ -34,6 +34,9 @@ const createImageAttachment = (id: number, filename: string) => ({
   height: 720,
 });
 
+/**
+ * Настраивает эмуляцию touch-устройства через matchMedia.
+ */
 const installTouchMatchMedia = () => {
   const original = window.matchMedia;
   Object.defineProperty(window, "matchMedia", {
@@ -62,6 +65,9 @@ const installTouchMatchMedia = () => {
   };
 };
 
+/**
+ * Настраивает модель ввода для десктопного сценария.
+ */
 const installDesktopInputModel = () => {
   const originalMatchMedia = window.matchMedia;
   const hadTouchStart = Object.prototype.hasOwnProperty.call(
@@ -299,6 +305,107 @@ describe("MessageBubble", () => {
     expect(
       screen.getByRole("link", { name: /report\.pdf/i }),
     ).toBeInTheDocument();
+  });
+
+  it("opens image preview modal with metadata", () => {
+    const message: Message = {
+      ...baseMessage,
+      attachments: [createImageAttachment(90, "preview.png")],
+    };
+
+    render(
+      <MessageBubble
+        message={message}
+        isOwn={false}
+        onlineUsernames={new Set<string>()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Открыть изображение preview\.png/i }),
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Просмотр изображения" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("preview.png")).toBeInTheDocument();
+    expect(screen.getByText(/ID: 90/i)).toBeInTheDocument();
+    expect(screen.getByText(/1\.0 KB/i)).toBeInTheDocument();
+    expect(screen.getByText(/1280x720/i)).toBeInTheDocument();
+    expect(screen.getByText(/Отправлено:/i)).toBeInTheDocument();
+  });
+
+  it("opens video preview modal with metadata", () => {
+    const message: Message = {
+      ...baseMessage,
+      attachments: [
+        {
+          id: 91,
+          originalFilename: "video.mp4",
+          contentType: "video/mp4",
+          fileSize: 5 * 1024 * 1024,
+          url: "/media/video.mp4",
+          thumbnailUrl: null,
+          width: 1920,
+          height: 1080,
+        },
+      ],
+    };
+
+    render(
+      <MessageBubble
+        message={message}
+        isOwn={false}
+        onlineUsernames={new Set<string>()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Открыть видео video\.mp4/i }),
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Просмотр видео" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("video.mp4")).toBeInTheDocument();
+    expect(screen.getByText(/ID: 91/i)).toBeInTheDocument();
+    expect(screen.getByText(/5\.0 MB/i)).toBeInTheDocument();
+    expect(screen.getByText(/1920x1080/i)).toBeInTheDocument();
+  });
+
+  it("treats known video extensions as video preview even with generic content type", () => {
+    const message: Message = {
+      ...baseMessage,
+      attachments: [
+        {
+          id: 92,
+          originalFilename: "clip.mkv",
+          contentType: "application/octet-stream",
+          fileSize: 1024 * 1024,
+          url: "/media/clip.mkv",
+          thumbnailUrl: null,
+          width: null,
+          height: null,
+        },
+      ],
+    };
+
+    render(
+      <MessageBubble
+        message={message}
+        isOwn={false}
+        onlineUsernames={new Set<string>()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Открыть видео clip\.mkv/i }),
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Просмотр видео" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("clip.mkv")).toBeInTheDocument();
   });
 
   it("opens full own-message action menu on tap for touch devices", () => {

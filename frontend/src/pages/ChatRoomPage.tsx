@@ -73,12 +73,18 @@ import {
   writePendingReadToStorage,
 } from "./chatRoomPage/utils";
 
+/**
+ * Описывает входные props компонента `Props`.
+ */
 type Props = {
   slug: string;
   user: UserProfile | null;
   onNavigate: (path: string) => void;
 };
 
+/**
+ * React-компонент ChatRoomPage отвечает за отрисовку и обработку UI-сценария.
+ */
 export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const {
     details,
@@ -488,12 +494,20 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
   useEffect(() => {
     if (!isHeaderSearchOpen) return;
+    /**
+     * Обрабатывает on key down.
+     * @param event Событие браузера.
+     */
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setHeaderSearchOpen(false);
       setHeaderSearchQuery("");
       setHeaderSearchResults([]);
     };
+    /**
+     * Обрабатывает on mouse down.
+     * @param event Событие браузера.
+     */
     const onMouseDown = (event: MouseEvent) => {
       if (!searchWrapRef.current) return;
       if (searchWrapRef.current.contains(event.target as Node)) return;
@@ -698,14 +712,23 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   useEffect(() => {
     if (!readStateEnabled) return;
 
+    /**
+     * Обрабатывает on visibility change.
+     */
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         flushPendingRead();
       }
     };
+    /**
+     * Обрабатывает on page hide.
+     */
     const onPageHide = () => {
       flushPendingRead();
     };
+    /**
+     * Обрабатывает on before unload.
+     */
     const onBeforeUnload = () => {
       flushPendingRead();
     };
@@ -1173,6 +1196,14 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const scrollToBottom = useCallback(() => {
     const list = listRef.current;
     if (!list) return;
+
+    const snapToBottom = () => {
+      const nextList = listRef.current;
+      if (!nextList) return;
+      nextList.scrollTop = nextList.scrollHeight;
+    };
+
+    beginProgrammaticScroll();
     if (typeof list.scrollTo === "function") {
       list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
     } else {
@@ -1181,8 +1212,17 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     isAtBottomRef.current = true;
     setShowScrollFab(false);
     setNewMsgCount(0);
-    window.setTimeout(() => scheduleViewportReadSync(), 220);
-  }, [scheduleViewportReadSync]);
+
+    requestAnimationFrame(() => {
+      snapToBottom();
+      requestAnimationFrame(() => {
+        snapToBottom();
+        endProgrammaticScroll(() => {
+          scheduleViewportReadSync();
+        }, 120);
+      });
+    });
+  }, [beginProgrammaticScroll, endProgrammaticScroll, scheduleViewportReadSync]);
 
   useEffect(() => {
     const previousSnapshot = lastMessageSnapshotRef.current;
@@ -1969,7 +2009,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 Загружаем ранние сообщения...
               </Panel>
             )}
-            {!hasMore && <Panel muted>Это начало истории.</Panel>}
+            {/* {!hasMore && <Panel muted>Это начало истории.</Panel>} */}
 
             {timeline.map((item) =>
               item.type === "day" ? (
