@@ -129,8 +129,8 @@ def get_client_ip_from_request(request) -> str | None:
     ip_val = _pick_ip(
         [
             request.META.get("HTTP_CF_CONNECTING_IP"),
-            request.META.get("HTTP_X_REAL_IP"),
             request.META.get("HTTP_X_FORWARDED_FOR"),
+            request.META.get("HTTP_X_REAL_IP"),
         ]
     )
     return ip_val or (_parse_ip(remote) or remote)
@@ -167,8 +167,8 @@ def get_client_ip_from_scope(scope) -> str | None:
     ip_val = _pick_ip(
         [
             header(b"cf-connecting-ip"),
-            header(b"x-real-ip"),
             header(b"x-forwarded-for"),
+            header(b"x-real-ip"),
         ]
     )
     return ip_val or (_parse_ip(remote) or remote)
