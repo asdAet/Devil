@@ -1,12 +1,16 @@
 import csv
 import json
+from collections import defaultdict
 from datetime import date, datetime
 from typing import Any, cast
 
 from django.contrib import admin
-from django.db.models import Q, QuerySet
+from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
+from django.db.models import Count, Max, Min, Q, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
-from django.urls import path, reverse
+from django.template.response import TemplateResponse
+from django.urls import NoReverseMatch, path, reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -234,6 +238,16 @@ class AuditEventAdmin(admin.ModelAdmin):
         "selected_only",
         "_selected_action",
     }
+    _IP_SORT_FIELDS = {
+        "ip": "ip",
+        "first_seen": "first_seen",
+        "last_seen": "last_seen",
+        "total_events": "total_events",
+        "account_count": "account_count",
+        "anonymous_events": "anonymous_events",
+    }
+    _IP_DEFAULT_SORT = ("last_seen", "desc")
+    _IP_SUMMARY_PAGE_SIZE = 100
 
     @admin.display(description="Path")
     def short_path(self, obj):
@@ -335,6 +349,11 @@ class AuditEventAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.export_view),
                 name="auditlog_auditevent_export",
             ),
+            path(
+                "ip-summary/",
+                self.admin_site.admin_view(self.ip_summary_view),
+                name="auditlog_auditevent_ip_summary",
+            ),
         ]
         return custom_urls + urls
 
@@ -365,7 +384,223 @@ class AuditEventAdmin(admin.ModelAdmin):
         context["export_jsonl_url"] = f"{export_base}{separator}format=jsonl"
         context["export_url"] = export_base
         context["export_preserved_items"] = preserved_items
+        context["ip_summary_url"] = reverse("admin:auditlog_auditevent_ip_summary")
         return super().changelist_view(request, extra_context=context)
+
+    def ip_summary_view(self, request: HttpRequest) -> HttpResponse:
+        """Renders a compact audit view grouped by unique IP addresses."""
+        base_queryset = self._get_ip_summary_base_queryset()
+        try:
+            filtered_queryset = self._apply_ip_summary_filters(base_queryset, request)
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc).encode("utf-8"))
+        sort_field, direction, order_expression = self._resolve_ip_sort(request)
+        grouped_queryset = (
+            filtered_queryset.values("ip")
+            .annotate(
+                total_events=Count("id"),
+                first_seen=Min("created_at"),
+                last_seen=Max("created_at"),
+                account_count=Count("actor_user_id_snapshot", distinct=True),
+                anonymous_events=Count("id", filter=Q(actor_user_id_snapshot__isnull=True)),
+            )
+            .order_by(order_expression, "ip")
+        )
+
+        paginator = Paginator(grouped_queryset, self._IP_SUMMARY_PAGE_SIZE)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        page_items = list(page_obj.object_list)
+        page_ips = [str(item["ip"]) for item in page_items if item.get("ip")]
+        accounts_by_ip = self._collect_accounts_by_ip(filtered_queryset, page_ips)
+        rows = [
+            {
+                "ip": item["ip"],
+                "total_events": item["total_events"],
+                "first_seen": item["first_seen"],
+                "last_seen": item["last_seen"],
+                "account_count": item["account_count"],
+                "anonymous_events": item["anonymous_events"],
+                "accounts": accounts_by_ip.get(str(item["ip"]), []),
+            }
+            for item in page_items
+        ]
+
+        sort_links = {
+            field: self._build_ip_summary_sort_url(request, field, sort_field, direction)
+            for field in self._IP_SORT_FIELDS
+        }
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Аудит по IP",
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request),
+            "ip_rows": rows,
+            "page_obj": page_obj,
+            "sort_field": sort_field,
+            "sort_direction": direction,
+            "sort_links": sort_links,
+            "ip_filter": (request.GET.get("ip") or "").strip(),
+            "actor_filter": (request.GET.get("actor") or "").strip(),
+            "date_from": (request.GET.get("date_from") or "").strip(),
+            "date_to": (request.GET.get("date_to") or "").strip(),
+            "query_without_page": self._build_query_string(request, {"page": None}),
+            "audit_changelist_url": reverse("admin:auditlog_auditevent_changelist"),
+        }
+        return TemplateResponse(
+            request,
+            "admin/auditlog/auditevent/ip_summary.html",
+            context=context,
+        )
+
+    def _get_ip_summary_base_queryset(self) -> QuerySet[AuditEvent]:
+        """Returns audit events with a non-empty IP address."""
+        return AuditEvent.objects.exclude(Q(ip__isnull=True) | Q(ip__exact=""))
+
+    def _apply_ip_summary_filters(
+        self,
+        queryset: QuerySet[AuditEvent],
+        request: HttpRequest,
+    ) -> QuerySet[AuditEvent]:
+        """Applies optional filters for IP summary view."""
+        filtered_queryset = queryset
+        ip_filter = (request.GET.get("ip") or "").strip()
+        if ip_filter:
+            filtered_queryset = filtered_queryset.filter(ip__icontains=ip_filter)
+
+        actor_filter = (request.GET.get("actor") or "").strip()
+        if actor_filter:
+            actor_match = Q(actor_username_snapshot__icontains=actor_filter)
+            if actor_filter.isdigit():
+                actor_match |= Q(actor_user_id_snapshot=int(actor_filter))
+            filtered_queryset = filtered_queryset.filter(actor_match)
+
+        date_from = self._parse_iso_date(request.GET.get("date_from"), param="date_from")
+        date_to = self._parse_iso_date(request.GET.get("date_to"), param="date_to")
+        if date_from is not None and date_to is not None and date_from > date_to:
+            raise ValueError("Некорректный диапазон дат: date_from должен быть <= date_to")
+        if date_from is not None:
+            filtered_queryset = filtered_queryset.filter(created_at__date__gte=date_from)
+        if date_to is not None:
+            filtered_queryset = filtered_queryset.filter(created_at__date__lte=date_to)
+        return filtered_queryset
+
+    def _resolve_ip_sort(self, request: HttpRequest) -> tuple[str, str, str]:
+        """Normalizes sorting arguments for the IP summary table."""
+        sort_field = (request.GET.get("sort") or "").strip().lower()
+        if sort_field not in self._IP_SORT_FIELDS:
+            sort_field = self._IP_DEFAULT_SORT[0]
+        direction = (request.GET.get("direction") or "").strip().lower()
+        if direction not in {"asc", "desc"}:
+            direction = self._IP_DEFAULT_SORT[1]
+        field_expression = self._IP_SORT_FIELDS[sort_field]
+        order_expression = field_expression if direction == "asc" else f"-{field_expression}"
+        return sort_field, direction, order_expression
+
+    def _build_ip_summary_sort_url(
+        self,
+        request: HttpRequest,
+        target_field: str,
+        current_field: str,
+        current_direction: str,
+    ) -> str:
+        """Builds a URL that toggles sorting for a specific column."""
+        next_direction = "asc"
+        if current_field != target_field:
+            default_field, default_direction = self._IP_DEFAULT_SORT
+            if target_field == default_field:
+                next_direction = default_direction
+        elif current_direction == "asc":
+            next_direction = "desc"
+        return self._build_query_string(
+            request,
+            {
+                "sort": target_field,
+                "direction": next_direction,
+                "page": None,
+            },
+        )
+
+    @staticmethod
+    def _build_query_string(request: HttpRequest, changes: dict[str, str | None]) -> str:
+        """Returns query string with updated parameters."""
+        params = request.GET.copy()
+        for key, value in changes.items():
+            if value is None:
+                params.pop(key, None)
+                continue
+            params[key] = value
+        encoded = params.urlencode()
+        return f"?{encoded}" if encoded else ""
+
+    def _collect_accounts_by_ip(
+        self,
+        queryset: QuerySet[AuditEvent],
+        ips: list[str],
+    ) -> dict[str, list[dict[str, str | int | None]]]:
+        """Collects account snapshots for each IP on current page."""
+        if not ips:
+            return {}
+        account_rows = (
+            queryset.filter(ip__in=ips)
+            .values("ip", "actor_user_id_snapshot", "actor_username_snapshot")
+            .exclude(
+                Q(actor_user_id_snapshot__isnull=True)
+                & (Q(actor_username_snapshot__isnull=True) | Q(actor_username_snapshot__exact=""))
+            )
+            .distinct()
+        )
+        grouped_raw: dict[str, set[tuple[int | None, str]]] = defaultdict(set)
+        user_ids: set[int] = set()
+        for row in account_rows:
+            ip_value = str(row["ip"])
+            user_id = cast(int | None, row["actor_user_id_snapshot"])
+            username = str(row["actor_username_snapshot"] or "").strip()
+            grouped_raw[ip_value].add((user_id, username))
+            if user_id is not None:
+                user_ids.add(user_id)
+
+        user_model = get_user_model()
+        existing_users = user_model._default_manager.filter(pk__in=user_ids)
+        users_by_id: dict[int, Any] = {int(user.pk): user for user in existing_users}
+        grouped: dict[str, list[dict[str, str | int | None]]] = {}
+
+        for ip_value, account_keys in grouped_raw.items():
+            account_items: list[dict[str, str | int | None]] = []
+            sorted_keys = sorted(
+                account_keys,
+                key=lambda item: (
+                    item[0] is None,
+                    item[0] if item[0] is not None else 0,
+                    item[1].lower(),
+                ),
+            )
+            for user_id, username_snapshot in sorted_keys:
+                resolved_username = username_snapshot
+                admin_url: str | None = None
+                if user_id is not None:
+                    user_obj = users_by_id.get(user_id)
+                    if user_obj is not None:
+                        resolved_username = str(getattr(user_obj, user_model.USERNAME_FIELD, resolved_username))
+                        try:
+                            admin_url = reverse(
+                                f"admin:{user_model._meta.app_label}_{user_model._meta.model_name}_change",
+                                args=[user_id],
+                            )
+                        except NoReverseMatch:
+                            admin_url = None
+                    elif not resolved_username:
+                        resolved_username = f"ID {user_id}"
+                elif not resolved_username:
+                    resolved_username = "Неизвестный пользователь"
+                account_items.append(
+                    {
+                        "user_id": user_id,
+                        "username": resolved_username,
+                        "admin_url": admin_url,
+                    }
+                )
+            grouped[ip_value] = account_items
+        return grouped
 
     def export_view(self, request):
         """Экспортирует view в запрошенный формат.

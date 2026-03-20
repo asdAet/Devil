@@ -215,6 +215,65 @@ describe("ApiService", () => {
     });
   });
 
+  it("hides html nginx errors and returns friendly 413 message", async () => {
+    server.use(
+      http.post(
+        "/api/auth/register/",
+        () =>
+          new HttpResponse(
+            "<html><body><h1>413 Request Entity Too Large</h1></body></html>",
+            { status: 413 },
+          ),
+      ),
+    );
+
+    await expect(
+      apiService.register("large_file_user", "pass12345", "pass12345", "Large User"),
+    ).rejects.toMatchObject({
+      status: 413,
+      message: "Файл слишком большой",
+      data: undefined,
+    });
+  });
+
+  it("returns generic server message for html 500 errors", async () => {
+    server.use(
+      http.post(
+        "/api/auth/register/",
+        () =>
+          new HttpResponse(
+            "<!doctype html><html><body><h1>Internal Server Error</h1></body></html>",
+            { status: 500 },
+          ),
+      ),
+    );
+
+    await expect(
+      apiService.register("server_error_user", "pass12345", "pass12345", "Server User"),
+    ).rejects.toMatchObject({
+      status: 500,
+      message: "Внутренняя ошибка сервера",
+      data: undefined,
+    });
+  });
+
+  it("decodes escaped unicode errors into readable text", async () => {
+    server.use(
+      http.post(
+        "/api/auth/register/",
+        () => new HttpResponse("\\u041d\\u0435\\u043b\\u044c\\u0437\\u044f", { status: 400 }),
+      ),
+    );
+
+    await expect(
+      apiService.register("bad_user", "pass12345", "pass12345", "Bad User"),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Нельзя",
+      data: expect.objectContaining({ detail: "\\u041d\\u0435\\u043b\\u044c\\u0437\\u044f" }),
+    });
+  });
+
   it("normalizes detail payload errors", async () => {
     server.use(
       http.post("/api/auth/login/", () =>

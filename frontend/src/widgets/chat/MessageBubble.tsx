@@ -35,7 +35,7 @@ import {
 } from "./lib/attachmentLayout";
 
 /**
- * РћРїРёСЃС‹РІР°РµС‚ РІС…РѕРґРЅС‹Рµ props РєРѕРјРїРѕРЅРµРЅС‚Р° `Props`.
+ * Описывает входные props компонента `Props`.
  */
 type Props = {
   message: Message;
@@ -53,12 +53,12 @@ type Props = {
 };
 
 /**
- * РћРїСЂРµРґРµР»СЏРµС‚ С‚РёРї РјРµРґРёР°, РєРѕС‚РѕСЂРѕРµ РѕС‚РєСЂС‹РІР°РµС‚СЃСЏ РІ РјРѕРґР°Р»СЊРЅРѕРј РїСЂРѕСЃРјРѕС‚СЂС‰РёРєРµ.
+ * Определяет тип медиа, которое открывается в модальном просмотрщике.
  */
 type LightboxMediaKind = "image" | "video";
 
 /**
- * РҐСЂР°РЅРёС‚ РјРµС‚Р°РґР°РЅРЅС‹Рµ РІР»РѕР¶РµРЅРёСЏ РґР»СЏ РїРѕРґРїРёСЃРё РІ РјРѕРґР°Р»СЊРЅРѕРј РїСЂРѕСЃРјРѕС‚СЂС‰РёРєРµ.
+ * Хранит метаданные вложения для подписи в модальном просмотрщике.
  */
 type LightboxMediaMetadata = {
   attachmentId: number;
@@ -71,7 +71,7 @@ type LightboxMediaMetadata = {
 };
 
 /**
- * РћРїРёСЃС‹РІР°РµС‚ СЃРѕСЃС‚РѕСЏРЅРёРµ Р°РєС‚РёРІРЅРѕРіРѕ РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂР° РІР»РѕР¶РµРЅРёСЏ.
+ * Описывает состояние активного предпросмотра вложения.
  */
 type LightboxMediaItem = {
   src: string;
@@ -81,22 +81,22 @@ type LightboxMediaItem = {
 };
 
 /**
- * РљРѕРЅСЃС‚Р°РЅС‚Р° `QUICK_REACTIONS` С…СЂР°РЅРёС‚ РёСЃРїРѕР»СЊР·СѓРµРјРѕРµ РІ РјРѕРґСѓР»Рµ Р·РЅР°С‡РµРЅРёРµ.
+ * Константа `QUICK_REACTIONS` хранит используемое в модуле значение.
  */
 const QUICK_REACTIONS = [
-  "\u{1F44D}",
-  "\u{2764}\u{FE0F}",
-  "\u{1F602}",
-  "\u{1F62E}",
-  "\u{1F44E}",
-  "\u{1F525}",
-  "\u{1F389}",
-  "\u{1F622}",
+  "👍",
+  "❤️",
+  "😂",
+  "😮",
+  "👎",
+  "🔥",
+  "🎉",
+  "😢",
 ];
 /**
- * Р¤РѕСЂРјР°С‚РёСЂСѓРµС‚ СЂР°Р·РјРµСЂ С„Р°Р№Р»Р° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ СЂСЏРґРѕРј СЃ РІР»РѕР¶РµРЅРёРµРј.
- * @param bytes Р Р°Р·РјРµСЂ С„Р°Р№Р»Р° РІ Р±Р°Р№С‚Р°С….
- * @returns РЎС‚СЂРѕРєР° РІ РѕС‚С„РѕСЂРјР°С‚РёСЂРѕРІР°РЅРЅРѕРј РІРёРґРµ.
+ * Форматирует размер файла для отображения рядом с вложением.
+ * @param bytes Размер файла в байтах.
+ * @returns Строка в отформатированном виде.
  */
 
 const formatFileSize = (bytes: number) => {
@@ -118,23 +118,24 @@ const formatMediaDuration = (totalSeconds: number): string => {
 
 
 /**
- * РџСЂРѕРІРµСЂСЏРµС‚, РѕС‚РЅРѕСЃРёС‚СЃСЏ Р»Рё MIME-С‚РёРї Рє РІРёРґРµРѕ.
- * @param ct РђСЂРіСѓРјРµРЅС‚ `ct` С‚РµРєСѓС‰РµРіРѕ РІС‹Р·РѕРІР°.
- * @returns Р›РѕРіРёС‡РµСЃРєРёР№ С„Р»Р°Рі СЂРµР·СѓР»СЊС‚Р°С‚Р° РїСЂРѕРІРµСЂРєРё.
+ * Проверяет, относится ли MIME-тип к видео.
+ * @param contentType MIME-тип вложения.
+ * @param fileName Имя файла, используется как дополнительная эвристика.
+ * @returns Логический флаг результата проверки.
  */
 
 const isVideoType = (contentType: string, fileName: string) =>
   isVideoAttachment(contentType, fileName);
 /**
- * РџСЂРѕРІРµСЂСЏРµС‚, РѕС‚РЅРѕСЃРёС‚СЃСЏ Р»Рё MIME-С‚РёРї Рє Р°СѓРґРёРѕ.
- * @param ct РђСЂРіСѓРјРµРЅС‚ `ct` С‚РµРєСѓС‰РµРіРѕ РІС‹Р·РѕРІР°.
- * @returns Р›РѕРіРёС‡РµСЃРєРёР№ С„Р»Р°Рі СЂРµР·СѓР»СЊС‚Р°С‚Р° РїСЂРѕРІРµСЂРєРё.
+ * Проверяет, относится ли MIME-тип к аудио.
+ * @param ct MIME-тип вложения.
+ * @returns Логический флаг результата проверки.
  */
 
 const isAudioType = (ct: string) => ct.startsWith("audio/");
 /**
- * РќРѕСЂРјР°Р»РёР·СѓРµС‚ actor ref.
- * @param value Р’С…РѕРґРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ РґР»СЏ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ.
+ * Нормализует публичный идентификатор пользователя для сравнения online-статуса.
+ * @param value Входное значение для преобразования.
  */
 
 const normalizeActorRef = (value: string) =>
@@ -151,7 +152,7 @@ const MOBILE_MENU_IGNORE_SELECTOR =
   'a,button,input,textarea,select,video,audio,img,[role="button"],[data-message-menu-ignore="true"]';
 
 /**
- * РџСЂРѕРІРµСЂСЏРµС‚ СѓСЃР»РѕРІРёРµ is touch like device.
+ * Определяет, используется ли устройство с touch-вводом.
  */
 
 const isTouchLikeDevice = () => {
@@ -162,9 +163,9 @@ const isTouchLikeDevice = () => {
   return window.innerWidth <= 768;
 };
 /**
- * РџСЂРѕРІРµСЂСЏРµС‚, С‡С‚Рѕ С‚Р°Рї Р±С‹Р» РїРѕ РёРЅС‚РµСЂР°РєС‚РёРІРЅРѕРјСѓ СЌР»РµРјРµРЅС‚Сѓ Рё РјРµРЅСЋ РѕС‚РєСЂС‹РІР°С‚СЊ РЅРµ РЅСѓР¶РЅРѕ.
- * @param target РђСЂРіСѓРјРµРЅС‚ `target` С‚РµРєСѓС‰РµРіРѕ РІС‹Р·РѕРІР°.
- * @returns Р›РѕРіРёС‡РµСЃРєРёР№ С„Р»Р°Рі, РЅСѓР¶РЅРѕ Р»Рё РІС‹РїРѕР»РЅСЏС‚СЊ РґРµР№СЃС‚РІРёРµ.
+ * Проверяет, что тап был по интерактивному элементу и меню открывать не нужно.
+ * @param target DOM-элемент, по которому пришло событие.
+ * @returns Логический флаг, нужно ли выполнять действие.
  */
 
 const shouldIgnoreMobileMenuTap = (target: EventTarget | null) => {
@@ -172,9 +173,7 @@ const shouldIgnoreMobileMenuTap = (target: EventTarget | null) => {
   return Boolean(target.closest(MOBILE_MENU_IGNORE_SELECTOR));
 };
 /**
- * РљРѕРјРїРѕРЅРµРЅС‚ ReplyQuote СЂРµРЅРґРµСЂРёС‚ UI С‚РµРєСѓС‰РµРіРѕ СЂР°Р·РґРµР»Р° Рё СЃРІСЏР·С‹РІР°РµС‚ РґРµР№СЃС‚РІРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РѕР±СЂР°Р±РѕС‚С‡РёРєР°РјРё.
- *
- * @param props РЎРІРѕР№СЃС‚РІР° РєРѕРјРїРѕРЅРµРЅС‚Р°.
+ * Компонент ReplyQuote рендерит UI текущего раздела и связывает действия пользователя с обработчиками.
  */
 function ReplyQuote({
   replyTo,
@@ -207,9 +206,7 @@ function ReplyQuote({
   );
 }
 /**
- * РљРѕРјРїРѕРЅРµРЅС‚ ReactionChip СЂРµРЅРґРµСЂРёС‚ UI С‚РµРєСѓС‰РµРіРѕ СЂР°Р·РґРµР»Р° Рё СЃРІСЏР·С‹РІР°РµС‚ РґРµР№СЃС‚РІРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РѕР±СЂР°Р±РѕС‚С‡РёРєР°РјРё.
- *
- * @param props РЎРІРѕР№СЃС‚РІР° РєРѕРјРїРѕРЅРµРЅС‚Р°.
+ * Компонент ReactionChip рендерит UI текущего раздела и связывает действия пользователя с обработчиками.
  */
 function ReactionChip({
   reaction,
@@ -233,7 +230,7 @@ function ReactionChip({
   );
 }
 /**
- * React-РєРѕРјРїРѕРЅРµРЅС‚ CheckMark РѕС‚РІРµС‡Р°РµС‚ Р·Р° РѕС‚СЂРёСЃРѕРІРєСѓ Рё РѕР±СЂР°Р±РѕС‚РєСѓ UI-СЃС†РµРЅР°СЂРёСЏ.
+ * React-компонент CheckMark отвечает за отрисовку и обработку UI-сценария.
  */
 function CheckMark({ isRead }: { isRead: boolean }) {
   return (
@@ -243,7 +240,7 @@ function CheckMark({ isRead }: { isRead: boolean }) {
       className={[styles.checkMark, isRead ? styles.checkRead : ""]
         .filter(Boolean)
         .join(" ")}
-      aria-label={isRead ? "\u041f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u043e" : "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e"}
+      aria-label={isRead ? "Прочитано" : "Отправлено"}
     >
       <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
         <path
@@ -266,9 +263,7 @@ function CheckMark({ isRead }: { isRead: boolean }) {
   );
 }
 /**
- * РљРѕРјРїРѕРЅРµРЅС‚ EmojiPicker СЂРµРЅРґРµСЂРёС‚ UI С‚РµРєСѓС‰РµРіРѕ СЂР°Р·РґРµР»Р° Рё СЃРІСЏР·С‹РІР°РµС‚ РґРµР№СЃС‚РІРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РѕР±СЂР°Р±РѕС‚С‡РёРєР°РјРё.
- *
- * @param props РЎРІРѕР№СЃС‚РІР° РєРѕРјРїРѕРЅРµРЅС‚Р°.
+ * Компонент EmojiPicker рендерит UI текущего раздела и связывает действия пользователя с обработчиками.
  */
 function EmojiPicker({
   onPick,
@@ -306,9 +301,7 @@ function EmojiPicker({
   );
 }
 /**
- * РљРѕРјРїРѕРЅРµРЅС‚ MessageBubble СЂРµРЅРґРµСЂРёС‚ UI С‚РµРєСѓС‰РµРіРѕ СЂР°Р·РґРµР»Р° Рё СЃРІСЏР·С‹РІР°РµС‚ РґРµР№СЃС‚РІРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РѕР±СЂР°Р±РѕС‚С‡РёРєР°РјРё.
- *
- * @param props РЎРІРѕР№СЃС‚РІР° РєРѕРјРїРѕРЅРµРЅС‚Р°.
+ * Компонент MessageBubble рендерит UI текущего раздела и связывает действия пользователя с обработчиками.
  */
 export function MessageBubble({
   message,
@@ -366,10 +359,10 @@ export function MessageBubble({
   );
 
   /**
-   * РЎРѕР±РёСЂР°РµС‚ РјРµС‚Р°РґР°РЅРЅС‹Рµ РІР»РѕР¶РµРЅРёСЏ РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ РїСЂРѕСЃРјРѕС‚СЂС‰РёРєРµ.
+   * Собирает метаданные вложения для отображения в просмотрщике.
    *
-   * @param attachment Р’Р»РѕР¶РµРЅРёРµ РёР· СЃРѕРѕР±С‰РµРЅРёСЏ.
-   * @returns РњРµС‚Р°РґР°РЅРЅС‹Рµ РґР»СЏ РїРѕРґРїРёСЃРё РїРѕРґ РјРµРґРёР°.
+   * @param attachment Вложение из сообщения.
+   * @returns Метаданные для подписи под медиа.
    */
   const buildLightboxMetadata = useCallback(
     (attachment: Message["attachments"][number]): LightboxMediaMetadata => ({
@@ -385,12 +378,10 @@ export function MessageBubble({
   );
 
   /**
-   * РћС‚РєСЂС‹РІР°РµС‚ РјРѕРґР°Р»СЊРЅС‹Р№ РїСЂРѕСЃРјРѕС‚СЂС‰РёРє РІС‹Р±СЂР°РЅРЅРѕРіРѕ РјРµРґРёР°-С„Р°Р№Р»Р°.
+   * Запоминает длительность видео, чтобы отобразить ее на превью.
    *
-   * @param attachment Р’Р»РѕР¶РµРЅРёРµ, РґР»СЏ РєРѕС‚РѕСЂРѕРіРѕ РѕС‚РєСЂС‹РІР°РµС‚СЃСЏ РїСЂРѕСЃРјРѕС‚СЂ.
-   * @param kind РўРёРї РјРµРґРёР° РґР»СЏ СЂРµР¶РёРјР° РїСЂРѕСЃРјРѕС‚СЂР°.
-   * @param src URL РѕСЂРёРіРёРЅР°Р»СЊРЅРѕРіРѕ С„Р°Р№Р»Р°.
-   * @param alt РђР»СЊС‚РµСЂРЅР°С‚РёРІРЅС‹Р№ С‚РµРєСЃС‚ РґР»СЏ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ.
+   * @param attachmentId Идентификатор вложения.
+   * @param durationSeconds Длительность видео в секундах.
    */
   const rememberVideoDuration = useCallback(
     (attachmentId: number, durationSeconds: number) => {
@@ -493,7 +484,7 @@ export function MessageBubble({
     const messageText = message.content.trim();
 
     contextMenuItems.push({
-      label: "\u041e\u0442\u0432\u0435\u0442\u0438\u0442\u044c",
+      label: "Ответить",
       icon: (
         <svg
           width="16"
@@ -514,7 +505,7 @@ export function MessageBubble({
 
     if (messageText.length > 0) {
       contextMenuItems.push({
-        label: "\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0442\u0435\u043a\u0441\u0442",
+        label: "Копировать текст",
         icon: (
           <svg
             width="16"
@@ -534,8 +525,8 @@ export function MessageBubble({
     }
 
     contextMenuItems.push({
-      label: "\u0420\u0435\u0430\u043a\u0446\u0438\u044f",
-      icon: <span style={{ fontSize: 14 }}>{"\u{1F44D}"}</span>,
+      label: "Реакция",
+      icon: <span style={{ fontSize: 14 }}>{"👍"}</span>,
       disabled: !onReact,
       onClick: () => {
         if (!onReact) return;
@@ -545,7 +536,7 @@ export function MessageBubble({
 
     if (!isOwn) {
       contextMenuItems.push({
-        label: "\u041f\u0440\u043e\u0444\u0438\u043b\u044c",
+        label: "Профиль",
         icon: (
           <svg
             width="16"
@@ -567,7 +558,7 @@ export function MessageBubble({
 
     if (canManageMessage) {
       contextMenuItems.push({
-        label: "\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c",
+        label: "Редактировать",
         icon: (
           <svg
             width="16"
@@ -587,7 +578,7 @@ export function MessageBubble({
       });
 
       contextMenuItems.push({
-        label: "\u0423\u0434\u0430\u043b\u0438\u0442\u044c",
+        label: "Удалить",
         icon: (
           <svg
             width="16"
@@ -677,7 +668,7 @@ export function MessageBubble({
           type="button"
           className={styles.avatarBtn}
           onClick={() => onAvatarClick?.(message.publicRef)}
-          aria-label={`\u041f\u0440\u043e\u0444\u0438\u043b\u044c ${message.displayName ?? message.username}`}
+          aria-label={`Профиль ${message.displayName ?? message.username}`}
         >
           <Avatar
             username={message.displayName ?? message.username}
@@ -710,7 +701,7 @@ export function MessageBubble({
             </div>
 
             {isDeleted ? (
-              <p className={styles.deletedContent}>\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u043e</p>
+              <p className={styles.deletedContent}>Сообщение удалено</p>
             ) : (
               <>
                 {message.content && (
@@ -761,7 +752,7 @@ export function MessageBubble({
                             onClick={() =>
                               openLightboxByAttachmentId(attachment.id)
                             }
-                            aria-label={`\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 ${attachment.originalFilename}`}
+                            aria-label={`Открыть изображение ${attachment.originalFilename}`}
                           >
                             <img
                               src={imageSrc}
@@ -849,7 +840,7 @@ export function MessageBubble({
                         att.contentType,
                         att.originalFilename,
                       );
-                      const fileMeta = `${formatFileSize(att.fileSize)} \u2022 ${contentTypeLabel}`;
+                      const fileMeta = `${formatFileSize(att.fileSize)} • ${contentTypeLabel}`;
 
                       if (att.url) {
                         return (
@@ -928,7 +919,7 @@ export function MessageBubble({
             {!isDeleted && (
               <div className={styles.footerInfo}>
                 {message.editedAt && (
-                  <span className={styles.editedTag}>\u0440\u0435\u0434.</span>
+                  <span className={styles.editedTag}>ред.</span>
                 )}
                 <span className={styles.time}>
                   {formatTimestamp(message.createdAt)}
@@ -976,3 +967,4 @@ export function MessageBubble({
     </>
   );
 }
+

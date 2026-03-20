@@ -1,0 +1,100 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Главная</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{{ audit_changelist_url }}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; Сводка по IP
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div id="content-main">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:8px; align-items:end; margin-bottom:16px;">
+      <div>
+        <label for="id_ip_filter">IP</label><br>
+        <input id="id_ip_filter" type="text" name="ip" value="{{ ip_filter }}" placeholder="Например 192.168">
+      </div>
+      <div>
+        <label for="id_actor_filter">Аккаунт</label><br>
+        <input id="id_actor_filter" type="text" name="actor" value="{{ actor_filter }}" placeholder="Логин или ID">
+      </div>
+      <div>
+        <label for="id_date_from">С даты</label><br>
+        <input id="id_date_from" type="date" name="date_from" value="{{ date_from }}">
+      </div>
+      <div>
+        <label for="id_date_to">По дату</label><br>
+        <input id="id_date_to" type="date" name="date_to" value="{{ date_to }}">
+      </div>
+      <button type="submit" class="button">Применить</button>
+      <a href="{% url 'admin:auditlog_auditevent_ip_summary' %}" class="button">Сбросить</a>
+    </form>
+
+    <div class="module">
+      <table id="result_list">
+        <thead>
+          <tr>
+            <th><a href="{{ sort_links.ip }}">IP</a></th>
+            <th><a href="{{ sort_links.total_events }}">Событий</a></th>
+            <th><a href="{{ sort_links.account_count }}">Аккаунтов</a></th>
+            <th><a href="{{ sort_links.anonymous_events }}">Анонимных</a></th>
+            <th><a href="{{ sort_links.first_seen }}">Первое событие</a></th>
+            <th><a href="{{ sort_links.last_seen }}">Последнее событие</a></th>
+            <th>Связанные аккаунты</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ip_rows %}
+            <tr>
+              <td><code>{{ row.ip }}</code></td>
+              <td>{{ row.total_events }}</td>
+              <td>{{ row.account_count }}</td>
+              <td>{{ row.anonymous_events }}</td>
+              <td>{{ row.first_seen|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ row.last_seen|date:"Y-m-d H:i:s" }}</td>
+              <td>
+                {% if row.accounts %}
+                  {% for account in row.accounts %}
+                    {% if account.admin_url %}
+                      <a href="{{ account.admin_url }}">{{ account.username }}</a>{% if account.user_id %} (ID {{ account.user_id }}){% endif %}{% if not forloop.last %}<br>{% endif %}
+                    {% else %}
+                      {{ account.username }}{% if account.user_id %} (ID {{ account.user_id }}){% endif %}{% if not forloop.last %}<br>{% endif %}
+                    {% endif %}
+                  {% endfor %}
+                {% else %}
+                  <span>-</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7">По выбранным условиям данных нет.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="paginator">
+        <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_previous %}
+          {% if query_without_page %}
+            <a href="{{ query_without_page }}&page={{ page_obj.previous_page_number }}">Назад</a>
+          {% else %}
+            <a href="?page={{ page_obj.previous_page_number }}">Назад</a>
+          {% endif %}
+        {% endif %}
+        {% if page_obj.has_next %}
+          {% if query_without_page %}
+            <a href="{{ query_without_page }}&page={{ page_obj.next_page_number }}">Вперёд</a>
+          {% else %}
+            <a href="?page={{ page_obj.next_page_number }}">Вперёд</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

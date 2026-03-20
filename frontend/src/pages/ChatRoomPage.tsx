@@ -2009,7 +2009,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 Загружаем ранние сообщения...
               </Panel>
             )}
-            {!hasMore && <Panel muted>Это начало истории.</Panel>}
+            {/* {!hasMore && <Panel muted>Это начало истории.</Panel>} */}
 
             {timeline.map((item) =>
               item.type === "day" ? (

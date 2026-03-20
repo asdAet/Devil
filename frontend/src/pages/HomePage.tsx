@@ -70,7 +70,7 @@ export function HomePage({ user, onNavigate }: Props) {
           </svg>
         </div>
 
-        <h2 className={styles.welcomeTitle}>Devil</h2>
+        <h1 className={styles.welcomeTitle}>Devil</h1>
         <p className={styles.welcomeText}>Выберите чат, чтобы начать общение</p>
 
         {!user && (

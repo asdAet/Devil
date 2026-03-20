@@ -11,9 +11,147 @@ import { DirectInboxProvider } from "../shared/directInbox";
 import { debugLog } from "../shared/lib/debug";
 import { buildUserProfilePath } from "../shared/lib/publicRef";
 import { PresenceProvider } from "../shared/presence";
-import shellStyles from "../styles/layout/AppShell.module.css";
+import appStyles from "../styles/app/AppAuthPage.module.css";
 import { AppShell } from "../widgets/layout/AppShell";
 import { AppRoutes } from "./routes";
+
+type SeoDescriptor = {
+  title: string;
+  description: string;
+  robots: string;
+};
+
+const DEFAULT_SEO: SeoDescriptor = {
+  title: "Devils Resting — чат в реальном времени",
+  description:
+    "Devils Resting — защищенный чат в реальном времени: личные сообщения, группы, обмен файлами и управление доступом.",
+  robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1",
+};
+
+const PRIVATE_ROUTE_SEO: SeoDescriptor = {
+  title: "Devils Resting — личный раздел",
+  description: "Личный раздел пользователя Devils Resting.",
+  robots: "noindex,nofollow",
+};
+
+const MATCHED_ROUTE_SEO: Array<{
+  match: (pathname: string) => boolean;
+  meta: SeoDescriptor;
+}> = [
+  {
+    match: (pathname) => pathname === "/",
+    meta: DEFAULT_SEO,
+  },
+  {
+    match: (pathname) =>
+      pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/profile" ||
+      pathname === "/settings",
+    meta: PRIVATE_ROUTE_SEO,
+  },
+  {
+    match: (pathname) => pathname === "/friends",
+    meta: {
+      title: "Друзья — Devils Resting",
+      description:
+        "Управляйте списком друзей, заявками и личными контактами в Devils Resting.",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
+    match: (pathname) => pathname === "/groups",
+    meta: {
+      title: "Группы — Devils Resting",
+      description:
+        "Создавайте и администрируйте групповые чаты в Devils Resting.",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
+    match: (pathname) => pathname.startsWith("/direct"),
+    meta: {
+      title: "Личные чаты — Devils Resting",
+      description: "Личные диалоги и переписка в Devils Resting.",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
+    match: (pathname) => pathname.startsWith("/rooms/"),
+    meta: {
+      title: "Чат — Devils Resting",
+      description: "Комната чата Devils Resting.",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
+    match: (pathname) => pathname.startsWith("/invite/"),
+    meta: {
+      title: "Приглашение в группу — Devils Resting",
+      description: "Просмотр приглашения в группу Devils Resting.",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
+    match: (pathname) => pathname.startsWith("/users/"),
+    meta: {
+      title: "Профиль пользователя — Devils Resting",
+      description: "Публичный профиль пользователя Devils Resting.",
+      robots: "noindex,nofollow",
+    },
+  },
+];
+
+/**
+ * Возвращает SEO-описание для текущего пути.
+ */
+const resolveSeoDescriptor = (pathname: string): SeoDescriptor => {
+  const matched = MATCHED_ROUTE_SEO.find((item) => item.match(pathname));
+  return matched?.meta ?? DEFAULT_SEO;
+};
+
+/**
+ * Обновляет или создает meta-тег по имени.
+ */
+const upsertMetaByName = (name: string, content: string) => {
+  let node = document.head.querySelector<HTMLMetaElement>(
+    `meta[name="${name}"]`,
+  );
+  if (!node) {
+    node = document.createElement("meta");
+    node.setAttribute("name", name);
+    document.head.append(node);
+  }
+  node.setAttribute("content", content);
+};
+
+/**
+ * Обновляет или создает meta-тег по property.
+ */
+const upsertMetaByProperty = (property: string, content: string) => {
+  let node = document.head.querySelector<HTMLMetaElement>(
+    `meta[property="${property}"]`,
+  );
+  if (!node) {
+    node = document.createElement("meta");
+    node.setAttribute("property", property);
+    document.head.append(node);
+  }
+  node.setAttribute("content", content);
+};
+
+/**
+ * Обновляет или создает canonical-ссылку.
+ */
+const upsertCanonicalLink = (href: string) => {
+  let node = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (!node) {
+    node = document.createElement("link");
+    node.setAttribute("rel", "canonical");
+    document.head.append(node);
+  }
+  node.setAttribute("href", href);
+};
 
 /**
  * Описывает структуру данных `ProfileFieldErrors`.
@@ -39,6 +177,23 @@ function AppInner() {
   );
   const [banner, setBanner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const meta = resolveSeoDescriptor(location.pathname);
+    const canonicalUrl = new URL(location.pathname, window.location.origin)
+      .toString();
+
+    document.title = meta.title;
+    upsertMetaByName("description", meta.description);
+    upsertMetaByName("robots", meta.robots);
+    upsertCanonicalLink(canonicalUrl);
+
+    upsertMetaByProperty("og:title", meta.title);
+    upsertMetaByProperty("og:description", meta.description);
+    upsertMetaByProperty("og:url", canonicalUrl);
+    upsertMetaByName("twitter:title", meta.title);
+    upsertMetaByName("twitter:description", meta.description);
+  }, [location.pathname]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -342,7 +497,7 @@ function AppInner() {
     <PresenceProvider user={auth.user} ready={!auth.loading}>
       <DirectInboxProvider user={auth.user} ready={!auth.loading}>
         {isAuthRoute ? (
-          <div className={shellStyles.authPage}>{routesElement}</div>
+          <div className={appStyles.authPage}>{routesElement}</div>
         ) : (
           <AppShell
             user={auth.user}
@@ -376,6 +531,4 @@ export function App() {
 }
 
 export default App;
-
-
 

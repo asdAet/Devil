@@ -10,7 +10,6 @@ import {
 } from "react";
 
 import styles from "../../styles/ui/ImageLightbox.module.css";
-import { resolveAttachmentTypeLabel } from "../lib/attachmentTypeLabel";
 
 const EXIT_ANIMATION_MS = 200;
 const MIN_ZOOM_SCALE = 1;
@@ -25,7 +24,6 @@ const NEXT_MEDIA_LABEL = "Следующее медиа";
 const IMAGE_DIALOG_LABEL = "Просмотр изображения";
 const VIDEO_DIALOG_LABEL = "Просмотр видео";
 const SENT_PREFIX = "Отправлено";
-const DIMENSIONS_PREFIX = "Размеры";
 
 export type ImageLightboxMediaKind = "image" | "video";
 
@@ -449,10 +447,6 @@ export function ImageLightbox(props: Props) {
     if (!currentItem) return [];
 
     const { metadata } = currentItem;
-    const attachmentType = resolveAttachmentTypeLabel(
-      metadata.contentType,
-      metadata.fileName,
-    );
 
     const lines: string[] = [
       metadata.fileName,
@@ -611,3 +605,4 @@ export function ImageLightbox(props: Props) {
     </div>
   );
 }
+

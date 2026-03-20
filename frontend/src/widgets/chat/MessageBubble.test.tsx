@@ -322,15 +322,16 @@ describe("MessageBubble", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /открыть изображение preview\.png/i }),
+      screen.getByRole("button", { name: /Открыть изображение preview\.png/i }),
     );
 
     expect(
       screen.getByRole("dialog", { name: "Просмотр изображения" }),
     ).toBeInTheDocument();
     expect(screen.getByText("preview.png")).toBeInTheDocument();
-    expect(screen.getByText(/MIME: image\/png/i)).toBeInTheDocument();
-    expect(screen.getByText(/png \| 1\.0 KB/i)).toBeInTheDocument();
+    expect(screen.getByText(/ID: 90/i)).toBeInTheDocument();
+    expect(screen.getByText(/1\.0 KB/i)).toBeInTheDocument();
+    expect(screen.getByText(/1280x720/i)).toBeInTheDocument();
     expect(screen.getByText(/Отправлено:/i)).toBeInTheDocument();
   });
 
@@ -367,8 +368,9 @@ describe("MessageBubble", () => {
       screen.getByRole("dialog", { name: "Просмотр видео" }),
     ).toBeInTheDocument();
     expect(screen.getByText("video.mp4")).toBeInTheDocument();
-    expect(screen.getByText(/MIME: video\/mp4/i)).toBeInTheDocument();
-    expect(screen.getByText(/Размеры: 1920x1080/i)).toBeInTheDocument();
+    expect(screen.getByText(/ID: 91/i)).toBeInTheDocument();
+    expect(screen.getByText(/5\.0 MB/i)).toBeInTheDocument();
+    expect(screen.getByText(/1920x1080/i)).toBeInTheDocument();
   });
 
   it("treats known video extensions as video preview even with generic content type", () => {

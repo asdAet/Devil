@@ -92,6 +92,78 @@ import { uploadAttachments } from "./apiService/uploadAttachments";
 
 const API_BASE = "/api";
 const CSRF_STORAGE_KEY = "csrfToken";
+const AXIOS_STATUS_MESSAGE_PATTERN = /^Request failed with status code \d+$/i;
+const HTML_ERROR_TAG_PATTERN = /<(?:!doctype\s+html|html|body|head)\b/i;
+const ESCAPED_UNICODE_PATTERN = /\\u([0-9a-fA-F]{4})/g;
+
+const STATUS_ERROR_MESSAGES: Readonly<Record<number, string>> = {
+  0: "Ошибка сети",
+  400: "Некорректный запрос",
+  401: "Требуется авторизация",
+  403: "Доступ запрещен",
+  404: "Ресурс не найден",
+  408: "Превышено время ожидания запроса",
+  409: "Конфликт данных",
+  413: "Файл слишком большой",
+  415: "Неподдерживаемый тип файла",
+  422: "Некорректные данные",
+  429: "Слишком много запросов, попробуйте позже",
+};
+
+/**
+ * Определяет, что строка выглядит как HTML-страница ошибки.
+ *
+ * @param payload Строка ответа от сервера.
+ * @returns true, когда в ответе обнаружены HTML-теги документа.
+ */
+const isHtmlErrorPayload = (payload: string): boolean =>
+  HTML_ERROR_TAG_PATTERN.test(payload);
+
+/**
+ * Декодирует escaped unicode-последовательности вида \uXXXX.
+ *
+ * @param value Исходная строка.
+ * @returns Строка после декодирования unicode-последовательностей.
+ */
+const decodeEscapedUnicode = (value: string): string =>
+  value.replace(ESCAPED_UNICODE_PATTERN, (_match, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
+
+/**
+ * Нормализует сообщение об ошибке до вида, пригодного для отображения.
+ *
+ * @param value Исходное сообщение.
+ * @returns Очищенное сообщение или undefined, если сообщение бесполезно для пользователя.
+ */
+const normalizeErrorMessageText = (
+  value: string | undefined,
+): string | undefined => {
+  if (!value) return undefined;
+
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return undefined;
+  if (AXIOS_STATUS_MESSAGE_PATTERN.test(normalized)) return undefined;
+  if (isHtmlErrorPayload(normalized)) return undefined;
+
+  return decodeEscapedUnicode(normalized);
+};
+
+/**
+ * Возвращает fallback-сообщение для HTTP-статуса.
+ *
+ * @param status HTTP-статус.
+ * @returns Сообщение для отображения пользователю.
+ */
+const getStatusFallbackMessage = (status: number): string => {
+  if (status in STATUS_ERROR_MESSAGES) {
+    return STATUS_ERROR_MESSAGES[status] as string;
+  }
+  if (status >= 500) {
+    return "Внутренняя ошибка сервера";
+  }
+  return "Ошибка сервера";
+};
 
 /**
  * Возвращает csrf token.
@@ -110,7 +182,8 @@ const normalizeErrorPayload = (
   if (!payload) return undefined;
 
   if (typeof payload === "string") {
-    const parsed = parseJson(payload);
+    const normalizedPayload = payload.trim();
+    const parsed = parseJson(normalizedPayload);
     if (parsed && typeof parsed === "object") {
       const typed = decodeAuthErrorPayload(parsed);
       return (
@@ -118,7 +191,12 @@ const normalizeErrorPayload = (
         (parsed as Record<string, unknown>)
       );
     }
-    return { detail: payload };
+
+    if (isHtmlErrorPayload(normalizedPayload)) {
+      return undefined;
+    }
+
+    return { detail: normalizedPayload };
   }
 
   if (typeof payload === "object") {
@@ -169,8 +247,16 @@ export const normalizeAxiosError = (error: unknown): ApiError => {
     const axiosError = error as AxiosError;
     const status = axiosError.response?.status ?? 0;
     const data = normalizeErrorPayload(axiosError.response?.data);
+    const messageFromPayload = normalizeErrorMessageText(
+      extractErrorMessage(data),
+    );
+    const messageFromAxios = normalizeErrorMessageText(axiosError.message);
     const message =
-      extractErrorMessage(data) || axiosError.message || "Ошибка сервера";
+      messageFromPayload ??
+      (status === 0 ? messageFromAxios : undefined) ??
+      getStatusFallbackMessage(status) ??
+      messageFromAxios ??
+      "Ошибка сервера";
     return { status, message, data };
   }
 
@@ -1162,6 +1248,4 @@ public async getRoomAttachments(
  * Экспорт `apiService` предоставляет инициализированный экземпляр для повторного использования в модуле.
  */
 export const apiService = new ApiService();
-
-
 

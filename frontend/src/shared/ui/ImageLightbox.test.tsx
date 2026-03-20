@@ -34,9 +34,9 @@ describe("ImageLightbox", () => {
     ).toBeInTheDocument();
     expect(screen.getByAltText("preview")).toBeInTheDocument();
     expect(screen.getByText("preview.png")).toBeInTheDocument();
-    expect(screen.getByText(/MIME: image\/png/i)).toBeInTheDocument();
-    expect(screen.getByText(/Размеры: 1280x720/i)).toBeInTheDocument();
     expect(screen.getByText(/ID: 77/i)).toBeInTheDocument();
+    expect(screen.getByText(/2\.0 KB/i)).toBeInTheDocument();
+    expect(screen.getByText(/1280x720/i)).toBeInTheDocument();
   });
 
   it("closes only after overlay click animation timeout", () => {
@@ -195,3 +195,4 @@ describe("ImageLightbox", () => {
     );
   });
 });
+
