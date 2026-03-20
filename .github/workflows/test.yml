@@ -150,7 +150,7 @@ jobs:
             cd "$DEPLOY_PATH"
             git fetch --all --prune
             git checkout main
-            git pull --ff-only origin main
+            git reset --hard origin/main
             docker compose -f docker-compose.prod.yml build --pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
             docker compose -f docker-compose.prod.yml ps
