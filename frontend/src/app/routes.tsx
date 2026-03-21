@@ -4,7 +4,6 @@ import { decodePublicRefParam, decodeRoomRefParam } from "../dto";
 import type { UserProfile } from "../entities/user/types";
 import { ChatRoomPage } from "../pages/ChatRoomPage";
 import { DirectChatByUsernamePage } from "../pages/DirectChatByUsernamePage";
-import { DirectChatsPage } from "../pages/DirectChatsPage";
 import { FriendsPage } from "../pages/FriendsPage";
 import { GroupsPage } from "../pages/GroupsPage";
 import { HomePage } from "../pages/HomePage";
@@ -14,6 +13,7 @@ import { ProfilePage } from "../pages/ProfilePage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UserProfilePage } from "../pages/UserProfilePage";
+import { DIRECT_HOME_FALLBACK_PATH } from "../shared/lib/directNavigation";
 
 /**
  * Описывает структуру данных `ProfileFieldErrors`.
@@ -98,6 +98,11 @@ function DirectRoute({
   }
 
   return <DirectChatByUsernamePage user={user} publicRef={ref} onNavigate={onNavigate} />;
+}
+
+function DirectInboxRedirectRoute() {
+  // Пустой /direct больше не рендерит отдельную страницу: это только legacy fallback.
+  return <Navigate to={DIRECT_HOME_FALLBACK_PATH} replace />;
 }
 
 /**
@@ -215,7 +220,7 @@ export function AppRoutes({
       />
       <Route
         path="/direct"
-        element={<DirectChatsPage user={user} onNavigate={onNavigate} />}
+        element={<DirectInboxRedirectRoute />}
       />
       <Route
         path="/direct/:ref"

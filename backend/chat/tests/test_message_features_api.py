@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 import json
 import tempfile
 from urllib.parse import parse_qs, urlparse
@@ -9,11 +10,13 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import OperationalError
 from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 
 from chat import api
 from chat.services import MessageForbiddenError
-from messages.models import Message, MessageAttachment, Reaction
+from messages.models import Message, MessageAttachment, MessageReadReceipt, MessageReadState, Reaction
 from roles.models import Membership
 from rooms.models import Room
 from rooms.services import ensure_membership
@@ -691,6 +694,7 @@ class ChatMessageFeatureApiTests(TestCase):
         )
         self.assertEqual(first_read_response.status_code, 200)
         self.assertEqual(first_read_response.json()["lastReadMessageId"], second_message.pk)
+        self.assertIsNotNone(first_read_response.json()["lastReadAt"])
 
         backward_response = self.client.post(
             f"/api/chat/rooms/{self.direct_room.pk}/read/",
@@ -719,6 +723,7 @@ class ChatMessageFeatureApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["lastReadMessageId"], message.pk)
+        self.assertIsNotNone(response.json()["lastReadAt"])
 
     def test_message_detail_patch_validates_content_type_and_empty_value(self):
         message = Message.objects.create(
@@ -942,7 +947,7 @@ class ChatMessageFeatureApiTests(TestCase):
         self.assertIn(first.pk, ids)
         self.assertNotIn(second.pk, ids)
 
-    def test_mark_read_validation_public_short_circuit_and_unread_counts(self):
+    def test_mark_read_validation_public_room_and_unread_counts(self):
         message = Message.objects.create(
             username=self.peer.username,
             user=self.peer,
@@ -981,11 +986,169 @@ class ChatMessageFeatureApiTests(TestCase):
         self.assertFalse(any(item["roomId"] == self.direct_room.pk for item in unread_after.json()["items"]))
 
         public_room = api._public_room()
+        public_message = Message.objects.create(
+            username=self.peer.username,
+            user=self.peer,
+            room=public_room,
+            message_content="public unread",
+        )
+        unread_public_before = self.client.get("/api/chat/rooms/unread/")
+        self.assertEqual(unread_public_before.status_code, 200)
+        self.assertTrue(
+            any(item["roomId"] == public_room.pk for item in unread_public_before.json()["items"])
+        )
         public_short = self.client.post(
             f"/api/chat/rooms/{public_room.pk}/read/",
-            data=json.dumps({"lastReadMessageId": 1}),
+            data=json.dumps({"lastReadMessageId": public_message.pk}),
             content_type="application/json",
         )
         self.assertEqual(public_short.status_code, 200)
-        self.assertIsNone(public_short.json()["lastReadMessageId"])
+        self.assertEqual(public_short.json()["lastReadMessageId"], public_message.pk)
+        self.assertIsNotNone(public_short.json()["lastReadAt"])
+        self.assertTrue(
+            MessageReadState.objects.filter(
+                user=self.owner,
+                room=public_room,
+                last_read_message_id=public_message.pk,
+            ).exists()
+        )
+
+        unread_public_after = self.client.get("/api/chat/rooms/unread/")
+        self.assertEqual(unread_public_after.status_code, 200)
+        self.assertFalse(
+            any(item["roomId"] == public_room.pk for item in unread_public_after.json()["items"])
+        )
+
+    def test_message_readers_endpoint_returns_direct_read_at_for_author(self):
+        message = Message.objects.create(
+            username=self.owner.username,
+            user=self.owner,
+            room=self.direct_room,
+            message_content="direct own message",
+        )
+        self.client.force_login(self.peer)
+        mark_read_response = self.client.post(
+            f"/api/chat/rooms/{self.direct_room.pk}/read/",
+            data=json.dumps({"lastReadMessageId": message.pk}),
+            content_type="application/json",
+        )
+        self.assertEqual(mark_read_response.status_code, 200)
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/api/chat/rooms/{self.direct_room.pk}/messages/{message.pk}/readers/"
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["roomKind"], "direct")
+        self.assertEqual(payload["messageId"], message.pk)
+        self.assertEqual(payload["readers"], [])
+        self.assertIsNotNone(payload["readAt"])
+
+    def test_message_readers_endpoint_returns_group_readers_for_author_only(self):
+        group_room = Room.objects.create(
+            slug="group_feat_readers",
+            name="Readers group",
+            kind=Room.Kind.GROUP,
+            is_public=False,
+            created_by=self.owner,
+        )
+        ensure_membership(group_room, self.owner, role_name="Owner")
+        ensure_membership(group_room, self.peer, role_name="Member")
+        ensure_membership(group_room, self.outsider, role_name="Member")
+        message = Message.objects.create(
+            username=self.owner.username,
+            user=self.owner,
+            room=group_room,
+            message_content="group own message",
+        )
+
+        self.client.force_login(self.peer)
+        self.assertEqual(
+            self.client.post(
+                f"/api/chat/rooms/{group_room.pk}/read/",
+                data=json.dumps({"lastReadMessageId": message.pk}),
+                content_type="application/json",
+            ).status_code,
+            200,
+        )
+
+        self.client.force_login(self.outsider)
+        self.assertEqual(
+            self.client.post(
+                f"/api/chat/rooms/{group_room.pk}/read/",
+                data=json.dumps({"lastReadMessageId": message.pk}),
+                content_type="application/json",
+            ).status_code,
+            200,
+        )
+
+        older = timezone.now() - timedelta(minutes=2)
+        newer = timezone.now() - timedelta(minutes=1)
+        MessageReadReceipt.objects.filter(message=message, user=self.peer).update(read_at=older)
+        MessageReadReceipt.objects.filter(message=message, user=self.outsider).update(read_at=newer)
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/api/chat/rooms/{group_room.pk}/messages/{message.pk}/readers/"
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["roomKind"], "group")
+        self.assertEqual(payload["messageId"], message.pk)
+        self.assertEqual([item["userId"] for item in payload["readers"]], [self.outsider.pk, self.peer.pk])
+        self.assertIn("profileImage", payload["readers"][0])
+        self.assertIn("avatarCrop", payload["readers"][0])
+        self.assertIsNone(payload["readAt"])
+
+        self.client.force_login(self.peer)
+        forbidden = self.client.get(
+            f"/api/chat/rooms/{group_room.pk}/messages/{message.pk}/readers/"
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+    def test_mark_read_endpoint_survives_missing_receipt_table(self):
+        message = Message.objects.create(
+            username=self.peer.username,
+            user=self.peer,
+            room=self.direct_room,
+            message_content="survive missing receipts",
+        )
+        self.client.force_login(self.owner)
+
+        with patch(
+            "chat.services.MessageReadReceipt.objects.bulk_create",
+            side_effect=OperationalError("no such table: messages_read_receipt"),
+        ):
+            response = self.client.post(
+                f"/api/chat/rooms/{self.direct_room.pk}/read/",
+                data=json.dumps({"lastReadMessageId": message.pk}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["lastReadMessageId"], message.pk)
+
+    def test_message_readers_endpoint_survives_missing_receipt_table(self):
+        message = Message.objects.create(
+            username=self.owner.username,
+            user=self.owner,
+            room=self.direct_room,
+            message_content="reader fallback",
+        )
+        self.client.force_login(self.owner)
+
+        with patch(
+            "chat.services.MessageReadReceipt.objects.filter",
+            side_effect=OperationalError("no such table: messages_read_receipt"),
+        ):
+            response = self.client.get(
+                f"/api/chat/rooms/{self.direct_room.pk}/messages/{message.pk}/readers/"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["roomKind"], "direct")
+        self.assertEqual(response.json()["messageId"], message.pk)
+        self.assertEqual(response.json()["readAt"], None)
+        self.assertEqual(response.json()["readers"], [])
 

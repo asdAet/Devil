@@ -19,6 +19,7 @@ import type { UserProfile } from "../../entities/user/types";
 import { useDirectInbox } from "../directInbox";
 import { debugLog } from "../lib/debug";
 import { normalizePublicRef } from "../lib/publicRef";
+import { resolveIdentityLabel } from "../lib/userIdentity";
 import { usePresence } from "../presence";
 import { useUnreadOverrides } from "../unreadOverrides/store";
 import { CONVERSATION_LIST_REFRESH_EVENT } from "./events";
@@ -28,11 +29,23 @@ import { CONVERSATION_LIST_REFRESH_EVENT } from "./events";
  */
 type FilterTab = "all" | "personal" | "groups";
 
+type ServerRailItem = {
+  key: string;
+  slug: string;
+  name: string;
+  path: string;
+  avatarUrl: string | null;
+  avatarCrop: GroupListItem["avatarCrop"] | null;
+  unreadCount: number;
+  isPublic: boolean;
+};
+
 /**
  * Описывает структуру состояния `ConversationList`.
  */
 type ConversationListState = {
   items: ConversationItem[];
+  serverItems: ServerRailItem[];
   loading: boolean;
   error: string | null;
   filter: FilterTab;
@@ -53,6 +66,7 @@ const EMPTY_GLOBAL_RESULTS: GlobalSearchResult = {
 
 const fallback: ConversationListState = {
   items: [],
+  serverItems: [],
   loading: false,
   error: null,
   filter: "all",
@@ -181,6 +195,16 @@ export function ConversationListProvider({ user, ready, children }: Props) {
   const isGlobalMode = searchQuery.trim().length >= 2;
   const canRunGlobalSearch = canRunGlobalSearchQuery(searchQuery);
 
+  const resolveUnreadCount = useCallback(
+    (slug: string, wsUnreadCount?: number) => {
+      const overrideUnread = unreadOverrides[slug];
+      if (typeof overrideUnread === "number") return overrideUnread;
+      if (typeof wsUnreadCount === "number") return wsUnreadCount;
+      return roomUnreads[slug] ?? 0;
+    },
+    [roomUnreads, unreadOverrides],
+  );
+
   useEffect(() => {
     if (!user || !isGlobalMode || !canRunGlobalSearch) {
       setGlobalLoading(false);
@@ -218,18 +242,6 @@ export function ConversationListProvider({ user, ready, children }: Props) {
   }, [canRunGlobalSearch, isGlobalMode, searchQuery, user]);
 
   const items = useMemo<ConversationItem[]>(() => {
-    /**
-     * Определяет unread count.
-     * @param slug Человекочитаемый идентификатор сущности.
-     * @param wsUnreadCount Числовой параметр `wsUnreadCount`, ограничивающий объем данных.
-     */
-    const resolveUnreadCount = (slug: string, wsUnreadCount?: number) => {
-      const overrideUnread = unreadOverrides[slug];
-      if (typeof overrideUnread === "number") return overrideUnread;
-      if (typeof wsUnreadCount === "number") return wsUnreadCount;
-      return roomUnreads[slug] ?? 0;
-    };
-
     const conversations: ConversationItem[] = [];
 
     if (filter === "all") {
@@ -255,7 +267,7 @@ export function ConversationListProvider({ user, ready, children }: Props) {
         conversations.push({
           type: "direct",
           slug: dm.slug,
-          name: dm.peer.displayName ?? dm.peer.username,
+          name: resolveIdentityLabel(dm.peer),
           directRef: peerRef,
           avatarUrl: dm.peer.profileImage ?? null,
           avatarCrop: dm.peer.avatarCrop ?? null,
@@ -306,14 +318,46 @@ export function ConversationListProvider({ user, ready, children }: Props) {
     groupItems,
     isGlobalMode,
     onlineUsernames,
-    unreadOverrides,
-    roomUnreads,
+    resolveUnreadCount,
     searchQuery,
     unreadCounts,
   ]);
 
+  const serverItems = useMemo<ServerRailItem[]>(() => {
+    // Server rail не зависит от текстового фильтра ЛС: держим публичную
+    // комнату и пользовательские группы в стабильном порядке.
+    const next: ServerRailItem[] = [
+      {
+        key: "public",
+        slug: "public",
+        name: "Публичный чат",
+        path: "/rooms/public",
+        avatarUrl: null,
+        avatarCrop: null,
+        unreadCount: resolveUnreadCount("public"),
+        isPublic: true,
+      },
+    ];
+
+    for (const group of groupItems) {
+      next.push({
+        key: `group-${group.slug}`,
+        slug: group.slug,
+        name: group.name,
+        path: `/rooms/${encodeURIComponent(group.slug)}`,
+        avatarUrl: group.avatarUrl ?? null,
+        avatarCrop: group.avatarCrop ?? null,
+        unreadCount: resolveUnreadCount(group.slug),
+        isPublic: false,
+      });
+    }
+
+    return next;
+  }, [groupItems, resolveUnreadCount]);
+
   const value: ConversationListState = {
     items,
+    serverItems,
     loading,
     error,
     filter,
@@ -340,5 +384,4 @@ export function useConversationList() {
   return useContext(ConversationListCtx);
 }
 
-export type { FilterTab };
-
+export type { FilterTab, ServerRailItem };

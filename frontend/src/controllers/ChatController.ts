@@ -2,6 +2,7 @@ import { apiService } from "../adapters/ApiService";
 import type {
   EditMessageResult,
   GlobalSearchResult,
+  MessageReadersResult,
   ReactionResult,
   ReadStateResult,
   RoomAttachmentsResult,
@@ -230,6 +231,19 @@ public async markRead(
     messageId?: number,
   ): Promise<ReadStateResult> {
     return apiService.markRead(roomId, messageId);
+  }
+
+    /**
+     * Возвращает exact readers конкретного сообщения.
+     * @param roomId Идентификатор комнаты.
+     * @param messageId Идентификатор сообщения.
+     * @returns Промис с данными, возвращаемыми этой функцией.
+     */
+public async getMessageReaders(
+    roomId: string,
+    messageId: number,
+  ): Promise<MessageReadersResult> {
+    return apiService.getMessageReaders(roomId, messageId);
   }
 
     /**

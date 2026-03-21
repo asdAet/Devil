@@ -8,6 +8,7 @@ import {
   resolveImagePreviewUrl,
 } from "../../shared/lib/attachmentMedia";
 import { formatLastSeen, formatTimestamp } from "../../shared/lib/format";
+import { resolveIdentityLabel } from "../../shared/lib/userIdentity";
 import { AudioAttachmentPlayer, Avatar, Spinner } from "../../shared/ui";
 import styles from "../../styles/chat/DirectInfoPanel.module.css";
 
@@ -49,6 +50,7 @@ const formatFileSize = (bytes: number) => {
  */
 function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
   const isImage = isImageAttachment(item.contentType, item.originalFilename);
+  const displayName = resolveIdentityLabel(item);
   const imageSrc = resolveImagePreviewUrl({
     url: item.url,
     thumbnailUrl: item.thumbnailUrl,
@@ -114,7 +116,7 @@ function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
         )}
 
       <div className={styles.cardMeta}>
-        <span>{item.displayName ?? item.username}</span>
+        <span>{displayName}</span>
         <span>{formatTimestamp(item.createdAt)}</span>
       </div>
     </>
@@ -201,6 +203,7 @@ export function DirectInfoPanel({ slug }: Props) {
 
   const peer = details?.peer ?? null;
   const attachmentItems = useMemo(() => attachments, [attachments]);
+  const peerDisplayName = peer ? resolveIdentityLabel(peer) : "";
 
   if (loading) {
     return (
@@ -236,14 +239,12 @@ export function DirectInfoPanel({ slug }: Props) {
       {tab === "profile" && peer && (
         <div className={styles.profile}>
           <Avatar
-            username={peer.displayName ?? peer.username}
+            username={peerDisplayName}
             profileImage={peer.profileImage}
             avatarCrop={peer.avatarCrop}
             size="default"
           />
-          <h4 className={styles.peerName}>
-            {peer.displayName ?? peer.username}
-          </h4>
+          <h4 className={styles.peerName}>{peerDisplayName}</h4>
           <p className={styles.meta}>
             Был(а) в сети: {formatLastSeen(peer.lastSeen ?? null) || "—"}
           </p>

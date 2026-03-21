@@ -35,6 +35,7 @@ import {
   resolveImagePreviewUrl,
 } from "../../shared/lib/attachmentMedia";
 import { formatPublicRef, isHandleRef } from "../../shared/lib/publicRef";
+import { resolveIdentityLabel } from "../../shared/lib/userIdentity";
 import { Avatar, AvatarCropModal, Modal, Spinner } from "../../shared/ui";
 import styles from "../../styles/groups/GroupInfoPanel.module.css";
 
@@ -279,7 +280,16 @@ export function GroupInfoPanel({ slug }: Props) {
       new Map(
         members.map((member) => [
           member.userId,
-          (member.displayName || member.nickname || member.username).trim(),
+          resolveIdentityLabel(
+            {
+              displayName: member.displayName,
+              name: member.nickname,
+              username: member.username,
+              publicRef: member.publicRef,
+              userId: member.userId,
+            },
+            String(member.userId),
+          ),
         ]),
       ),
     [members],
@@ -291,13 +301,16 @@ export function GroupInfoPanel({ slug }: Props) {
 
   const resolveMemberDisplayName = useCallback(
     (member: GroupMember): string => {
-      const trimmedDisplayName = member.displayName?.trim();
-      if (trimmedDisplayName) return trimmedDisplayName;
-
-      const trimmedNickname = member.nickname?.trim();
-      if (trimmedNickname) return trimmedNickname;
-
-      return member.username;
+      return resolveIdentityLabel(
+        {
+          displayName: member.displayName,
+          name: member.nickname,
+          username: member.username,
+          publicRef: member.publicRef,
+          userId: member.userId,
+        },
+        String(member.userId),
+      );
     },
     [],
   );
@@ -1886,7 +1899,7 @@ export function GroupInfoPanel({ slug }: Props) {
           {joinRequests.map((request) => (
             <div key={request.id} className={styles.requestRow}>
               <div className={styles.requestMeta}>
-                <strong>{request.username}</strong>
+                <strong>{resolveIdentityLabel(request, String(request.userId))}</strong>
                 <span>{request.message || "Без комментария"}</span>
               </div>
               <div className={styles.requestActions}>
@@ -2048,7 +2061,7 @@ export function GroupInfoPanel({ slug }: Props) {
           {bannedMembers.map((member) => (
             <div key={member.userId} className={styles.requestRow}>
               <div className={styles.requestMeta}>
-                <strong>{member.displayName || member.username}</strong>
+                <strong>{resolveIdentityLabel(member, String(member.userId))}</strong>
                 {member.publicRef && member.publicRef.startsWith("@") && (
                   <span>{member.publicRef}</span>
                 )}

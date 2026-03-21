@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../pages/HomePage", () => ({
   HomePage: () => <div>HOME_PAGE</div>,
@@ -18,8 +18,8 @@ vi.mock("../pages/ProfilePage", () => ({
   ProfilePage: () => <div>PROFILE_PAGE</div>,
 }));
 
-vi.mock("../pages/DirectChatsPage", () => ({
-  DirectChatsPage: () => <div>DIRECT_CHATS_PAGE</div>,
+vi.mock("../pages/FriendsPage", () => ({
+  FriendsPage: () => <div>FRIENDS_PAGE</div>,
 }));
 
 vi.mock("../pages/DirectChatByUsernamePage", () => ({
@@ -50,6 +50,10 @@ const handlers = {
 };
 
 describe("AppRoutes", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("renders login route", () => {
     render(
       <MemoryRouter initialEntries={["/login"]}>
@@ -93,6 +97,21 @@ describe("AppRoutes", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("DIRECT_BY_REF_PAGE:alice")).toBeInTheDocument();
+  });
+
+  it("redirects /direct to friends fallback", () => {
+    render(
+      <MemoryRouter initialEntries={["/direct"]}>
+        <AppRoutes
+          user={null}
+          error={null}
+          passwordRules={[]}
+          googleAuthDisabledReason={null}
+          {...handlers}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("FRIENDS_PAGE")).toBeInTheDocument();
   });
 
   it("treats /@username route as invalid and redirects to home", () => {

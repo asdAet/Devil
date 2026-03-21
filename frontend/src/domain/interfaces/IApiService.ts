@@ -249,6 +249,17 @@ getUserProfile(publicRef: string): Promise<{ user: UserProfile }>;
 getUnreadCounts(): Promise<UnreadCountItem[]>;
 
     /**
+     * Возвращает exact readers конкретного сообщения.
+     * @param roomId Идентификатор комнаты.
+     * @param messageId Идентификатор сообщения.
+     * @returns Промис с данными, возвращаемыми этой функцией.
+     */
+getMessageReaders(
+    roomId: string,
+    messageId: number,
+  ): Promise<MessageReadersResult>;
+
+    /**
      * Обрабатывает edit message.
      * @param roomId Идентификатор комнаты.
      * @param messageId Идентификатор сообщения.
@@ -832,11 +843,35 @@ export type UploadResult = {
 export type ReadStateResult = {
   roomId: number;
   lastReadMessageId: number | null;
+  lastReadAt?: string | null;
 };
 /**
  * Описывает структуру данных `UnreadCountItem`.
  */
 export type UnreadCountItem = { roomId: number; unreadCount: number };
+
+/**
+ * Описывает одного reader для конкретного сообщения.
+ */
+export type MessageReaderItem = {
+  userId: number;
+  publicRef: string;
+  username: string;
+  displayName?: string;
+  profileImage: string | null;
+  avatarCrop?: AvatarCrop | null;
+  readAt: string;
+};
+
+/**
+ * Описывает результат загрузки readers конкретного сообщения.
+ */
+export type MessageReadersResult = {
+  roomKind: RoomKind;
+  messageId: number;
+  readAt: string | null;
+  readers: MessageReaderItem[];
+};
 
 /**
  * Описывает настраиваемые опции `UploadAttachments`.

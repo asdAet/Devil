@@ -1,9 +1,10 @@
-﻿import {
+import {
   act,
   fireEvent,
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,6 +53,19 @@ const infoPanelMock = vi.hoisted(() => ({
   open: vi.fn(),
 }));
 
+const mobileShellMock = vi.hoisted(() => ({
+  openDrawer: vi.fn(),
+  closeDrawer: vi.fn(),
+  toggleDrawer: vi.fn(),
+  isDrawerOpen: false,
+  isMobileViewport: false,
+}));
+
+const locationMock = vi.hoisted(() => ({
+  search: "",
+  pathname: "/rooms/public",
+}));
+
 const permissionsMock = vi.hoisted(() => ({
   loading: false,
   raw: null,
@@ -85,10 +99,16 @@ const chatControllerMock = vi.hoisted(() => ({
   searchMessages: vi.fn().mockResolvedValue({ results: [] }),
   uploadAttachments: vi.fn().mockResolvedValue({}),
   markRead: vi.fn().mockResolvedValue({}),
+  getMessageReaders: vi.fn().mockResolvedValue({
+    roomKind: "direct",
+    messageId: 1,
+    readAt: null,
+    readers: [],
+  }),
 }));
 
 vi.mock("react-router-dom", () => ({
-  useLocation: () => ({ search: "" }),
+  useLocation: () => locationMock,
 }));
 
 vi.mock("../hooks/useChatRoom", () => ({
@@ -147,6 +167,10 @@ vi.mock("../shared/layout/useInfoPanel", () => ({
   useInfoPanel: () => infoPanelMock,
 }));
 
+vi.mock("../shared/layout/useMobileShell", () => ({
+  useMobileShell: () => mobileShellMock,
+}));
+
 vi.mock("../controllers/ChatController", () => ({
   chatController: chatControllerMock,
 }));
@@ -166,6 +190,16 @@ const user = {
   lastSeen: null,
   registeredAt: null,
 };
+
+const formatReadReceiptTimestamp = (iso: string) =>
+  new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(iso));
 
 /**
  * Создает сообщение от другого пользователя для проверки прав.
@@ -237,10 +271,23 @@ describe("ChatRoomPage", () => {
     permissionsMock.refresh.mockReset().mockResolvedValue(undefined);
     groupControllerMock.joinGroup.mockReset().mockResolvedValue(undefined);
     chatControllerMock.markRead.mockReset().mockResolvedValue({});
+    chatControllerMock.getMessageReaders.mockReset().mockResolvedValue({
+      roomKind: "direct",
+      messageId: 1,
+      readAt: null,
+      readers: [],
+    });
     presenceMock.online = [];
     presenceMock.status = "online";
     presenceMock.lastError = null;
     infoPanelMock.open.mockReset();
+    mobileShellMock.openDrawer.mockReset();
+    mobileShellMock.closeDrawer.mockReset();
+    mobileShellMock.toggleDrawer.mockReset();
+    mobileShellMock.isDrawerOpen = false;
+    mobileShellMock.isMobileViewport = false;
+    locationMock.search = "";
+    locationMock.pathname = "/rooms/public";
     Object.defineProperty(window.navigator, "sendBeacon", {
       configurable: true,
       value: undefined,
@@ -254,6 +301,15 @@ describe("ChatRoomPage", () => {
 
     expect(screen.getByTestId("chat-auth-callout")).toBeInTheDocument();
     expect(screen.queryByLabelText("Сообщение")).toBeNull();
+  });
+
+  it("opens the mobile drawer from room chats", () => {
+    locationMock.pathname = "/rooms/public";
+
+    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("chat-mobile-open-button"));
+    expect(mobileShellMock.openDrawer).toHaveBeenCalledTimes(1);
   });
 
   it("sends message for authenticated user", () => {
@@ -371,6 +427,37 @@ describe("ChatRoomPage", () => {
     expect(
       container.querySelector('article[data-own-message="false"]'),
     ).not.toBeNull();
+  });
+
+  it("groups consecutive messages from the same author", () => {
+    chatRoomMock.messages = [
+      makeForeignMessage(1, "first"),
+      makeForeignMessage(2, "second"),
+      {
+        id: 3,
+        publicRef: "demo",
+        username: "demo",
+        content: "mine",
+        profilePic: null,
+        createdAt: "2026-02-13T12:02:00.000Z",
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
+      },
+    ];
+
+    const { container } = render(
+      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+    );
+
+    expect(
+      container.querySelectorAll('article[data-message-grouped="true"]').length,
+    ).toBe(1);
+    expect(
+      container.querySelectorAll('article[data-message-avatar="true"]').length,
+    ).toBe(2);
   });
 
   it("highlights own messages for fallback public id identity", () => {
@@ -516,8 +603,15 @@ describe("ChatRoomPage", () => {
           Object.defineProperty(node, "getBoundingClientRect", {
             configurable: true,
             value: () => ({ bottom: 120 + index * 120 }),
-          });
-        });
+    });
+    mobileShellMock.openDrawer.mockReset();
+    mobileShellMock.closeDrawer.mockReset();
+    mobileShellMock.toggleDrawer.mockReset();
+    mobileShellMock.isDrawerOpen = false;
+    mobileShellMock.isMobileViewport = false;
+    locationMock.search = "";
+    locationMock.pathname = "/rooms/public";
+  });
     };
     mockViewport();
 
@@ -1360,6 +1454,172 @@ describe("ChatRoomPage", () => {
     expect(scrollTopValue).toBe(160);
   });
 
+  it("does not auto-scroll for incoming message when user is away from bottom", async () => {
+    chatRoomMock.details = {
+      slug: "dm_1",
+      roomId: 1,
+      name: "dm",
+      kind: "direct",
+      created: false,
+      createdBy: null,
+      peer: { username: "alice", profileImage: null, lastSeen: null },
+      lastReadMessageId: 2,
+    } as RoomDetails;
+    chatRoomMock.messages = [
+      makeForeignMessage(1, "first"),
+      makeForeignMessage(2, "second"),
+    ];
+
+    const { container, rerender } = render(
+      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+    );
+    const chatLog = container.querySelector(
+      '[aria-live="polite"]',
+    ) as HTMLDivElement;
+
+    const scrollWrites: number[] = [];
+    let scrollTopValue = 0;
+    Object.defineProperty(chatLog, "scrollTop", {
+      configurable: true,
+      get: () => scrollTopValue,
+      set: (value: number) => {
+        scrollTopValue = value;
+        scrollWrites.push(value);
+      },
+    });
+    Object.defineProperty(chatLog, "scrollHeight", {
+      configurable: true,
+      get: () => 1320,
+    });
+    Object.defineProperty(chatLog, "clientHeight", {
+      configurable: true,
+      get: () => 400,
+    });
+    Object.defineProperty(chatLog, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ bottom: 260 }),
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 260));
+    });
+
+    scrollTopValue = 160;
+    fireEvent.scroll(chatLog);
+    const writesBeforeIncoming = scrollWrites.length;
+
+    act(() => {
+      wsState.options?.onMessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({
+            id: 3,
+            message: "third",
+            publicRef: "alice",
+            username: "alice",
+            roomId: 1,
+            createdAt: "2026-02-13T12:03:00.000Z",
+            attachments: [],
+            type: "chat_message",
+          }),
+        }),
+      );
+    });
+
+    rerender(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+    });
+
+    expect(scrollWrites.length).toBe(writesBeforeIncoming);
+    expect(scrollTopValue).toBe(160);
+  });
+
+  it("does not auto-reposition on read receipt events", async () => {
+    chatRoomMock.details = {
+      slug: "dm_1",
+      roomId: 1,
+      name: "dm",
+      kind: "direct",
+      created: false,
+      createdBy: null,
+      peer: { username: "alice", profileImage: null, lastSeen: null },
+      lastReadMessageId: 0,
+    } as RoomDetails;
+    chatRoomMock.messages = [
+      {
+        id: 1,
+        publicRef: "demo",
+        username: "demo",
+        content: "mine",
+        profilePic: null,
+        createdAt: "2026-02-13T12:00:00.000Z",
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
+      },
+      makeForeignMessage(2, "second"),
+    ];
+
+    const { container } = render(
+      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+    );
+    const chatLog = container.querySelector(
+      '[aria-live="polite"]',
+    ) as HTMLDivElement;
+
+    const scrollWrites: number[] = [];
+    let scrollTopValue = 160;
+    Object.defineProperty(chatLog, "scrollTop", {
+      configurable: true,
+      get: () => scrollTopValue,
+      set: (value: number) => {
+        scrollTopValue = value;
+        scrollWrites.push(value);
+      },
+    });
+    Object.defineProperty(chatLog, "scrollHeight", {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(chatLog, "clientHeight", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(chatLog, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ bottom: 260 }),
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 260));
+    });
+    scrollTopValue = 160;
+    fireEvent.scroll(chatLog);
+    const writesBeforeReceipt = scrollWrites.length;
+
+    act(() => {
+      wsState.options?.onMessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({
+            type: "read_receipt",
+            userId: 2,
+            publicRef: "alice",
+            username: "alice",
+            lastReadMessageId: 1,
+            lastReadAt: "2026-02-13T12:05:00.000Z",
+            roomId: 1,
+          }),
+        }),
+      );
+    });
+
+    expect(scrollWrites.length).toBe(writesBeforeReceipt);
+    expect(scrollTopValue).toBe(160);
+  });
+
   it("group chat: performs a single initial scroll to bottom when unread messages are absent", async () => {
     chatRoomMock.details = {
       slug: "g-team",
@@ -1665,4 +1925,151 @@ describe("ChatRoomPage", () => {
 
     expect(scrollToSpy).toHaveBeenCalledWith({ top: 840, behavior: "smooth" });
   });
+
+  it("opens direct readers menu for own message with avatar and profile action", async () => {
+    chatRoomMock.details = {
+      slug: "dm_1",
+      roomId: 1,
+      name: "dm",
+      kind: "direct",
+      created: false,
+      createdBy: null,
+      peer: {
+        publicRef: "alice",
+        username: "alice",
+        displayName: "Alice",
+        profileImage: "https://cdn.example.com/alice.jpg",
+        lastSeen: null,
+      },
+    } as RoomDetails;
+    chatRoomMock.messages = [
+      {
+        id: 1,
+        publicRef: "demo",
+        username: "demo",
+        content: "mine",
+        profilePic: null,
+        createdAt: "2026-02-13T12:00:00.000Z",
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
+      },
+    ];
+    chatControllerMock.getMessageReaders.mockResolvedValueOnce({
+      roomKind: "direct",
+      messageId: 1,
+      readAt: "2026-02-13T12:10:00.000Z",
+      readers: [],
+    });
+
+    const { container } = render(
+      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+    );
+    const article = container.querySelector(
+      'article[data-message-id="1"]',
+    ) as HTMLElement;
+
+    fireEvent.contextMenu(article);
+    fireEvent.click(screen.getByText("Кто прочитал"));
+
+    await waitFor(() => {
+      expect(chatControllerMock.getMessageReaders).toHaveBeenCalledWith("1", 1);
+    });
+    const readersMenu = screen.getByRole("menu", { name: "Кто прочитал" });
+    expect(within(readersMenu).getByText("Alice")).toBeInTheDocument();
+    expect(
+      within(readersMenu).getByRole("img", { name: "Alice" }),
+    ).toBeInTheDocument();
+    expect(
+      within(readersMenu).getByText(
+        formatReadReceiptTimestamp("2026-02-13T12:10:00.000Z"),
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(readersMenu).getByRole("menuitem", { name: /Alice/ }));
+    expect(infoPanelMock.open).toHaveBeenCalledWith("profile", "alice");
+  });
+
+  it("opens group readers menu with avatars and profile action", async () => {
+    chatRoomMock.details = {
+      slug: "g-team",
+      roomId: 17,
+      name: "Team",
+      kind: "group",
+      created: false,
+      createdBy: "owner",
+      isPublic: false,
+    } as RoomDetails;
+    chatRoomMock.messages = [
+      {
+        id: 8,
+        publicRef: "demo",
+        username: "demo",
+        content: "mine",
+        profilePic: null,
+        createdAt: "2026-02-13T12:00:00.000Z",
+        editedAt: null,
+        isDeleted: false,
+        replyTo: null,
+        attachments: [],
+        reactions: [],
+      },
+    ];
+    chatControllerMock.getMessageReaders.mockResolvedValueOnce({
+      roomKind: "group",
+      messageId: 8,
+      readAt: null,
+      readers: [
+        {
+          userId: 2,
+          publicRef: "alice",
+          username: "alice",
+          displayName: "Alice",
+          profileImage: "https://cdn.example.com/alice.jpg",
+          avatarCrop: null,
+          readAt: "2026-02-13T12:10:00.000Z",
+        },
+        {
+          userId: 3,
+          publicRef: "bob",
+          username: "bob",
+          displayName: "Bob",
+          profileImage: "https://cdn.example.com/bob.jpg",
+          avatarCrop: null,
+          readAt: "2026-02-13T12:09:00.000Z",
+        },
+      ],
+    });
+
+    const { container } = render(
+      <ChatRoomPage slug="g-team" user={user} onNavigate={vi.fn()} />,
+    );
+    const article = container.querySelector(
+      'article[data-message-id="8"]',
+    ) as HTMLElement;
+
+    fireEvent.contextMenu(article);
+    fireEvent.click(screen.getByText("Кто прочитал"));
+
+    await waitFor(() => {
+      expect(chatControllerMock.getMessageReaders).toHaveBeenCalledWith("17", 8);
+    });
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Alice" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        formatReadReceiptTimestamp("2026-02-13T12:10:00.000Z"),
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Bob" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /Alice/ }));
+    expect(infoPanelMock.open).toHaveBeenCalledWith("profile", "alice");
+  });
 });
+

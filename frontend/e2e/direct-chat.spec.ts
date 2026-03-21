@@ -85,11 +85,8 @@ test("direct chat by username opens and delivers messages between users", async 
   ).toBeVisible({ timeout: 15_000 });
 
   await bobPage.goto("/direct");
-  await expect(
-    bobPage
-      .getByRole("region", { name: /Список личных чатов/i })
-      .getByRole("button", { name: new RegExp(`\\b${alice}\\b`, "i") }),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(bobPage).toHaveURL("/friends");
 
   await bobContext.close();
 });
+

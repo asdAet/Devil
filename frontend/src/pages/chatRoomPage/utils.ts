@@ -21,6 +21,7 @@ export type ReadReceipt = {
   username: string;
   displayName?: string;
   lastReadMessageId: number;
+  lastReadAt?: string | null;
 };
 
 /**

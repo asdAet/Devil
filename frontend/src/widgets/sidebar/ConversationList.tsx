@@ -10,6 +10,10 @@ import {
   buildUserProfilePath,
   formatPublicRef,
 } from "../../shared/lib/publicRef";
+import {
+  resolveIdentityHandle,
+  resolveIdentityLabel,
+} from "../../shared/lib/userIdentity";
 import { Avatar, EmptyState, Spinner } from "../../shared/ui";
 import styles from "../../styles/sidebar/ConversationList.module.css";
 import { ConversationListItem } from "./ConversationListItem";
@@ -119,31 +123,32 @@ export function ConversationList({ onNavigate }: Props) {
           {!globalLoading && globalResults.users.length > 0 && (
             <section className={styles.globalSection}>
               <h4 className={styles.globalTitle}>Пользователи</h4>
-              {globalResults.users.map((user) => (
-                <button
-                  key={`u-${user.publicRef}`}
-                  type="button"
-                  className={styles.globalItem}
-                  onClick={() =>
-                    onNavigate(buildUserProfilePath(user.publicRef))
-                  }
-                >
-                  <Avatar
-                    username={user.displayName ?? user.username}
-                    profileImage={user.profileImage}
-                    avatarCrop={user.avatarCrop}
-                    size="tiny"
-                  />
-                  <div className={styles.globalMeta}>
-                    <span className={styles.globalPrimary}>
-                      {user.displayName ?? user.username}
-                    </span>
-                    <span className={styles.globalSecondary}>
-                      {formatPublicRef(user.publicRef)}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {globalResults.users.map((user) => {
+                const displayName = resolveIdentityLabel(user);
+                const handle =
+                  resolveIdentityHandle(user) ?? formatPublicRef(user.publicRef);
+                return (
+                  <button
+                    key={`u-${user.publicRef}`}
+                    type="button"
+                    className={styles.globalItem}
+                    onClick={() =>
+                      onNavigate(buildUserProfilePath(user.publicRef))
+                    }
+                  >
+                    <Avatar
+                      username={displayName}
+                      profileImage={user.profileImage}
+                      avatarCrop={user.avatarCrop}
+                      size="tiny"
+                    />
+                    <div className={styles.globalMeta}>
+                      <span className={styles.globalPrimary}>{displayName}</span>
+                      <span className={styles.globalSecondary}>{handle}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </section>
           )}
 
@@ -178,28 +183,30 @@ export function ConversationList({ onNavigate }: Props) {
           {!globalLoading && globalResults.messages.length > 0 && (
             <section className={styles.globalSection}>
               <h4 className={styles.globalTitle}>Сообщения</h4>
-              {globalResults.messages.map((message) => (
-                <button
-                  key={`m-${message.id}`}
-                  type="button"
-                  className={styles.globalItem}
-                  onClick={() =>
-                    onNavigate(
-                      `/rooms/${encodeURIComponent(String(message.roomId))}?message=${message.id}`,
-                    )
-                  }
-                >
-                  <div className={styles.globalMeta}>
-                    <span className={styles.globalPrimary}>
-                      {message.displayName ?? message.username} •{" "}
-                      {message.roomName || String(message.roomId)}
-                    </span>
-                    <span className={styles.globalSecondary}>
-                      {message.content}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {globalResults.messages.map((message) => {
+                const displayName = resolveIdentityLabel(message);
+                return (
+                  <button
+                    key={`m-${message.id}`}
+                    type="button"
+                    className={styles.globalItem}
+                    onClick={() =>
+                      onNavigate(
+                        `/rooms/${encodeURIComponent(String(message.roomId))}?message=${message.id}`,
+                      )
+                    }
+                  >
+                    <div className={styles.globalMeta}>
+                      <span className={styles.globalPrimary}>
+                        {displayName} • {message.roomName || String(message.roomId)}
+                      </span>
+                      <span className={styles.globalSecondary}>
+                        {message.content}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </section>
           )}
         </div>

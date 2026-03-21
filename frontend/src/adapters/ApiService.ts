@@ -44,6 +44,7 @@ import { getInvitePreview } from "./apiService/getInvitePreview";
 import { getInvites } from "./apiService/getInvites";
 import { getJoinRequests } from "./apiService/getJoinRequests";
 import { getMemberRoles } from "./apiService/getMemberRoles";
+import { getMessageReaders } from "./apiService/getMessageReaders";
 import { getMyGroups } from "./apiService/getMyGroups";
 import { getMyPermissions } from "./apiService/getMyPermissions";
 import { getOutgoingRequests } from "./apiService/getOutgoingRequests";
@@ -531,6 +532,18 @@ public async getUserProfile(publicRef: string) {
    */
 public async getUnreadCounts() {
     return this.runWithDecode(async () => getUnreadCounts(this.apiClient));
+  }
+
+    /**
+   * Асинхронно возвращает readers конкретного сообщения.
+   *
+   * @param roomId Идентификатор комнаты.
+   * @param messageId Идентификатор сообщения.
+   */
+public async getMessageReaders(roomId: string, messageId: number) {
+    return this.runWithDecode(async () =>
+      getMessageReaders(this.apiClient, roomId, messageId),
+    );
   }
 
     /**
@@ -1248,4 +1261,3 @@ public async getRoomAttachments(
  * Экспорт `apiService` предоставляет инициализированный экземпляр для повторного использования в модуле.
  */
 export const apiService = new ApiService();
-

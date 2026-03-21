@@ -7,6 +7,7 @@ import type {
   RoomKind,
   RoomPeer,
 } from "../../entities/room/types";
+import type { AvatarCrop } from "../../shared/api/users";
 import { decodeOrThrow } from "../core/codec";
 
 const roomKindSchema = z.enum(["public", "private", "direct", "group"]);
@@ -402,6 +403,28 @@ const readStateResponseSchema = z
   .object({
     roomId: z.union([z.number(), z.string()]),
     lastReadMessageId: z.number().nullable(),
+    lastReadAt: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const messageReaderItemSchema = z
+  .object({
+    userId: z.number(),
+    publicRef: z.string().min(1),
+    username: z.string().min(1),
+    displayName: z.string().optional(),
+    profileImage: z.string().nullable().optional(),
+    avatarCrop: avatarCropSchema.nullable().optional(),
+    readAt: z.string(),
+  })
+  .passthrough();
+
+const messageReadersResponseSchema = z
+  .object({
+    roomKind: roomKindSchema,
+    messageId: z.number(),
+    readAt: z.string().nullable().optional(),
+    readers: z.array(messageReaderItemSchema).optional(),
   })
   .passthrough();
 
@@ -513,11 +536,35 @@ export type UploadResponse = {
 export type ReadStateResponse = {
   roomId: number;
   lastReadMessageId: number | null;
+  lastReadAt?: string | null;
 };
 /**
  * Описывает структуру данных `UnreadCountItem`.
  */
 export type UnreadCountItem = { roomId: number; unreadCount: number };
+
+/**
+ * Описывает exact reader конкретного сообщения.
+ */
+export type MessageReaderItem = {
+  userId: number;
+  publicRef: string;
+  username: string;
+  displayName?: string;
+  profileImage: string | null;
+  avatarCrop?: AvatarCrop | null;
+  readAt: string;
+};
+
+/**
+ * Описывает ответ API `MessageReadersResponse`.
+ */
+export type MessageReadersResponse = {
+  roomKind: RoomKind;
+  messageId: number;
+  readAt: string | null;
+  readers: MessageReaderItem[];
+};
 /**
  * Описывает структуру данных `RoomAttachmentItem`.
  */
@@ -642,6 +689,36 @@ export const decodeReadStateResponse = (input: unknown): ReadStateResponse => {
   return {
     roomId: toRoomId(parsed.roomId),
     lastReadMessageId: parsed.lastReadMessageId,
+    lastReadAt: parsed.lastReadAt ?? null,
+  };
+};
+
+/**
+ * Преобразует HTTP-данные для операции decode message readers response.
+ * @param input Входной объект с параметрами операции.
+ * @returns Нормализованные данные после декодирования.
+ */
+export const decodeMessageReadersResponse = (
+  input: unknown,
+): MessageReadersResponse => {
+  const parsed = decodeOrThrow(
+    messageReadersResponseSchema,
+    input,
+    "chat/message-readers",
+  );
+  return {
+    roomKind: parsed.roomKind,
+    messageId: parsed.messageId,
+    readAt: parsed.readAt ?? null,
+    readers: (parsed.readers ?? []).map((reader) => ({
+      userId: reader.userId,
+      publicRef: reader.publicRef,
+      username: reader.username,
+      displayName: reader.displayName ?? reader.username,
+      profileImage: reader.profileImage ?? null,
+      avatarCrop: reader.avatarCrop ?? null,
+      readAt: reader.readAt,
+    })),
   };
 };
 

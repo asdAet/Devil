@@ -3,6 +3,7 @@
 import {
   decodeDirectChatsResponse,
   decodeDirectStartResponse,
+  decodeMessageReadersResponse,
   decodeRoomMessagesResponse,
 } from "./chat";
 
@@ -71,5 +72,33 @@ describe("chat HTTP DTO decoders", () => {
 
     expect(decoded.items[0]?.slug).toBe("123");
     expect(decoded.items[0]?.peer.publicRef).toBe("bob");
+  });
+
+  it("decodes message readers response with avatar fields", () => {
+    const decoded = decodeMessageReadersResponse({
+      roomKind: "group",
+      messageId: 7,
+      readers: [
+        {
+          userId: 2,
+          publicRef: "alice",
+          username: "alice",
+          displayName: "Alice",
+          profileImage: "https://cdn.example.com/alice.jpg",
+          avatarCrop: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+          readAt: "2026-02-18T00:00:00Z",
+        },
+      ],
+    });
+
+    expect(decoded.readers[0]?.profileImage).toBe(
+      "https://cdn.example.com/alice.jpg",
+    );
+    expect(decoded.readers[0]?.avatarCrop).toEqual({
+      x: 0.1,
+      y: 0.2,
+      width: 0.3,
+      height: 0.4,
+    });
   });
 });

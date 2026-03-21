@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { chatController } from "../../controllers/ChatController";
 import type { SearchResultItem } from "../../domain/interfaces/IApiService";
 import { formatTimestamp } from "../../shared/lib/format";
+import { resolveIdentityLabel } from "../../shared/lib/userIdentity";
 import { Spinner } from "../../shared/ui";
 import styles from "../../styles/chat/ChatSearch.module.css";
 
@@ -89,28 +90,29 @@ export function ChatSearch({ slug, onResultClick }: Props) {
         )}
 
         {!loading &&
-          results.map((r) => (
-            <div
-              key={r.id}
-              className={styles.resultItem}
-              onClick={() => onResultClick?.(r.id)}
-              role="button"
-              tabIndex={0}
-            >
-              <span className={styles.resultUser}>
-                {r.displayName ?? r.username}
-              </span>
-              <span className={styles.resultTime}>
-                {formatTimestamp(r.createdAt)}
-              </span>
+          results.map((r) => {
+            const displayName = resolveIdentityLabel(r);
+            return (
               <div
-                className={styles.resultContent}
-                dangerouslySetInnerHTML={{
-                  __html: r.highlight || highlightText(r.content, query),
-                }}
-              />
-            </div>
-          ))}
+                key={r.id}
+                className={styles.resultItem}
+                onClick={() => onResultClick?.(r.id)}
+                role="button"
+                tabIndex={0}
+              >
+                <span className={styles.resultUser}>{displayName}</span>
+                <span className={styles.resultTime}>
+                  {formatTimestamp(r.createdAt)}
+                </span>
+                <div
+                  className={styles.resultContent}
+                  dangerouslySetInnerHTML={{
+                    __html: r.highlight || highlightText(r.content, query),
+                  }}
+                />
+              </div>
+            );
+          })}
       </div>
     </div>
   );

@@ -32,6 +32,7 @@ from .services import (
     add_reaction,
     delete_message,
     edit_message,
+    get_message_readers,
     get_unread_counts,
     mark_read as service_mark_read,
     remove_reaction,
@@ -697,6 +698,21 @@ def _ensure_room_read_access(request, room: Room):
         ensure_can_read_or_404(room, request.user)
 
 
+def _serialize_reader(request, user, *, read_at):
+    """Сериализует reader payload для ответа API."""
+
+    profile = getattr(user, "profile", None)
+    return {
+        "userId": user.pk,
+        "publicRef": user_public_ref(user),
+        "username": user_public_username(user),
+        "displayName": user_display_name(user),
+        "profileImage": resolve_user_avatar_url_from_request(request, user),
+        "avatarCrop": serialize_avatar_crop(profile),
+        "readAt": read_at.isoformat() if read_at else None,
+    }
+
+
 # ── Message Edit / Delete ─────────────────────────────────────────────
 
 @api_view(["PATCH", "DELETE"])
@@ -759,6 +775,50 @@ def message_detail(request, room_id: int, message_id):
         return Response({"error": str(exc)}, status=http_status.HTTP_403_FORBIDDEN)
     except MessageValidationError as exc:
         return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def message_readers(request, room_id: int, message_id: int):
+    """Возвращает readers конкретного сообщения для его автора."""
+
+    room, error_response = _resolve_room(room_id)
+    if error_response:
+        return error_response
+    if room is None:
+        return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
+
+    try:
+        _ensure_room_read_access(request, room)
+    except Http404:
+        return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
+
+    try:
+        readers_state = get_message_readers(request.user, room, message_id)
+    except MessageNotFoundError:
+        return Response({"error": "Сообщение не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
+    except MessageForbiddenError as exc:
+        return Response({"error": str(exc)}, status=http_status.HTTP_403_FORBIDDEN)
+
+    payload = {
+        "roomKind": room.kind,
+        "messageId": message_id,
+        "readAt": None,
+        "readers": [],
+    }
+    if room.kind == Room.Kind.DIRECT:
+        payload["readAt"] = (
+            readers_state["read_at"].isoformat()
+            if readers_state["read_at"]
+            else None
+        )
+        return Response(payload)
+
+    payload["readers"] = [
+        _serialize_reader(request, receipt.user, read_at=receipt.read_at)
+        for receipt in readers_state["receipts"]
+    ]
+    return Response(payload)
 
 
 # ── Reactions ─────────────────────────────────────────────────────────
@@ -1541,9 +1601,6 @@ def mark_read_view(request, room_id: int):
     if room is None:
         return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
 
-    if room.kind == Room.Kind.PUBLIC:
-        return Response({"roomId": room.pk, "lastReadMessageId": None})
-
     try:
         _ensure_room_read_access(request, room)
     except Http404:
@@ -1579,12 +1636,14 @@ def mark_read_view(request, room_id: int):
         "username": user_public_username(request.user),
         "displayName": user_display_name(request.user),
         "lastReadMessageId": state.last_read_message_id,
+        "lastReadAt": state.last_read_at.isoformat() if state.last_read_at else None,
         "roomId": room.pk,
     })
 
     return Response({
         "roomId": room.pk,
         "lastReadMessageId": state.last_read_message_id,
+        "lastReadAt": state.last_read_at.isoformat() if state.last_read_at else None,
     })
 
 
@@ -1601,4 +1660,3 @@ def unread_counts(request):
     """
     items = get_unread_counts(request.user)
     return Response({"items": items})
-

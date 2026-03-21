@@ -14,6 +14,7 @@ urlpatterns = [
     path("rooms/<int:room_id>/messages/search/", api.search_messages, name="api-search-messages"),
     path("rooms/<int:room_id>/messages/<int:message_id>/reactions/<str:emoji>/", api.message_reaction_remove, name="api-message-reaction-remove"),
     path("rooms/<int:room_id>/messages/<int:message_id>/reactions/", api.message_reactions, name="api-message-reactions"),
+    path("rooms/<int:room_id>/messages/<int:message_id>/readers/", api.message_readers, name="api-message-readers"),
     path("rooms/<int:room_id>/messages/<int:message_id>/", api.message_detail, name="api-message-detail"),
     path("rooms/<int:room_id>/messages/", api.room_messages, name="api-room-messages"),
     path("rooms/<int:room_id>/attachments/", api.upload_attachments, name="api-upload-attachments"),
