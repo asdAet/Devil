@@ -1,5 +1,6 @@
 import { apiService } from "../adapters/ApiService";
 import type {
+  ChatResolveResult,
   EditMessageResult,
   GlobalSearchResult,
   MessageReadersResult,
@@ -13,13 +14,11 @@ import type {
 } from "../domain/interfaces/IApiService";
 import type {
   DirectChatsResponseDto,
-  DirectStartResponseDto,
   RoomMessagesDto,
   RoomMessagesParams,
 } from "../dto";
 import type { RoomDetails as RoomDetailsDto } from "../entities/room/types";
 
-let publicRoomInFlight: Promise<RoomDetailsDto> | null = null;
 let directChatsInFlight: Promise<DirectChatsResponseDto> | null = null;
 
 const roomDetailsInFlight = new Map<string, Promise<RoomDetailsDto>>();
@@ -42,20 +41,8 @@ const buildRoomMessagesKey = (roomId: string, params?: RoomMessagesParams) => {
  * Класс ChatController инкапсулирует логику текущего слоя приложения.
  */
 class ChatController {
-    /**
-     * Возвращает public room.
-     * @returns Промис с данными, возвращаемыми этой функцией.
-     */
-public async getPublicRoom(): Promise<RoomDetailsDto> {
-    if (publicRoomInFlight) {
-      return publicRoomInFlight;
-    }
-
-    publicRoomInFlight = apiService.getPublicRoom().finally(() => {
-      publicRoomInFlight = null;
-    });
-
-    return publicRoomInFlight;
+public async resolveChatTarget(target: string): Promise<ChatResolveResult> {
+    return apiService.resolveChatTarget(target);
   }
 
     /**
@@ -99,18 +86,6 @@ public async getRoomMessages(
 
     roomMessagesInFlight.set(cacheKey, request);
     return request;
-  }
-
-    /**
-     * Обрабатывает start direct chat.
-     * @param publicRef Публичный идентификатор пользователя.
-     * @returns Промис с данными, возвращаемыми этой функцией.
-     */
-public async startDirectChat(
-    publicRef: string,
-  ): Promise<DirectStartResponseDto> {
-    const response = await apiService.startDirectChat(publicRef);
-    return response;
   }
 
     /**

@@ -34,7 +34,6 @@ const roomPeerSchema = z
 
 const roomDetailsSchema = z
   .object({
-    roomRef: z.string().optional(),
     name: z.string(),
     kind: roomKindSchema,
     avatarUrl: z.string().nullable().optional(),
@@ -109,11 +108,14 @@ const roomMessagesSchema = z
   })
   .passthrough();
 
-const directStartSchema = z
+const chatResolveSchema = z
   .object({
+    targetKind: z.enum(["direct", "group", "public"]),
     roomId: z.union([z.number(), z.string()]),
-    kind: roomKindSchema,
-    peer: roomPeerSchema,
+    roomKind: roomKindSchema,
+    resolvedTarget: z.string().min(1),
+    peer: roomPeerSchema.optional(),
+    room: roomDetailsSchema.optional(),
   })
   .passthrough();
 
@@ -164,12 +166,8 @@ const mapRoomDetails = (
     typeof raw.roomId === "number"
       ? raw.roomId
       : Number(raw.roomId ?? Number.NaN);
-  const roomRef =
-    (typeof dto.roomRef === "string" ? dto.roomRef : "").trim() ||
-    (Number.isFinite(rawRoomId) ? String(Math.trunc(rawRoomId)) : "");
   return {
     roomId: Number.isFinite(rawRoomId) ? Math.trunc(rawRoomId) : undefined,
-    slug: roomRef,
     name: dto.name,
     kind: dto.kind,
     avatarUrl: dto.avatarUrl ?? null,
@@ -249,13 +247,13 @@ export type RoomMessagesParams = {
   beforeId?: number;
 };
 
-/**
- * Описывает структуру ответа API `DirectStartResponseDto`.
- */
-export type DirectStartResponseDto = {
+export type ChatResolveResponseDto = {
+  targetKind: "direct" | "group" | "public";
   roomId: number;
-  kind: RoomDetails["kind"];
-  peer: RoomPeer;
+  roomKind: RoomDetails["kind"];
+  resolvedTarget: string;
+  peer?: RoomPeer;
+  room?: RoomDetails;
 };
 
 /**
@@ -263,17 +261,6 @@ export type DirectStartResponseDto = {
  */
 export type DirectChatsResponseDto = {
   items: DirectChatListItem[];
-};
-
-/**
- * Преобразует HTTP-данные для операции decode public room response.
- * @param input Входной объект с параметрами операции.
- * @returns Нормализованные данные после декодирования.
- */
-
-export const decodePublicRoomResponse = (input: unknown): RoomDetails => {
-  const parsed = decodeOrThrow(roomDetailsSchema, input, "chat/public-room");
-  return mapRoomDetails(parsed);
 };
 
 /**
@@ -301,20 +288,17 @@ export const decodeRoomMessagesResponse = (input: unknown): RoomMessagesDto => {
   };
 };
 
-/**
- * Преобразует HTTP-данные для операции decode direct start response.
- * @param input Входной объект с параметрами операции.
- * @returns Нормализованные данные после декодирования.
- */
-
-export const decodeDirectStartResponse = (
+export const decodeChatResolveResponse = (
   input: unknown,
-): DirectStartResponseDto => {
-  const parsed = decodeOrThrow(directStartSchema, input, "chat/direct-start");
+): ChatResolveResponseDto => {
+  const parsed = decodeOrThrow(chatResolveSchema, input, "chat/resolve");
   return {
+    targetKind: parsed.targetKind,
     roomId: toRoomId(parsed.roomId),
-    kind: parsed.kind,
-    peer: mapPeer(parsed.peer),
+    roomKind: parsed.roomKind,
+    resolvedTarget: parsed.resolvedTarget,
+    peer: parsed.peer ? mapPeer(parsed.peer) : undefined,
+    room: parsed.room ? mapRoomDetails(parsed.room) : undefined,
   };
 };
 
@@ -330,7 +314,7 @@ export const decodeDirectChatsResponse = (
   const parsed = decodeOrThrow(directChatsSchema, input, "chat/direct-chats");
   return {
     items: parsed.items.map((item) => ({
-      slug: String(toRoomId(item.roomId)),
+      roomId: toRoomId(item.roomId),
       peer: mapPeer(item.peer),
       lastMessage: item.lastMessage,
       lastMessageAt: item.lastMessageAt ?? "",
@@ -446,6 +430,7 @@ const globalSearchGroupSchema = z
     name: z.string(),
     description: z.string().optional(),
     publicRef: z.string().min(1),
+    roomTarget: z.string().min(1).optional(),
     memberCount: z.number().optional(),
     isPublic: z.boolean().optional(),
   })
@@ -462,6 +447,7 @@ const globalSearchMessageSchema = z
     roomId: z.union([z.number(), z.string()]),
     roomName: z.string().optional(),
     roomKind: roomKindSchema.optional(),
+    roomTarget: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -594,6 +580,7 @@ export type GlobalSearchResponse = {
     name: string;
     description: string;
     publicRef: string;
+    roomTarget: string;
     memberCount: number;
     isPublic: boolean;
   }[];
@@ -607,6 +594,7 @@ export type GlobalSearchResponse = {
     roomId: number;
     roomName: string;
     roomKind: RoomKind;
+    roomTarget: string | null;
   }[];
 };
 
@@ -804,6 +792,7 @@ export const decodeGlobalSearchResponse = (
       name: g.name,
       description: g.description ?? "",
       publicRef: g.publicRef,
+      roomTarget: g.roomTarget ?? g.publicRef,
       memberCount: g.memberCount ?? 0,
       isPublic: g.isPublic ?? false,
     })),
@@ -817,6 +806,7 @@ export const decodeGlobalSearchResponse = (
       roomId: toRoomId(m.roomId),
       roomName: m.roomName ?? "",
       roomKind: m.roomKind ?? "public",
+      roomTarget: m.roomTarget ?? null,
     })),
   };
 };

@@ -7,10 +7,10 @@ import { Sidebar } from "./Sidebar";
 
 const directInboxMock = vi.hoisted(() => ({
   unreadDialogsCount: 2,
-  unreadCounts: { "dm-1": 2 },
+  unreadCounts: { "1": 2 },
   items: [
     {
-      slug: "dm-1",
+      roomId: 1,
       peer: {
         publicRef: "alice",
         username: "alice",
@@ -31,9 +31,10 @@ const conversationListMock = vi.hoisted(() => ({
   serverItems: [
     {
       key: "public",
-      slug: "public",
+      roomId: 99,
+      roomTarget: "public",
       name: "Публичный чат",
-      path: "/rooms/public",
+      path: "/public",
       avatarUrl: null,
       avatarCrop: null,
       unreadCount: 1,
@@ -82,7 +83,7 @@ describe("Sidebar", () => {
     );
 
     fireEvent.click(screen.getByTestId("sidebar-logo-button"));
-    expect(onNavigate).toHaveBeenCalledWith("/direct/alice");
+    expect(onNavigate).toHaveBeenCalledWith("/@alice");
   });
 
   it("falls back to first direct chat when there is no remembered direct", () => {
@@ -95,7 +96,7 @@ describe("Sidebar", () => {
     );
 
     fireEvent.click(screen.getByTestId("sidebar-logo-button"));
-    expect(onNavigate).toHaveBeenCalledWith("/direct/alice");
+    expect(onNavigate).toHaveBeenCalledWith("/@alice");
   });
 
   it("shows shortcut section with divider and navigates to friends/public chat", () => {
@@ -111,7 +112,7 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByTestId("friends-nav-button"));
     expect(onNavigate).toHaveBeenCalledWith("/friends");
     fireEvent.click(screen.getByTestId("public-chat-nav-button"));
-    expect(onNavigate).toHaveBeenCalledWith("/rooms/public");
+    expect(onNavigate).toHaveBeenCalledWith("/public");
   });
 
   it("opens settings modal from footer button", () => {

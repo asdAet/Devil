@@ -51,7 +51,6 @@ import { getOutgoingRequests } from "./apiService/getOutgoingRequests";
 import { getPasswordRules } from "./apiService/getPasswordRules";
 import { getPinnedMessages } from "./apiService/getPinnedMessages";
 import { getPublicGroups } from "./apiService/getPublicGroups";
-import { getPublicRoom } from "./apiService/getPublicRoom";
 import { getRoomAttachments } from "./apiService/getRoomAttachments";
 import { getRoomDetails } from "./apiService/getRoomDetails";
 import { getRoomMessages } from "./apiService/getRoomMessages";
@@ -72,6 +71,7 @@ import { muteMember } from "./apiService/muteMember";
 import { oauthGoogle } from "./apiService/oauthGoogle";
 import { pinMessage } from "./apiService/pinMessage";
 import { register } from "./apiService/register";
+import { resolveChatTarget } from "./apiService/resolveChatTarget";
 import { rejectJoinRequest } from "./apiService/rejectJoinRequest";
 import { removeFriend } from "./apiService/removeFriend";
 import { removeReaction } from "./apiService/removeReaction";
@@ -79,7 +79,6 @@ import { revokeInvite } from "./apiService/revokeInvite";
 import { searchMessages } from "./apiService/searchMessages";
 import { sendFriendRequest } from "./apiService/sendFriendRequest";
 import { setMemberRoles } from "./apiService/setMemberRoles";
-import { startDirectChat } from "./apiService/startDirectChat";
 import { transferOwnership } from "./apiService/transferOwnership";
 import { unbanMember } from "./apiService/unbanMember";
 import { unblockUser } from "./apiService/unblockUser";
@@ -467,11 +466,10 @@ public async updateProfile(fields: UpdateProfileInput) {
     );
   }
 
-    /**
-   * Асинхронно возвращает public комнаты.
-   */
-public async getPublicRoom() {
-    return this.runWithDecode(async () => getPublicRoom(this.apiClient));
+public async resolveChatTarget(target: string) {
+    return this.runWithDecode(async () =>
+      resolveChatTarget(this.apiClient, target),
+    );
   }
 
     /**
@@ -495,17 +493,6 @@ public async getRoomMessages(
   ) {
     return this.runWithDecode(async () =>
       getRoomMessages(this.apiClient, roomId, params),
-    );
-  }
-
-    /**
-   * Асинхронно запускает direct-чат чата.
-   *
-   * @param publicRef Публичный идентификатор пользователя или комнаты.
-   */
-public async startDirectChat(publicRef: string) {
-    return this.runWithDecode(async () =>
-      startDirectChat(this.apiClient, publicRef),
     );
   }
 

@@ -6,10 +6,16 @@ import { useConversationList } from "../../shared/conversationList/ConversationL
 import { useDirectInbox } from "../../shared/directInbox";
 import {
   DIRECT_HOME_FALLBACK_PATH,
-  parseDirectRefFromPathname,
   rememberLastDirectRef,
   resolveRememberedDirectPath,
 } from "../../shared/lib/directNavigation";
+import {
+  buildChatTargetPath,
+  buildPublicChatPath,
+  normalizeChatTarget,
+  parseChatTargetFromPathname,
+  PUBLIC_CHAT_TARGET,
+} from "../../shared/lib/chatTarget";
 import { formatFullName } from "../../shared/lib/format";
 import {
   buildDirectPath,
@@ -46,17 +52,6 @@ const clampSidebarWidth = (value: number): number =>
 
 const normalizeActorRef = (value: string): string =>
   normalizePublicRef(value).toLowerCase();
-
-const parseRoomSlugFromPathname = (pathname: string): string | null => {
-  if (!pathname.startsWith("/rooms/")) return null;
-  const slug = pathname.slice("/rooms/".length).split("/")[0] || "";
-  if (!slug) return null;
-  try {
-    return decodeURIComponent(slug);
-  } catch {
-    return slug;
-  }
-};
 
 const FriendsIcon = () => (
   <svg viewBox="0 0 24 24" className={styles.iconSvg} aria-hidden="true">
@@ -116,18 +111,26 @@ export function Sidebar({
     [presenceOnline, presenceStatus],
   );
 
-  const activeRoomSlug = useMemo(
-    () => parseRoomSlugFromPathname(location.pathname),
+  const activeChatTarget = useMemo(
+    () => parseChatTargetFromPathname(location.pathname),
     [location.pathname],
+  );
+  const directChatTargets = useMemo(
+    () =>
+      new Set(
+        directItems
+          .map((item) => normalizeChatTarget(item.peer.publicRef))
+          .filter(Boolean),
+      ),
+    [directItems],
   );
 
   const isLogoActive =
-    location.pathname === "/direct" ||
-    location.pathname.startsWith("/direct/") ||
-    location.pathname.startsWith("/friends");
+    location.pathname.startsWith("/friends") ||
+    (activeChatTarget !== null && directChatTargets.has(activeChatTarget));
 
   const isFriendsActive = location.pathname.startsWith("/friends");
-  const isPublicChatActive = activeRoomSlug === "public";
+  const isPublicChatActive = activeChatTarget === PUBLIC_CHAT_TARGET;
   // Shortcut в DM-pane использует тот же unread, что и public room в server rail.
   const publicChatUnread =
     serverItems.find((item) => item.isPublic)?.unreadCount ?? 0;
@@ -205,12 +208,12 @@ export function Sidebar({
   }, []);
 
   useEffect(() => {
-    const activeDirectRef = parseDirectRefFromPathname(location.pathname);
-    if (!activeDirectRef) return;
+    const activeDirectRef = parseChatTargetFromPathname(location.pathname);
+    if (!activeDirectRef || !directChatTargets.has(activeDirectRef)) return;
 
     // Запоминаем последнее реально открытое ЛС, чтобы логотип возвращал именно туда.
     rememberLastDirectRef(activeDirectRef);
-  }, [location.pathname]);
+  }, [directChatTargets, location.pathname]);
 
   const handleResizeStart = useCallback((event: React.MouseEvent) => {
     if (window.innerWidth <= MOBILE_BREAKPOINT) return;
@@ -251,10 +254,10 @@ export function Sidebar({
   }, []);
 
   const handleGroupCreated = useCallback(
-    (slug: string) => {
+    (roomTarget: string) => {
       setShowCreateGroup(false);
       refresh();
-      navigateFromSidebar(`/rooms/${encodeURIComponent(slug)}`);
+      navigateFromSidebar(buildChatTargetPath(roomTarget));
     },
     [navigateFromSidebar, refresh],
   );
@@ -282,30 +285,6 @@ export function Sidebar({
         .join(" ")}
       ref={sidebarRef}
     >
-      {showMobileDrawerControls && (
-        <button
-          type="button"
-          className={styles.mobileCloseButton}
-          onClick={onCloseMobileDrawer}
-          aria-label="Закрыть меню"
-          data-testid="sidebar-mobile-close"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      )}
-
       <nav className={styles.guildsSidebar} aria-label="Серверы">
         <div
           className={[
@@ -335,7 +314,7 @@ export function Sidebar({
 
         <div className={styles.guildsList}>
           {serverItems.map((server) => {
-            const isServerActive = activeRoomSlug === server.slug;
+            const isServerActive = activeChatTarget === server.roomTarget;
             const unread = server.unreadCount;
 
             return (
@@ -405,6 +384,29 @@ export function Sidebar({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
+          {showMobileDrawerControls && (
+            <button
+              type="button"
+              className={styles.mobileCloseButton}
+              onClick={onCloseMobileDrawer}
+              aria-label="Закрыть меню"
+              data-testid="sidebar-mobile-close"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
 
         <div className={styles.dmScroll} data-testid="sidebar-dm-scroll">
@@ -435,7 +437,7 @@ export function Sidebar({
             ]
               .filter(Boolean)
               .join(" ")}
-            onClick={() => navigateFromSidebar("/rooms/public")}
+            onClick={() => navigateFromSidebar(buildPublicChatPath())}
             data-testid="public-chat-nav-button"
           >
             <span
@@ -474,15 +476,17 @@ export function Sidebar({
               {filteredDirectItems.map((item) => {
                 const displayName = resolveIdentityLabel(item.peer);
                 const peerRef = item.peer.publicRef;
+                const directTarget = normalizeChatTarget(peerRef);
                 const directPath = buildDirectPath(peerRef);
-                const isDirectActive = location.pathname === directPath;
+                const isDirectActive =
+                  Boolean(directTarget) && activeChatTarget === directTarget;
                 const isPeerOnline = onlineUsernames.has(
                   normalizeActorRef(peerRef),
                 );
-                const unread = unreadCounts[item.slug] ?? 0;
+                const unread = unreadCounts[String(item.roomId)] ?? 0;
 
                 return (
-                  <li key={item.slug} className={styles.dmItem}>
+                  <li key={item.roomId} className={styles.dmItem}>
                     <button
                       type="button"
                       className={[

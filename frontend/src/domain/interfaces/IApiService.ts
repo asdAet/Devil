@@ -77,13 +77,15 @@ export type RoomMessagesResponse = {
   };
 };
 
-/**
- * Описывает структуру ответа API `DirectStartResponse`.
- */
-export type DirectStartResponse = {
+export type ChatResolveTargetKind = "direct" | "group" | "public";
+
+export type ChatResolveResult = {
+  targetKind: ChatResolveTargetKind;
   roomId: number;
-  kind: RoomKind;
-  peer: RoomPeer;
+  roomKind: RoomKind;
+  resolvedTarget: string;
+  peer?: RoomPeer;
+  room?: RoomDetails;
 };
 
 /**
@@ -99,7 +101,7 @@ export type DirectChatsResponse = {
 export type ClientRuntimeConfig = {
   usernameMaxLength: number;
   chatMessageMaxLength: number;
-  chatRoomSlugRegex: string;
+  chatTargetRegex: string;
   chatAttachmentMaxSizeMb: number;
   chatAttachmentMaxPerMessage: number;
   chatAttachmentAllowedTypes: string[];
@@ -196,10 +198,11 @@ logout(): Promise<{ ok: boolean }>;
 updateProfile(fields: UpdateProfileInput): Promise<{ user: UserProfile }>;
 
     /**
-     * Возвращает public room.
-     * @returns Промис с данными, возвращаемыми этой функцией.
+     * Разрешает prefixless chat target в конкретную комнату.
+     * @param target Внешний адрес чата: public, @username, public id или group publicRef.
+     * @returns Промис с данными разрешения target.
      */
-getPublicRoom(): Promise<RoomDetails>;
+resolveChatTarget(target: string): Promise<ChatResolveResult>;
 
     /**
      * Возвращает room details.
@@ -220,13 +223,6 @@ getRoomMessages(
     roomId: string,
     params?: { limit?: number; beforeId?: number },
   ): Promise<RoomMessagesResponse>;
-
-    /**
-     * Обрабатывает start direct chat.
-     * @param publicRef Публичный идентификатор пользователя.
-     * @returns Промис с данными, возвращаемыми этой функцией.
-     */
-startDirectChat(publicRef: string): Promise<DirectStartResponse>;
 
     /**
      * Возвращает direct chats.
@@ -597,7 +593,9 @@ getInvitePreview(code: string): Promise<InvitePreview>;
      * @param code Код приглашения.
      * @returns Промис с данными, возвращаемыми этой функцией.
      */
-joinViaInvite(code: string): Promise<{ roomId: number }>;
+joinViaInvite(
+    code: string,
+  ): Promise<{ roomId: number; groupPublicRef?: string | null }>;
     /**
      * Возвращает join requests.
      * @param roomId Идентификатор комнаты.
@@ -926,6 +924,7 @@ export type GlobalSearchGroup = {
   name: string;
   description: string;
   publicRef: string;
+  roomTarget: string;
   memberCount: number;
   isPublic: boolean;
 };
@@ -943,6 +942,7 @@ export type GlobalSearchMessage = {
   roomId: number;
   roomName: string;
   roomKind: RoomKind;
+  roomTarget: string | null;
 };
 
 /**

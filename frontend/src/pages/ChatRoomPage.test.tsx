@@ -22,7 +22,7 @@ const wsState = vi.hoisted(() => ({
 
 const chatRoomMock = vi.hoisted(() => ({
   details: {
-    slug: "public",
+    roomId: 1,
     name: "Public",
     kind: "public",
     created: false,
@@ -63,7 +63,7 @@ const mobileShellMock = vi.hoisted(() => ({
 
 const locationMock = vi.hoisted(() => ({
   search: "",
-  pathname: "/rooms/public",
+  pathname: "/public",
 }));
 
 const permissionsMock = vi.hoisted(() => ({
@@ -229,7 +229,7 @@ describe("ChatRoomPage", () => {
     wsState.options = null;
 
     chatRoomMock.details = {
-      slug: "public",
+      roomId: 1,
       name: "Public",
       kind: "public",
       created: false,
@@ -287,7 +287,7 @@ describe("ChatRoomPage", () => {
     mobileShellMock.isDrawerOpen = false;
     mobileShellMock.isMobileViewport = false;
     locationMock.search = "";
-    locationMock.pathname = "/rooms/public";
+    locationMock.pathname = "/public";
     Object.defineProperty(window.navigator, "sendBeacon", {
       configurable: true,
       value: undefined,
@@ -297,23 +297,23 @@ describe("ChatRoomPage", () => {
   });
 
   it("shows read-only mode for guest in public room", () => {
-    render(<ChatRoomPage slug="public" user={null} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={null} onNavigate={vi.fn()} />);
 
     expect(screen.getByTestId("chat-auth-callout")).toBeInTheDocument();
     expect(screen.queryByLabelText("Сообщение")).toBeNull();
   });
 
   it("opens the mobile drawer from room chats", () => {
-    locationMock.pathname = "/rooms/public";
+    locationMock.pathname = "/public";
 
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
 
     fireEvent.click(screen.getByTestId("chat-mobile-open-button"));
     expect(mobileShellMock.openDrawer).toHaveBeenCalledTimes(1);
   });
 
   it("sends message for authenticated user", () => {
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText("Сообщение"), {
       target: { value: "Hello from test" },
@@ -331,7 +331,7 @@ describe("ChatRoomPage", () => {
   it("disables submit while websocket is not online", () => {
     wsState.status = "connecting";
 
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Сообщение"), {
       target: { value: "text" },
     });
@@ -342,7 +342,7 @@ describe("ChatRoomPage", () => {
   });
 
   it("activates local rate limit cooldown from ws error event", () => {
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText("Сообщение"), {
       target: { value: "text" },
@@ -366,8 +366,7 @@ describe("ChatRoomPage", () => {
 
   it("shows online status for direct peer", () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
@@ -383,7 +382,7 @@ describe("ChatRoomPage", () => {
       { publicRef: "alice", username: "alice", profileImage: null },
     ];
 
-    render(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
     expect(screen.getByText("В сети")).toBeInTheDocument();
   });
 
@@ -418,7 +417,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
 
     expect(
@@ -449,7 +448,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
 
     expect(
@@ -498,7 +497,7 @@ describe("ChatRoomPage", () => {
     };
 
     const { container } = render(
-      <ChatRoomPage slug="public" user={fallbackUser} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={fallbackUser} onNavigate={vi.fn()} />,
     );
 
     expect(
@@ -511,7 +510,7 @@ describe("ChatRoomPage", () => {
 
   it("shows join CTA and hides input for public group non-member", async () => {
     chatRoomMock.details = {
-      slug: "g-public-1",
+      roomId: 3,
       name: "Public Group",
       kind: "group",
       created: false,
@@ -522,7 +521,7 @@ describe("ChatRoomPage", () => {
     permissionsMock.canWrite = false;
     permissionsMock.canJoin = true;
 
-    render(<ChatRoomPage slug="g-public-1" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="3" initialRoomKind="group" user={user} onNavigate={vi.fn()} />);
 
     expect(screen.getByTestId("group-join-callout")).toBeInTheDocument();
     expect(screen.queryByLabelText("Сообщение")).toBeNull();
@@ -533,15 +532,14 @@ describe("ChatRoomPage", () => {
       await Promise.resolve();
     });
 
-    expect(groupControllerMock.joinGroup).toHaveBeenCalledWith("g-public-1");
+    expect(groupControllerMock.joinGroup).toHaveBeenCalledWith("3");
     expect(permissionsMock.refresh).toHaveBeenCalledTimes(1);
     expect(chatRoomMock.reload).toHaveBeenCalledTimes(1);
   });
 
   it("deduplicates mark-read for same last message id", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
@@ -583,7 +581,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container, rerender } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -603,15 +601,8 @@ describe("ChatRoomPage", () => {
           Object.defineProperty(node, "getBoundingClientRect", {
             configurable: true,
             value: () => ({ bottom: 120 + index * 120 }),
-    });
-    mobileShellMock.openDrawer.mockReset();
-    mobileShellMock.closeDrawer.mockReset();
-    mobileShellMock.toggleDrawer.mockReset();
-    mobileShellMock.isDrawerOpen = false;
-    mobileShellMock.isMobileViewport = false;
-    locationMock.search = "";
-    locationMock.pathname = "/rooms/public";
-  });
+          });
+        });
     };
     mockViewport();
 
@@ -621,12 +612,12 @@ describe("ChatRoomPage", () => {
     fireEvent.scroll(chatLog);
 
     await waitFor(() => {
-      expect(chatControllerMock.markRead).toHaveBeenCalledWith("1", 2);
+      expect(chatControllerMock.markRead).toHaveBeenCalledWith("2", 2);
     });
     expect(chatControllerMock.markRead).toHaveBeenCalledTimes(1);
 
     chatRoomMock.messages = [...chatRoomMock.messages];
-    rerender(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    rerender(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
     mockViewport();
     fireEvent.scroll(chatLog);
 
@@ -651,19 +642,19 @@ describe("ChatRoomPage", () => {
         reactions: [],
       },
     ];
-    rerender(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    rerender(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
     mockViewport();
     fireEvent.scroll(chatLog);
 
     await waitFor(() => {
-      expect(chatControllerMock.markRead).toHaveBeenCalledWith("1", 3);
+      expect(chatControllerMock.markRead).toHaveBeenCalledWith("2", 3);
     });
     expect(chatControllerMock.markRead).toHaveBeenCalledTimes(2);
   });
 
   it("accepts arbitrary attachment type on client", () => {
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
 
     const fileInput = container.querySelector(
@@ -686,7 +677,7 @@ describe("ChatRoomPage", () => {
   it("allows oversized attachment selection for superuser", () => {
     const { container } = render(
       <ChatRoomPage
-        slug="public"
+        roomId="1" initialRoomKind="public"
         user={{ ...user, isSuperuser: true }}
         onNavigate={vi.fn()}
       />,
@@ -713,7 +704,7 @@ describe("ChatRoomPage", () => {
   it("allows attachment count above runtime limit for superuser", () => {
     const { container } = render(
       <ChatRoomPage
-        slug="public"
+        roomId="1" initialRoomKind="public"
         user={{ ...user, isSuperuser: true }}
         onNavigate={vi.fn()}
       />,
@@ -738,7 +729,7 @@ describe("ChatRoomPage", () => {
 
   it("keeps attachment count limit for non-superuser", () => {
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
 
     const fileInput = container.querySelector(
@@ -755,7 +746,7 @@ describe("ChatRoomPage", () => {
 
   it("keeps attachment size limit for non-superuser", () => {
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
 
     const fileInput = container.querySelector(
@@ -775,7 +766,7 @@ describe("ChatRoomPage", () => {
   });
 
   it("queues pasted files from clipboard items", () => {
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
 
     const input = screen.getByLabelText("Сообщение");
     const pastedFile = new File(["clip"], "clipboard.bin", {
@@ -803,7 +794,7 @@ describe("ChatRoomPage", () => {
   });
 
   it("queues pasted files from clipboard fallback files list", () => {
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
 
     const input = screen.getByLabelText("Сообщение");
     const pastedFile = new File(["mobile"], "mobile-clipboard.txt", {
@@ -828,7 +819,7 @@ describe("ChatRoomPage", () => {
   });
 
   it("shows drop overlay and queues dropped files", () => {
-    render(<ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />);
 
     const chatRoot = screen.getByTestId("chat-page-root");
     const droppedFile = new File(["drop"], "drag-drop.txt", {
@@ -865,7 +856,7 @@ describe("ChatRoomPage", () => {
     });
 
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
 
     const fileInput = container.querySelector(
@@ -907,13 +898,12 @@ describe("ChatRoomPage", () => {
 
   it("keeps unread divider anchored while partially reading and after full read in current chat", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -923,7 +913,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1026,13 +1016,12 @@ describe("ChatRoomPage", () => {
 
   it("hides unread divider when current user sends a message", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1041,7 +1030,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1096,13 +1085,12 @@ describe("ChatRoomPage", () => {
 
   it("does not show unread divider for incoming message when user is at bottom", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 2,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1111,7 +1099,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container, rerender } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1190,7 +1178,7 @@ describe("ChatRoomPage", () => {
       );
     });
 
-    rerender(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    rerender(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
     setViewport(260, { 1: 120, 2: 170, 3: 210 });
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 240));
@@ -1202,13 +1190,12 @@ describe("ChatRoomPage", () => {
 
   it("performs a single initial scroll to bottom when unread messages are absent", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 3,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1218,7 +1205,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1253,13 +1240,12 @@ describe("ChatRoomPage", () => {
 
   it("does not jump to bottom while positioning to first unread on enter", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1269,7 +1255,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1318,15 +1304,14 @@ describe("ChatRoomPage", () => {
     expect(scrollWrites).not.toContain(1200);
   });
 
-  it("does not inherit unread divider from previous slug while next chat is loading", async () => {
+  it("does not inherit unread divider from previous room while next chat is loading", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1336,7 +1321,7 @@ describe("ChatRoomPage", () => {
     chatRoomMock.loading = false;
 
     const { container, rerender } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 260));
@@ -1349,24 +1334,24 @@ describe("ChatRoomPage", () => {
     expect(dividerInFirstChat?.dataset.unreadAnchorId).toBe("1");
 
     chatRoomMock.loading = true;
-    rerender(<ChatRoomPage slug="dm_2" user={user} onNavigate={vi.fn()} />);
+    rerender(<ChatRoomPage roomId="22" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
     expect(container.querySelector("[data-unread-divider]")).toBeNull();
 
     chatRoomMock.loading = false;
     chatRoomMock.details = {
-      slug: "dm_2",
+      roomId: 22,
       name: "dm2",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "bob", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@bob", username: "bob", profileImage: null, lastSeen: null },
       lastReadMessageId: 2,
     } as RoomDetails;
     chatRoomMock.messages = [
       makeForeignMessage(1, "other-first"),
       makeForeignMessage(2, "other-second"),
     ];
-    rerender(<ChatRoomPage slug="dm_2" user={user} onNavigate={vi.fn()} />);
+    rerender(<ChatRoomPage roomId="22" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
 
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 260));
@@ -1377,13 +1362,12 @@ describe("ChatRoomPage", () => {
 
   it("does not auto-reposition on non-append message updates", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1392,7 +1376,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1456,13 +1440,12 @@ describe("ChatRoomPage", () => {
 
   it("does not auto-scroll for incoming message when user is away from bottom", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 2,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1471,7 +1454,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container, rerender } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1525,7 +1508,7 @@ describe("ChatRoomPage", () => {
       );
     });
 
-    rerender(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    rerender(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
 
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 120));
@@ -1537,13 +1520,12 @@ describe("ChatRoomPage", () => {
 
   it("does not auto-reposition on read receipt events", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
       createdBy: null,
-      peer: { username: "alice", profileImage: null, lastSeen: null },
+      peer: { publicRef: "@alice", username: "alice", profileImage: null, lastSeen: null },
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [
@@ -1564,7 +1546,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1622,7 +1604,7 @@ describe("ChatRoomPage", () => {
 
   it("group chat: performs a single initial scroll to bottom when unread messages are absent", async () => {
     chatRoomMock.details = {
-      slug: "g-team",
+      roomId: 4,
       name: "Team",
       kind: "group",
       created: false,
@@ -1637,7 +1619,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="g-team" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="4" initialRoomKind="group" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1672,7 +1654,7 @@ describe("ChatRoomPage", () => {
 
   it("group chat: does not jump to bottom while positioning to first unread on enter", async () => {
     chatRoomMock.details = {
-      slug: "g-team",
+      roomId: 4,
       name: "Team",
       kind: "group",
       created: false,
@@ -1687,7 +1669,7 @@ describe("ChatRoomPage", () => {
     ];
 
     const { container } = render(
-      <ChatRoomPage slug="g-team" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="4" initialRoomKind="group" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1738,7 +1720,7 @@ describe("ChatRoomPage", () => {
 
   it("group chat: ignores non-user scroll events for loadMore on enter", async () => {
     chatRoomMock.details = {
-      slug: "g-team",
+      roomId: 4,
       name: "Team",
       kind: "group",
       created: false,
@@ -1755,7 +1737,7 @@ describe("ChatRoomPage", () => {
     chatRoomMock.loadingMore = false;
 
     const { container } = render(
-      <ChatRoomPage slug="g-team" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="4" initialRoomKind="group" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1797,8 +1779,7 @@ describe("ChatRoomPage", () => {
 
   it("flushes pending read with sendBeacon on pagehide", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "DM",
       kind: "direct",
       created: false,
@@ -1806,7 +1787,7 @@ describe("ChatRoomPage", () => {
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [];
-    window.sessionStorage.setItem("chat.pendingRead.dm_1", "5");
+    window.sessionStorage.setItem("chat.pendingRead.2", "5");
 
     const sendBeaconSpy = vi.fn().mockReturnValue(true);
     Object.defineProperty(window.navigator, "sendBeacon", {
@@ -1814,7 +1795,7 @@ describe("ChatRoomPage", () => {
       value: sendBeaconSpy,
     });
 
-    render(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
 
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 260));
@@ -1829,15 +1810,14 @@ describe("ChatRoomPage", () => {
       string,
       FormData,
     ];
-    expect(url).toBe("/api/chat/rooms/1/read/");
+    expect(url).toBe("/api/chat/2/read/");
     expect(payload).toBeInstanceOf(FormData);
     expect(payload.get("lastReadMessageId")).toBe("5");
   });
 
   it("falls back to fetch keepalive when sendBeacon is unavailable", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "DM",
       kind: "direct",
       created: false,
@@ -1845,7 +1825,7 @@ describe("ChatRoomPage", () => {
       lastReadMessageId: 0,
     } as RoomDetails;
     chatRoomMock.messages = [];
-    window.sessionStorage.setItem("chat.pendingRead.dm_1", "6");
+    window.sessionStorage.setItem("chat.pendingRead.2", "6");
 
     const sendBeaconSpy = vi.fn().mockReturnValue(false);
     Object.defineProperty(window.navigator, "sendBeacon", {
@@ -1867,7 +1847,7 @@ describe("ChatRoomPage", () => {
       value: "hidden",
     });
 
-    render(<ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />);
+    render(<ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />);
 
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 260));
@@ -1879,7 +1859,7 @@ describe("ChatRoomPage", () => {
 
     expect(sendBeaconSpy).toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/chat/rooms/1/read/",
+      "/api/chat/2/read/",
       expect.objectContaining({
         method: "POST",
         keepalive: true,
@@ -1899,7 +1879,7 @@ describe("ChatRoomPage", () => {
 
   it("smoothly scrolls to bottom after sending own message", () => {
     const { container } = render(
-      <ChatRoomPage slug="public" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="1" initialRoomKind="public" user={user} onNavigate={vi.fn()} />,
     );
     const chatLog = container.querySelector(
       '[aria-live="polite"]',
@@ -1928,8 +1908,7 @@ describe("ChatRoomPage", () => {
 
   it("opens direct readers menu for own message with avatar and profile action", async () => {
     chatRoomMock.details = {
-      slug: "dm_1",
-      roomId: 1,
+      roomId: 2,
       name: "dm",
       kind: "direct",
       created: false,
@@ -1965,7 +1944,7 @@ describe("ChatRoomPage", () => {
     });
 
     const { container } = render(
-      <ChatRoomPage slug="dm_1" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="2" initialRoomKind="direct" user={user} onNavigate={vi.fn()} />,
     );
     const article = container.querySelector(
       'article[data-message-id="1"]',
@@ -1975,7 +1954,7 @@ describe("ChatRoomPage", () => {
     fireEvent.click(screen.getByText("Кто прочитал"));
 
     await waitFor(() => {
-      expect(chatControllerMock.getMessageReaders).toHaveBeenCalledWith("1", 1);
+      expect(chatControllerMock.getMessageReaders).toHaveBeenCalledWith("2", 1);
     });
     const readersMenu = screen.getByRole("menu", { name: "Кто прочитал" });
     expect(within(readersMenu).getByText("Alice")).toBeInTheDocument();
@@ -1994,8 +1973,7 @@ describe("ChatRoomPage", () => {
 
   it("opens group readers menu with avatars and profile action", async () => {
     chatRoomMock.details = {
-      slug: "g-team",
-      roomId: 17,
+      roomId: 4,
       name: "Team",
       kind: "group",
       created: false,
@@ -2044,7 +2022,7 @@ describe("ChatRoomPage", () => {
     });
 
     const { container } = render(
-      <ChatRoomPage slug="g-team" user={user} onNavigate={vi.fn()} />,
+      <ChatRoomPage roomId="4" initialRoomKind="group" user={user} onNavigate={vi.fn()} />,
     );
     const article = container.querySelector(
       'article[data-message-id="8"]',
@@ -2054,7 +2032,7 @@ describe("ChatRoomPage", () => {
     fireEvent.click(screen.getByText("Кто прочитал"));
 
     await waitFor(() => {
-      expect(chatControllerMock.getMessageReaders).toHaveBeenCalledWith("17", 8);
+      expect(chatControllerMock.getMessageReaders).toHaveBeenCalledWith("4", 8);
     });
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(

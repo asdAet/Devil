@@ -5,21 +5,22 @@ import { decodeMessageReadersResponse } from "../../dto";
 import { resolveRoomId } from "./resolveRoomId";
 
 /**
- * Выполняет API-запрос для загрузки readers конкретного сообщения.
- * @param apiClient Сконфигурированный HTTP-клиент для выполнения запроса.
- * @param roomId Идентификатор комнаты.
- * @param messageId Идентификатор сообщения.
- * @returns Промис с данными, возвращаемыми этой функцией.
+ * Loads read receipts for a specific message.
+ * @param apiClient Configured HTTP client.
+ * @param roomId Room identifier.
+ * @param messageId Message identifier.
+ * @returns Readers payload.
  */
 export async function getMessageReaders(
   apiClient: AxiosInstance,
   roomId: string,
   messageId: number,
 ): Promise<MessageReadersResult> {
-  const apiRoomRef = await resolveRoomId(apiClient, roomId);
-  const encodedRoomRef = encodeURIComponent(apiRoomRef);
+  const apiRoomId = await resolveRoomId(apiClient, roomId);
+  const encodedRoomId = encodeURIComponent(apiRoomId);
   const response = await apiClient.get<unknown>(
-    `/chat/rooms/${encodedRoomRef}/messages/${messageId}/readers/`,
+    `/chat/${encodedRoomId}/messages/${messageId}/readers/`,
   );
   return decodeMessageReadersResponse(response.data);
 }
+

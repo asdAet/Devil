@@ -1,7 +1,6 @@
 """Unit tests for chat.services business logic."""
 
 from datetime import timedelta
-import tempfile
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -13,6 +12,7 @@ from django.utils import timezone
 
 from chat import services
 from chat.services import MessageForbiddenError, MessageNotFoundError, MessageValidationError
+from chat.tests.media_utils import workspace_media_root
 from messages.models import (
     Message,
     MessageAttachment,
@@ -32,7 +32,6 @@ class ChatServicesTests(TestCase):
         self.peer = User.objects.create_user(username="svc_peer", password="pass12345")
         self.other = User.objects.create_user(username="svc_other", password="pass12345")
         self.room = Room.objects.create(
-            slug="svc-room-1",
             name="Service room",
             kind=Room.Kind.PRIVATE,
             created_by=self.owner,
@@ -103,7 +102,7 @@ class ChatServicesTests(TestCase):
 
     @override_settings(CHAT_ATTACHMENT_DELETE_FILES_ON_MESSAGE_DELETE=True)
     def test_delete_message_deletes_attachment_files_when_enabled(self):
-        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+        with workspace_media_root():
             msg = self._message(user=self.owner)
             attachment = MessageAttachment.objects.create(
                 message=msg,
@@ -133,7 +132,7 @@ class ChatServicesTests(TestCase):
 
     @override_settings(CHAT_ATTACHMENT_DELETE_FILES_ON_MESSAGE_DELETE=False)
     def test_delete_message_keeps_attachment_files_when_delete_disabled(self):
-        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+        with workspace_media_root():
             msg = self._message(user=self.owner)
             attachment = MessageAttachment.objects.create(
                 message=msg,
@@ -159,7 +158,7 @@ class ChatServicesTests(TestCase):
 
     @override_settings(CHAT_ATTACHMENT_DELETE_FILES_ON_MESSAGE_DELETE=True)
     def test_delete_message_logs_storage_errors_and_continues(self):
-        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+        with workspace_media_root():
             msg = self._message(user=self.owner)
             attachment = MessageAttachment.objects.create(
                 message=msg,
@@ -185,7 +184,7 @@ class ChatServicesTests(TestCase):
         CHAT_ATTACHMENT_DELETE_RETRIES=3,
     )
     def test_delete_message_retries_locked_file_delete_on_windows(self):
-        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+        with workspace_media_root():
             msg = self._message(user=self.owner)
             attachment = MessageAttachment.objects.create(
                 message=msg,
@@ -349,7 +348,6 @@ class ChatServicesTests(TestCase):
 
     def test_get_message_readers_returns_direct_read_at_only(self):
         direct_room = Room.objects.create(
-            slug="svc-direct-room",
             name="Service direct",
             kind=Room.Kind.DIRECT,
             direct_pair_key=f"{self.owner.pk}:{self.peer.pk}",
@@ -384,7 +382,6 @@ class ChatServicesTests(TestCase):
 
     def test_get_direct_message_readers_returns_empty_when_receipt_table_is_missing(self):
         direct_room = Room.objects.create(
-            slug="svc-direct-room-missing",
             name="Service direct missing",
             kind=Room.Kind.DIRECT,
             direct_pair_key=f"{self.owner.pk}:{self.peer.pk}",
@@ -410,7 +407,6 @@ class ChatServicesTests(TestCase):
 
     def test_get_unread_counts_returns_only_rooms_with_unread(self):
         second_room = Room.objects.create(
-            slug="svc-room-2",
             name="Second room",
             kind=Room.Kind.PRIVATE,
             created_by=self.owner,

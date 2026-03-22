@@ -1,4 +1,4 @@
-import {
+﻿import {
   type ReactNode,
   useCallback,
   useEffect,
@@ -13,10 +13,12 @@ type Props = {
   trigger: ReactNode;
   children: ReactNode;
   align?: "left" | "right";
+  offset?: number;
   wrapperClassName?: string;
   triggerClassName?: string;
   menuClassName?: string;
   closeOnContentClick?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 const menuStyle: React.CSSProperties = {
@@ -33,30 +35,42 @@ export function Dropdown({
   trigger,
   children,
   align = "left",
+  offset = 4,
   wrapperClassName,
   triggerClassName,
   menuClassName,
   closeOnContentClick = true,
+  onOpenChange,
 }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const handlePointerDown = useCallback((event: Event) => {
-    const target = event.target;
-    if (!(target instanceof Node)) {
-      setOpen(false);
-      return;
-    }
-    if (ref.current && !ref.current.contains(target)) {
-      setOpen(false);
-    }
-  }, []);
+  const handlePointerDown = useCallback(
+    (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        setOpen(false);
+        return;
+      }
+      if (ref.current && !ref.current.contains(target)) {
+        setOpen(false);
+      }
+    },
+    [],
+  );
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      setOpen(false);
-    }
-  }, []);
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,15 +98,23 @@ export function Dropdown({
     <div
       ref={ref}
       className={wrapperClassName}
+      data-open={open ? "true" : "false"}
       style={{ position: "relative", display: "inline-block" }}
     >
-      <div className={triggerClassName} onClick={() => setOpen(!open)}>
+      <div
+        className={triggerClassName}
+        onClick={() => setOpen((prevOpen) => !prevOpen)}
+      >
         {trigger}
       </div>
       {open && (
         <div
           className={menuClassName}
-          style={{ ...menuStyle, [align === "right" ? "right" : "left"]: 0 }}
+          style={{
+            ...menuStyle,
+            marginTop: offset,
+            [align === "right" ? "right" : "left"]: 0,
+          }}
           onClick={closeOnContentClick ? () => setOpen(false) : undefined}
         >
           {children}

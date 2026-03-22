@@ -2,19 +2,20 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   DIRECT_HOME_FALLBACK_PATH,
-  parseDirectRefFromPathname,
   rememberLastDirectRef,
   resolveRememberedDirectPath,
 } from "./directNavigation";
+import { parseChatTargetFromPathname } from "./chatTarget";
 
 describe("directNavigation", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
-  it("parses direct ref from pathname", () => {
-    expect(parseDirectRefFromPathname("/direct/alice")).toBe("alice");
-    expect(parseDirectRefFromPathname("/rooms/public")).toBeNull();
+  it("parses prefixless direct target from pathname", () => {
+    expect(parseChatTargetFromPathname("/@alice")).toBe("@alice");
+    expect(parseChatTargetFromPathname("/public")).toBe("public");
+    expect(parseChatTargetFromPathname("/friends")).toBeNull();
   });
 
   it("prefers active direct pathname", () => {
@@ -22,17 +23,17 @@ describe("directNavigation", () => {
 
     expect(
       resolveRememberedDirectPath({
-        pathname: "/direct/alice",
-        directPeerRefs: ["charlie"],
+        pathname: "/@alice",
+        directPeerRefs: ["@alice", "charlie"],
       }),
-    ).toBe("/direct/alice");
+    ).toBe("/@alice");
   });
 
   it("falls back to stored direct ref and then to friends", () => {
     expect(resolveRememberedDirectPath()).toBe(DIRECT_HOME_FALLBACK_PATH);
 
     rememberLastDirectRef("bob");
-    expect(resolveRememberedDirectPath()).toBe("/direct/bob");
+    expect(resolveRememberedDirectPath()).toBe("/@bob");
   });
 
   it("uses first known inbox peer when storage is empty", () => {
@@ -40,6 +41,6 @@ describe("directNavigation", () => {
       resolveRememberedDirectPath({
         directPeerRefs: ["", null, "alice"],
       }),
-    ).toBe("/direct/alice");
+    ).toBe("/@alice");
   });
 });

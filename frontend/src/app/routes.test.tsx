@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../pages/HomePage", () => ({
   HomePage: () => <div>HOME_PAGE</div>,
@@ -18,14 +18,20 @@ vi.mock("../pages/ProfilePage", () => ({
   ProfilePage: () => <div>PROFILE_PAGE</div>,
 }));
 
+vi.mock("../pages/SettingsPage", () => ({
+  SettingsPage: () => <div>SETTINGS_PAGE</div>,
+}));
+
 vi.mock("../pages/FriendsPage", () => ({
   FriendsPage: () => <div>FRIENDS_PAGE</div>,
 }));
 
-vi.mock("../pages/DirectChatByUsernamePage", () => ({
-  DirectChatByUsernamePage: ({ publicRef }: { publicRef: string }) => (
-    <div>DIRECT_BY_REF_PAGE:{publicRef}</div>
-  ),
+vi.mock("../pages/GroupsPage", () => ({
+  GroupsPage: () => <div>GROUPS_PAGE</div>,
+}));
+
+vi.mock("../pages/InvitePreviewPage", () => ({
+  InvitePreviewPage: ({ code }: { code: string }) => <div>INVITE_PAGE:{code}</div>,
 }));
 
 vi.mock("../pages/UserProfilePage", () => ({
@@ -34,8 +40,14 @@ vi.mock("../pages/UserProfilePage", () => ({
   ),
 }));
 
-vi.mock("../pages/ChatRoomPage", () => ({
-  ChatRoomPage: ({ slug }: { slug: string }) => <div>ROOM_PAGE:{slug}</div>,
+vi.mock("../pages/ChatTargetPage", () => ({
+  ChatTargetPage: ({ target }: { target: string }) => (
+    <div>CHAT_TARGET_PAGE:{target}</div>
+  ),
+}));
+
+vi.mock("../pages/NotFoundPage", () => ({
+  NotFoundPage: () => <div>NOT_FOUND_PAGE</div>,
 }));
 
 import { AppRoutes } from "./routes";
@@ -50,10 +62,6 @@ const handlers = {
 };
 
 describe("AppRoutes", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
   it("renders login route", () => {
     render(
       <MemoryRouter initialEntries={["/login"]}>
@@ -84,9 +92,9 @@ describe("AppRoutes", () => {
     expect(screen.getByText("REGISTER_PAGE")).toBeInTheDocument();
   });
 
-  it("renders direct by ref route", () => {
+  it("renders prefixless direct target route", () => {
     render(
-      <MemoryRouter initialEntries={["/direct/alice"]}>
+      <MemoryRouter initialEntries={["/@alice"]}>
         <AppRoutes
           user={null}
           error={null}
@@ -96,12 +104,27 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("DIRECT_BY_REF_PAGE:alice")).toBeInTheDocument();
+    expect(screen.getByText("CHAT_TARGET_PAGE:@alice")).toBeInTheDocument();
   });
 
-  it("redirects /direct to friends fallback", () => {
+  it("renders public chat route through chat target page", () => {
     render(
-      <MemoryRouter initialEntries={["/direct"]}>
+      <MemoryRouter initialEntries={["/public"]}>
+        <AppRoutes
+          user={null}
+          error={null}
+          passwordRules={[]}
+          googleAuthDisabledReason={null}
+          {...handlers}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("CHAT_TARGET_PAGE:public")).toBeInTheDocument();
+  });
+
+  it("keeps reserved routes above catch-all target route", () => {
+    render(
+      <MemoryRouter initialEntries={["/friends"]}>
         <AppRoutes
           user={null}
           error={null}
@@ -114,37 +137,7 @@ describe("AppRoutes", () => {
     expect(screen.getByText("FRIENDS_PAGE")).toBeInTheDocument();
   });
 
-  it("treats /@username route as invalid and redirects to home", () => {
-    render(
-      <MemoryRouter initialEntries={["/@alice"]}>
-        <AppRoutes
-          user={null}
-          error={null}
-          passwordRules={[]}
-          googleAuthDisabledReason={null}
-          {...handlers}
-        />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("HOME_PAGE")).toBeInTheDocument();
-  });
-
-  it("renders room route for valid slug", () => {
-    render(
-      <MemoryRouter initialEntries={["/rooms/public"]}>
-        <AppRoutes
-          user={null}
-          error={null}
-          passwordRules={[]}
-          googleAuthDisabledReason={null}
-          {...handlers}
-        />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("ROOM_PAGE:public")).toBeInTheDocument();
-  });
-
-  it("normalizes ref route by trimming only one leading @", () => {
+  it("normalizes user profile route by trimming one leading @", () => {
     render(
       <MemoryRouter initialEntries={["/users/%40%40%40%40"]}>
         <AppRoutes
@@ -159,9 +152,9 @@ describe("AppRoutes", () => {
     expect(screen.getByText("USER_PAGE:@@@")).toBeInTheDocument();
   });
 
-  it("redirects invalid room slug to home", () => {
+  it("treats removed legacy /direct route as not found", () => {
     render(
-      <MemoryRouter initialEntries={["/rooms/a"]}>
+      <MemoryRouter initialEntries={["/direct"]}>
         <AppRoutes
           user={null}
           error={null}
@@ -171,6 +164,21 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("HOME_PAGE")).toBeInTheDocument();
+    expect(screen.getByText("NOT_FOUND_PAGE")).toBeInTheDocument();
+  });
+
+  it("renders not found for deep unmatched paths", () => {
+    render(
+      <MemoryRouter initialEntries={["/some/deep/path"]}>
+        <AppRoutes
+          user={null}
+          error={null}
+          passwordRules={[]}
+          googleAuthDisabledReason={null}
+          {...handlers}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("NOT_FOUND_PAGE")).toBeInTheDocument();
   });
 });

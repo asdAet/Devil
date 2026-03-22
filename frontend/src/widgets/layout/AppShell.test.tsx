@@ -13,9 +13,10 @@ const conversationListMock = vi.hoisted(() => ({
   serverItems: [
     {
       key: "public",
-      slug: "public",
+      roomId: 99,
+      roomTarget: "public",
       name: "Public",
-      path: "/rooms/public",
+      path: "/public",
       avatarUrl: null,
       avatarCrop: null,
       unreadCount: 3,
@@ -123,15 +124,31 @@ describe("AppShell mobile navigation", () => {
     setViewport(1280);
   });
 
-  it("opens the mobile drawer and closes it after sidebar navigation", async () => {
+  it("opens the sidebar drawer from the home header button on mobile", () => {
     setViewport(390);
     const { container } = render(
-      <MemoryRouter initialEntries={["/profile"]}>
+      <MemoryRouter initialEntries={["/"]}>
         <ShellHarness />
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByTestId("app-shell-mobile-open"));
+    fireEvent.click(screen.getByTestId("app-shell-mobile-back"));
+
+    expect(screen.getByTestId("route-value")).toHaveTextContent("/");
+    expect(
+      container.querySelector(`.${styles.sidebarPaneMobileOpen}`),
+    ).not.toBeNull();
+  });
+
+  it("opens the mobile drawer from back button on friends and closes it after sidebar navigation", async () => {
+    setViewport(390);
+    const { container } = render(
+      <MemoryRouter initialEntries={["/friends"]}>
+        <ShellHarness />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTestId("app-shell-mobile-back"));
     expect(
       container.querySelector(`.${styles.sidebarPaneMobileOpen}`),
     ).not.toBeNull();
@@ -151,7 +168,7 @@ describe("AppShell mobile navigation", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByTestId("app-shell-mobile-open")).toBeNull();
+    expect(screen.queryByTestId("app-shell-mobile-back")).toBeNull();
     expect(container.querySelector(`.${styles.sidebarBackdrop}`)).toBeNull();
   });
 

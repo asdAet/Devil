@@ -88,7 +88,8 @@ import {
  * Описывает входные props компонента `Props`.
  */
 type Props = {
-  slug: string;
+  roomId: string;
+  initialRoomKind?: "public" | "private" | "direct" | "group" | null;
   user: UserProfile | null;
   onNavigate: (path: string) => void;
 };
@@ -105,7 +106,7 @@ type ReadersMenuState = {
 /**
  * React-компонент ChatRoomPage отвечает за отрисовку и обработку UI-сценария.
  */
-export function ChatRoomPage({ slug, user, onNavigate }: Props) {
+export function ChatRoomPage({ roomId, initialRoomKind = null, user, onNavigate }: Props) {
   const {
     details,
     messages,
@@ -116,18 +117,19 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     loadMore,
     reload,
     setMessages,
-  } = useChatRoom(slug, user);
+  } = useChatRoom(roomId, user, initialRoomKind);
   const location = useLocation();
-  const isPublicRoom = slug === "public";
-  const parsedSlugRoomId = useMemo(() => parseRoomIdRef(slug), [slug]);
+  const resolvedRoomKind = details?.kind ?? initialRoomKind ?? null;
+  const isPublicRoom = resolvedRoomKind === "public";
+  const parsedInitialRoomId = useMemo(() => parseRoomIdRef(roomId), [roomId]);
   const resolvedRoomId = useMemo(() => {
     const fromDetails = parseRoomIdRef(details?.roomId);
-    return fromDetails ?? parsedSlugRoomId;
-  }, [details?.roomId, parsedSlugRoomId]);
+    return fromDetails ?? parsedInitialRoomId;
+  }, [details?.roomId, parsedInitialRoomId]);
   const roomApiRef = useMemo(() => {
     return resolvedRoomId === null ? null : String(resolvedRoomId);
   }, [resolvedRoomId]);
-  const roomIdForRequests = roomApiRef ?? slug;
+  const roomIdForRequests = roomApiRef ?? roomId;
   const isOnline = useOnlineStatus();
   const { open: openInfoPanel } = useInfoPanel();
   const { openDrawer } = useMobileShell();
@@ -137,7 +139,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const maxAttachmentSizeMb = useChatAttachmentMaxSizeMb();
   const maxAttachmentPerMessage = useChatAttachmentMaxPerMessage();
   const isCurrentUserSuperuser = Boolean(user?.isSuperuser);
-  const roomPermissions = useRoomPermissions(user ? slug : null);
+  const roomPermissions = useRoomPermissions(user ? roomIdForRequests : null);
   const {
     loading: permissionsLoading,
     canWrite: canWriteToRoom,
@@ -221,7 +223,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     null,
   );
   const paginationInteractionRef = useRef(false);
-  const pendingReadFlushRef = useRef<number>(readPendingReadFromStorage(slug));
+  const pendingReadFlushRef = useRef<number>(readPendingReadFromStorage(roomId));
   const readersRequestSeqRef = useRef(0);
   const [initialPositioningPhase, setInitialPositioningPhase] =
     useState<InitialPositioningPhase>("pending");
@@ -285,9 +287,9 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       if (normalized < 1) return;
       if (normalized <= pendingReadFlushRef.current) return;
       pendingReadFlushRef.current = normalized;
-      writePendingReadToStorage(slug, normalized);
+      writePendingReadToStorage(roomId, normalized);
     },
-    [slug],
+    [roomId],
   );
 
   const clearPendingRead = useCallback(
@@ -295,9 +297,9 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       const normalized = normalizeReadMessageId(upTo);
       if (normalized < pendingReadFlushRef.current) return;
       pendingReadFlushRef.current = 0;
-      clearPendingReadFromStorage(slug);
+      clearPendingReadFromStorage(roomId);
     },
-    [slug],
+    [roomId],
   );
 
   const effectiveServerLastReadMessageId = Math.max(
@@ -318,7 +320,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     currentActorRef,
     serverLastReadMessageId: effectiveServerLastReadMessageId,
     enabled: Boolean(readStateEnabled && initialPositioningPhase === "settled"),
-    resetKey: slug,
+    resetKey: roomId,
   });
   const localLastReadMessageId = readStateEnabled
     ? trackedLocalLastReadMessageId
@@ -327,7 +329,10 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     ? trackedFirstUnreadMessageId
     : null;
   const localUnreadCount = readStateEnabled ? trackedLocalUnreadCount : 0;
-  const roomDataReady = !loading && (details?.slug === slug || Boolean(error));
+  const roomDataReady =
+    !loading &&
+    ((details?.roomId !== undefined && String(details.roomId) === roomIdForRequests) ||
+      Boolean(error));
 
   const unreadDividerRenderTarget = useMemo(() => {
     if (!roomDataReady && unreadDividerAnchorId === null) {
@@ -462,7 +467,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     uploadAbortRef.current?.abort();
     uploadAbortRef.current = null;
     lastReadSentRef.current = 0;
-    pendingReadFlushRef.current = readPendingReadFromStorage(slug);
+    pendingReadFlushRef.current = readPendingReadFromStorage(roomId);
     readersRequestSeqRef.current += 1;
     if (markReadTimerRef.current !== null) {
       window.clearTimeout(markReadTimerRef.current);
@@ -489,8 +494,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     updateUnreadDividerAnchor(null);
     updateInitialPositioningPhase("pending");
     lastMessageSnapshotRef.current = { count: 0, lastId: null };
-    clearUnreadOverride(slug);
-  }, [slug, updateInitialPositioningPhase, updateUnreadDividerAnchor]);
+    clearUnreadOverride(roomIdForRequests);
+  }, [roomId, roomIdForRequests, updateInitialPositioningPhase, updateUnreadDividerAnchor]);
 
   useEffect(() => {
     return () => {
@@ -505,16 +510,16 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
         window.clearTimeout(programmaticScrollTimerRef.current);
       }
       isProgrammaticScrollRef.current = false;
-      clearUnreadOverride(slug);
+      clearUnreadOverride(roomIdForRequests);
     };
-  }, [slug]);
+  }, [roomIdForRequests]);
 
   useEffect(() => {
     if (headerSearchTimerRef.current !== null) {
       window.clearTimeout(headerSearchTimerRef.current);
       headerSearchTimerRef.current = null;
     }
-  }, [slug]);
+  }, [roomIdForRequests]);
 
   useEffect(() => {
     return () => {
@@ -676,8 +681,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     if (!roomApiRef) return;
 
     persistPendingRead(candidate);
-    const encodedRoomRef = encodeURIComponent(roomApiRef);
-    const url = `/api/chat/rooms/${encodedRoomRef}/read/`;
+    const encodedRoomId = encodeURIComponent(roomApiRef);
+    const url = `/api/chat/${encodedRoomId}/read/`;
     const csrfToken = resolveCsrfToken();
     let beaconSent = false;
 
@@ -795,8 +800,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   }, [details?.kind, resolvedRoomId, setActiveRoom, user]);
 
   useEffect(() => {
-    setUnreadOverride({ roomSlug: slug, unreadCount: localUnreadCount });
-  }, [localUnreadCount, slug]);
+    setUnreadOverride({ roomId: roomIdForRequests, unreadCount: localUnreadCount });
+  }, [localUnreadCount, roomIdForRequests]);
 
   useEffect(() => {
     if (!roomDataReady) return;
@@ -964,7 +969,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
             return;
           }
           const messageId = decoded.message.id;
-          invalidateRoomMessages(slug);
+          invalidateRoomMessages(roomIdForRequests);
           if (details?.kind === "direct") invalidateDirectChats();
 
           setMessages((prev) => {
@@ -1130,7 +1135,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       maxMessageLength,
       readStateEnabled,
       setMessages,
-      slug,
+      roomIdForRequests,
       updateUnreadDividerAnchor,
       currentActorRef,
     ],
@@ -1417,7 +1422,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
       message: cleaned,
       username: currentActorRef,
       profile_pic: user.profileImage,
-      room: slug,
+      room: roomIdForRequests,
     };
     if (replyTo) payload.replyTo = replyTo.id;
 
@@ -1441,7 +1446,6 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     roomIdForRequests,
     send,
     setMessages,
-    slug,
     scrollToBottom,
     status,
     updateUnreadDividerAnchor,
@@ -1658,13 +1662,13 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
 
   const openDirectInfo = useCallback(() => {
     if (!details?.peer?.publicRef && !details?.peer?.username) return;
-    openInfoPanel("direct", slug);
-  }, [details?.peer?.publicRef, details?.peer?.username, openInfoPanel, slug]);
+    openInfoPanel("direct", roomIdForRequests);
+  }, [details?.peer?.publicRef, details?.peer?.username, openInfoPanel, roomIdForRequests]);
 
   const openGroupInfo = useCallback(() => {
     if (details?.kind !== "group") return;
-    openInfoPanel("group", slug);
-  }, [details?.kind, openInfoPanel, slug]);
+    openInfoPanel("group", roomIdForRequests);
+  }, [details?.kind, openInfoPanel, roomIdForRequests]);
 
   const handleJoinGroup = useCallback(async () => {
     if (!user) {
@@ -1674,7 +1678,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     setJoinInProgress(true);
     setRoomError(null);
     try {
-      await groupController.joinGroup(slug);
+      await groupController.joinGroup(roomIdForRequests);
       reload();
       await refreshRoomPermissions();
     } catch (err) {
@@ -1684,7 +1688,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     } finally {
       setJoinInProgress(false);
     }
-  }, [refreshRoomPermissions, reload, slug, user]);
+  }, [refreshRoomPermissions, reload, roomIdForRequests, user]);
 
   const handleMobileOpenClick = useCallback(() => {
     openDrawer();
@@ -1742,7 +1746,7 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
   const roomTitle =
     details?.kind === "direct"
       ? resolveIdentityLabel(details.peer ?? { name: details.name }, details.name)
-      : (details?.name ?? slug);
+      : (details?.name ?? roomIdForRequests);
 
   const groupTypingLabel = useMemo(
     () => formatGroupTypingLabel(details?.kind, activeTypingUsers),
@@ -1934,8 +1938,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
               disabled={details?.kind !== "group"}
               aria-label={
                 details?.kind === "group"
-                  ? "РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РіСЂСѓРїРїРµ"
-                  : "РРЅС„РѕСЂРјР°С†РёСЏ Рѕ С‡Р°С‚Рµ"
+                  ? "Информация о группе"
+                  : "Информация о чате"
               }
             >
               <Avatar
@@ -1991,8 +1995,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 type="button"
                 className={styles.headerIconBtn}
                 onClick={openGroupInfo}
-                aria-label="РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РіСЂСѓРїРїРµ"
-                title="РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РіСЂСѓРїРїРµ"
+                aria-label="Информация о группе"
+                title="Информация о группе"
               >
                 <svg
                   width="18"
@@ -2015,8 +2019,8 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
                 type="button"
                 className={styles.headerIconBtn}
                 onClick={openDirectInfo}
-                aria-label="РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ"
-                title="РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ"
+                aria-label="Информация о пользователе"
+                title="Информация о пользователе"
               >
                 <svg
                   width="18"
@@ -2375,9 +2379,6 @@ export function ChatRoomPage({ slug, user, onNavigate }: Props) {
     </div>
   );
 }
-
-
-
 
 
 

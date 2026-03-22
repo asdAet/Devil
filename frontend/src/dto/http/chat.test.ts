@@ -2,7 +2,6 @@
 
 import {
   decodeDirectChatsResponse,
-  decodeDirectStartResponse,
   decodeMessageReadersResponse,
   decodeRoomMessagesResponse,
 } from "./chat";
@@ -34,30 +33,6 @@ describe("chat HTTP DTO decoders", () => {
     expect(decoded.pagination?.limit).toBe(50);
   });
 
-  it("decodes direct start response", () => {
-    const decoded = decodeDirectStartResponse({
-      roomId: 123,
-      kind: "direct",
-      peer: {
-        publicRef: "bob",
-        username: "bob",
-        profileImage: null,
-        avatarCrop: { x: 0.11, y: 0.22, width: 0.33, height: 0.44 },
-        lastSeen: null,
-      },
-    });
-
-    expect(decoded.peer.username).toBe("bob");
-    expect(decoded.peer.publicRef).toBe("bob");
-    expect(decoded.peer.avatarCrop).toEqual({
-      x: 0.11,
-      y: 0.22,
-      width: 0.33,
-      height: 0.44,
-    });
-    expect(decoded.roomId).toBe(123);
-  });
-
   it("decodes direct chats response", () => {
     const decoded = decodeDirectChatsResponse({
       items: [
@@ -70,7 +45,7 @@ describe("chat HTTP DTO decoders", () => {
       ],
     });
 
-    expect(decoded.items[0]?.slug).toBe("123");
+    expect(decoded.items[0]?.roomId).toBe(123);
     expect(decoded.items[0]?.peer.publicRef).toBe("bob");
   });
 

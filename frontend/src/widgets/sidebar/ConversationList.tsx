@@ -1,4 +1,4 @@
-﻿import { useCallback } from "react";
+import { useCallback } from "react";
 import { useLocation } from "react-router-dom";
 
 import {
@@ -11,6 +11,10 @@ import {
   formatPublicRef,
 } from "../../shared/lib/publicRef";
 import {
+  buildChatTargetPath,
+  buildPublicChatPath,
+} from "../../shared/lib/chatTarget";
+import {
   resolveIdentityHandle,
   resolveIdentityLabel,
 } from "../../shared/lib/userIdentity";
@@ -18,9 +22,6 @@ import { Avatar, EmptyState, Spinner } from "../../shared/ui";
 import styles from "../../styles/sidebar/ConversationList.module.css";
 import { ConversationListItem } from "./ConversationListItem";
 
-/**
- * Описывает входные props компонента `Props`.
- */
 type Props = {
   onNavigate: (path: string) => void;
 };
@@ -31,9 +32,6 @@ const TAB_LABELS: { key: FilterTab; label: string }[] = [
   { key: "groups", label: "Группы" },
 ];
 
-/**
- * React-компонент ConversationList отвечает за отрисовку и обработку UI-сценария.
- */
 export function ConversationList({ onNavigate }: Props) {
   const {
     items,
@@ -50,14 +48,33 @@ export function ConversationList({ onNavigate }: Props) {
   const getItemPath = useCallback(
     (item: {
       type: string;
-      slug: string;
+      roomTarget: string;
       name: string;
       directRef?: string;
     }) => {
       if (item.type === "direct") {
         return buildDirectPath(item.directRef ?? item.name);
       }
-      return `/rooms/${encodeURIComponent(item.slug)}`;
+      if (item.type === "room") {
+        return buildPublicChatPath();
+      }
+      return buildChatTargetPath(item.roomTarget);
+    },
+    [],
+  );
+
+  const getSearchMessagePath = useCallback(
+    (message: {
+      roomKind?: string | null;
+      roomTarget?: string | null;
+      id: number;
+    }) => {
+      const roomPath = message.roomTarget
+        ? buildChatTargetPath(message.roomTarget)
+        : message.roomKind === "public"
+          ? buildPublicChatPath()
+          : "/friends";
+      return `${roomPath}?message=${message.id}`;
     },
     [],
   );
@@ -65,7 +82,7 @@ export function ConversationList({ onNavigate }: Props) {
   const isItemActive = useCallback(
     (item: {
       type: string;
-      slug: string;
+      roomTarget: string;
       name: string;
       directRef?: string;
     }) => {
@@ -116,7 +133,7 @@ export function ConversationList({ onNavigate }: Props) {
           {!globalLoading && !hasGlobalResults && (
             <EmptyState
               title="Ничего не найдено"
-              description="Измените запрос и попробуйте снова"
+              description="Попробуйте другой запрос или уточните имя."
             />
           )}
 
@@ -132,9 +149,7 @@ export function ConversationList({ onNavigate }: Props) {
                     key={`u-${user.publicRef}`}
                     type="button"
                     className={styles.globalItem}
-                    onClick={() =>
-                      onNavigate(buildUserProfilePath(user.publicRef))
-                    }
+                    onClick={() => onNavigate(buildUserProfilePath(user.publicRef))}
                   >
                     <Avatar
                       username={displayName}
@@ -160,11 +175,7 @@ export function ConversationList({ onNavigate }: Props) {
                   key={`g-${group.roomId}`}
                   type="button"
                   className={styles.globalItem}
-                  onClick={() =>
-                    onNavigate(
-                      `/rooms/${encodeURIComponent(String(group.roomId))}`,
-                    )
-                  }
+                  onClick={() => onNavigate(buildChatTargetPath(group.roomTarget))}
                 >
                   <Avatar username={group.name} size="tiny" />
                   <div className={styles.globalMeta}>
@@ -190,11 +201,7 @@ export function ConversationList({ onNavigate }: Props) {
                     key={`m-${message.id}`}
                     type="button"
                     className={styles.globalItem}
-                    onClick={() =>
-                      onNavigate(
-                        `/rooms/${encodeURIComponent(String(message.roomId))}?message=${message.id}`,
-                      )
-                    }
+                    onClick={() => onNavigate(getSearchMessagePath(message))}
                   >
                     <div className={styles.globalMeta}>
                       <span className={styles.globalPrimary}>
@@ -211,23 +218,23 @@ export function ConversationList({ onNavigate }: Props) {
           )}
         </div>
       ) : loading ? (
-        <div
-          style={{ display: "flex", justifyContent: "center", padding: "24px" }}
-        >
+        <div style={{ display: "flex", justifyContent: "center", padding: "24px" }}>
           <Spinner size="md" />
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          title={searchQuery ? "Ничего не найдено" : "Нет бесед"}
+          title={searchQuery ? "Ничего не найдено" : "Нет чатов"}
           description={
-            searchQuery ? "Попробуйте другой запрос" : "Начните новый диалог"
+            searchQuery
+              ? "Попробуйте другой запрос."
+              : "Откройте публичный чат или начните новый диалог."
           }
         />
       ) : (
         <div className={styles.list}>
           {items.map((item) => (
             <ConversationListItem
-              key={`${item.type}-${item.slug}`}
+              key={`${item.type}-${item.roomId ?? item.roomTarget}`}
               item={item}
               isActive={isItemActive(item)}
               onClick={() => onNavigate(getItemPath(item))}

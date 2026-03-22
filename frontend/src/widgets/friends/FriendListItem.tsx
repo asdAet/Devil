@@ -1,4 +1,7 @@
+﻿import { useState } from "react";
+
 import type { Friend } from "../../entities/friend/types";
+import { formatRegistrationDate } from "../../shared/lib/format";
 import { resolveIdentityLabel } from "../../shared/lib/userIdentity";
 import { Avatar, Dropdown } from "../../shared/ui";
 import styles from "../../styles/friends/FriendListItem.module.css";
@@ -44,11 +47,23 @@ export function FriendListItem({
   onRemove,
   onBlock,
 }: Props) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const peerRef = friend.publicRef;
   const displayName = resolveIdentityLabel(friend);
+  const lastSeenLabel = formatRegistrationDate(friend.lastSeen);
+  // Keep the human-readable last online timestamp instead of a generic offline label.
+  const statusLabel = isOnline
+    ? "В сети"
+    : lastSeenLabel
+      ? `Последний раз в сети: ${lastSeenLabel}`
+      : "Был(а) в сети давно";
 
   return (
-    <div className={styles.item}>
+    <div
+      className={[styles.item, isMenuOpen ? styles.itemMenuOpen : ""]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <Avatar
         username={displayName}
         profileImage={friend.profileImage}
@@ -59,11 +74,13 @@ export function FriendListItem({
       />
       <div className={styles.itemInfo}>
         <div className={styles.itemName}>{displayName}</div>
-        <div className={styles.itemMeta}>{isOnline ? "В сети" : "Не в сети"}</div>
+        <div className={styles.itemMeta}>{statusLabel}</div>
       </div>
       <div className={styles.itemActions}>
         <Dropdown
           align="right"
+          offset={-6}
+          onOpenChange={setIsMenuOpen}
           wrapperClassName={styles.actionMenuWrap}
           menuClassName={styles.actionMenu}
           trigger={
@@ -71,6 +88,7 @@ export function FriendListItem({
               type="button"
               className={styles.actionMenuTrigger}
               aria-label={`Действия для ${displayName}`}
+              aria-expanded={isMenuOpen}
             >
               <IconMore />
             </button>
@@ -95,7 +113,7 @@ export function FriendListItem({
             className={[styles.actionMenuItem, styles.actionMenuItemDanger].join(" ")}
             onClick={() => onBlock(peerRef)}
           >
-            Блок
+            Заблокировать
           </button>
         </Dropdown>
       </div>

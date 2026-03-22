@@ -35,18 +35,31 @@
 
 .mobileCloseButton {
   display: none;
-  position: absolute;
-  top: calc(var(--safe-top, 0px) + 10px);
-  right: calc(var(--safe-right, 0px) + 10px);
-  z-index: 6;
-  width: var(--touch-target-min, 44px);
-  height: var(--touch-target-min, 44px);
-  border: 0;
-  border-radius: 14px;
-  background: rgba(30, 31, 34, 0.94);
-  color: var(--text-main);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-soft);
   cursor: pointer;
+  transition: background var(--tg-transition-fast, 150ms),
+    border-color var(--tg-transition-fast, 150ms),
+    color var(--tg-transition-fast, 150ms);
+}
+
+.mobileCloseButton svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.mobileCloseButton:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: #191a1d;
+  color: var(--text-main);
 }
 
 .guildsSidebar {
@@ -208,19 +221,25 @@
 
 .sidebarSearch {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-sidebar);
 }
 
 .searchInput {
+  flex: 1 1 auto;
   width: 100%;
+  min-width: 0;
   height: 40px;
   border: 0;
   border-radius: 10px;
   background: var(--bg-input);
   color: var(--text-main);
   padding: 0 14px;
+  box-sizing: border-box;
   font-size: 14px;
 }
 
@@ -502,10 +521,6 @@
     padding: calc(var(--safe-top, 0px) + 10px) 10px 10px;
   }
 
-  .sidebarMobileDrawer .sidebarSearch {
-    padding-right: 62px;
-  }
-
   .searchInput {
     font-size: 16px;
   }
@@ -541,10 +556,6 @@
 
   .sidebarSearch {
     padding: calc(var(--safe-top, 0px) + 8px) 8px 8px;
-  }
-
-  .sidebarMobileDrawer .sidebarSearch {
-    padding-right: 56px;
   }
 
   .authButtons {

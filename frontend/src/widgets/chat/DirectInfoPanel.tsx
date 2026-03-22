@@ -16,7 +16,7 @@ import styles from "../../styles/chat/DirectInfoPanel.module.css";
  * Описывает входные props компонента `Props`.
  */
 type Props = {
-  slug: string;
+  roomId: string;
 };
 
 /**
@@ -149,7 +149,7 @@ function AttachmentCard({ item }: { item: RoomAttachmentItem }) {
 /**
  * React-компонент DirectInfoPanel отвечает за отрисовку и обработку UI-сценария.
  */
-export function DirectInfoPanel({ slug }: Props) {
+export function DirectInfoPanel({ roomId }: Props) {
   const [tab, setTab] = useState<Tab>("profile");
   const [details, setDetails] = useState<RoomDetails | null>(null);
   const [attachments, setAttachments] = useState<RoomAttachmentItem[]>([]);
@@ -162,8 +162,8 @@ export function DirectInfoPanel({ slug }: Props) {
     setLoading(true);
     try {
       const [room, files] = await Promise.all([
-        chatController.getRoomDetails(slug),
-        chatController.getRoomAttachments(slug, { limit: 60 }),
+        chatController.getRoomDetails(roomId),
+        chatController.getRoomAttachments(roomId, { limit: 60 }),
       ]);
       setDetails(room);
       setAttachments(files.items);
@@ -177,7 +177,7 @@ export function DirectInfoPanel({ slug }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [roomId]);
 
   useEffect(() => {
     void loadInitial();
@@ -187,7 +187,7 @@ export function DirectInfoPanel({ slug }: Props) {
     if (!hasMore || !nextBefore || loadingMore) return;
     setLoadingMore(true);
     try {
-      const files = await chatController.getRoomAttachments(slug, {
+      const files = await chatController.getRoomAttachments(roomId, {
         limit: 60,
         before: nextBefore,
       });
@@ -199,7 +199,7 @@ export function DirectInfoPanel({ slug }: Props) {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, nextBefore, slug]);
+  }, [hasMore, loadingMore, nextBefore, roomId]);
 
   const peer = details?.peer ?? null;
   const attachmentItems = useMemo(() => attachments, [attachments]);

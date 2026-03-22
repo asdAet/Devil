@@ -1,4 +1,6 @@
-.item {
+﻿.item {
+  position: relative;
+  z-index: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -8,6 +10,11 @@
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.02);
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.itemMenuOpen {
+  /* Raise the active row so its menu can cover neighboring action buttons. */
+  z-index: 6;
 }
 
 .item:hover {
@@ -44,6 +51,7 @@
 }
 
 .actionMenuWrap {
+  position: relative;
   margin-left: auto;
 }
 
@@ -68,6 +76,7 @@
 }
 
 .actionMenu {
+  z-index: 8;
   min-width: 180px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
