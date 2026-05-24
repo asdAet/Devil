@@ -89,7 +89,6 @@ export function SecuritySettingsSection({ enabled }: Props) {
       <header className={styles.sectionHeader}>
         <div>
           <h2>Безопасность</h2>
-          <p>Пароль и двухфакторная аутентификация.</p>
         </div>
       </header>
 

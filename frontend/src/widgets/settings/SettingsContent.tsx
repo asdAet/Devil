@@ -39,7 +39,7 @@ type Props = {
   showTitle?: boolean;
 };
 
-type NotificationKey = "sound" | "comments" | "replies" | "likes" | "mentions";
+type NotificationKey = "sound" | "replies" | "likes" | "mentions";
 
 const notificationRows: Array<{
   key: NotificationKey;
@@ -49,32 +49,26 @@ const notificationRows: Array<{
 }> = [
   {
     key: "sound",
-    title: "Звук при новом уведомлении",
-    description: "Короткий сигнал, когда счетчик непрочитанных растет.",
+    title: "Уведомление личных сообщений",
+    description: "Короткий звук, когда вам приходит новое личное сообщение.",
     icon: "sound",
   },
   {
-    key: "comments",
-    title: "Комментарии к моим постам",
-    description: "Ответы под твоими работами и публикациями.",
-    icon: "comment",
-  },
-  {
     key: "replies",
-    title: "Ответы на мои комментарии",
-    description: "Когда кто-то отвечает в ветке, где ты писал.",
+    title: "Ответы на мои сообщения",
+    description: "Когда кто-то отвечает на ваше сообщение.",
     icon: "reply",
   },
   {
     key: "likes",
-    title: "Лайки в галерее",
-    description: "Кто поставил лайк твоему скриншоту.",
+    title: "Реакции на мои сообщения",
+    description: "Кто поставил реакцию вашему сообщению.",
     icon: "heart",
   },
   {
     key: "mentions",
     title: "Упоминания",
-    description: "Когда вас упоминают через @ник в комментариях или галерее.",
+    description: "Когда вас упоминают через @ник",
     icon: "mention",
   },
 ];
@@ -217,7 +211,6 @@ export function SettingsContent({
     sound:
       typeof Notification !== "undefined" &&
       Notification.permission === "granted",
-    comments: true,
     replies: true,
     likes: true,
     mentions: true,
@@ -513,17 +506,13 @@ export function SettingsContent({
         </form>
       </section>
 
-      <section className={styles.section}>
+      <section className={styles.section} style={{ display: 'none' }}>
         <header className={styles.sectionHeader}>
           <span className={styles.sectionIcon}>
             <BellIcon />
           </span>
           <h2>Уведомления</h2>
         </header>
-        <p className={styles.sectionLead}>
-          Сохраняются в аккаунте, одинаково на всех устройствах и браузерах.
-          Звук в колокольчике подстраивается под эти настройки.
-        </p>
 
         <div className={styles.settingsList}>
           {notificationRows.map((row) => (
