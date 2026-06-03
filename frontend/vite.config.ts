@@ -29,6 +29,73 @@ const toWsOrigin = (httpOrigin: string) => {
   return url.origin;
 };
 
+const normalizeAssetBase = (value: string | undefined) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "/";
+  }
+
+  return raw.endsWith("/") ? raw : `${raw}/`;
+};
+
+const toKebabChunkName = (value: string) =>
+  value
+    .replace(/\.[^.]+$/, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+const getManualChunk = (id: string) => {
+  const normalizedId = id.replaceAll("\\", "/");
+
+  if (normalizedId.includes("/node_modules/react-router-dom/")) {
+    return "vendor-router";
+  }
+  if (
+    normalizedId.includes("/node_modules/react/") ||
+    normalizedId.includes("/node_modules/react-dom/")
+  ) {
+    return "vendor-react";
+  }
+  if (
+    normalizedId.includes("/node_modules/lottie-web/") ||
+    normalizedId.includes("/node_modules/fflate/") ||
+    normalizedId.includes("/node_modules/react-easy-crop/")
+  ) {
+    return "vendor-media";
+  }
+  if (
+    normalizedId.includes("/node_modules/axios/") ||
+    normalizedId.includes("/node_modules/zod/")
+  ) {
+    return "vendor-api";
+  }
+
+  const pageMatch = normalizedId.match(/\/src\/pages\/([^/]+Page)\.tsx$/);
+  if (pageMatch?.[1]) {
+    return `page-${toKebabChunkName(pageMatch[1])}`;
+  }
+
+  return undefined;
+};
+
+const getAssetFileName = (assetName: string | undefined) => {
+  if (/\.(?:tgs|webp|webm)$/i.test(assetName ?? "")) {
+    return "assets/custom-emoji/[name]-[hash][extname]";
+  }
+
+  if (/\.(?:png|jpe?g|gif|svg|avif)$/i.test(assetName ?? "")) {
+    return "assets/images/[name]-[hash][extname]";
+  }
+
+  if (/\.(?:woff2?|ttf|otf)$/i.test(assetName ?? "")) {
+    return "assets/fonts/[name]-[hash][extname]";
+  }
+
+  return "assets/[name]-[hash][extname]";
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const enablePwa = String(env.VITE_ENABLE_PWA ?? "").trim() === "1";
@@ -40,6 +107,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     assetsInclude: customEmojiAssetPatterns,
+    base: normalizeAssetBase(env.VITE_ASSET_BASE_URL),
+    build: {
+      rollupOptions: {
+        output: {
+          assetFileNames: (assetInfo) => getAssetFileName(assetInfo.name),
+          chunkFileNames: "assets/chunks/[name]-[hash].js",
+          entryFileNames: "assets/entry/[name]-[hash].js",
+          manualChunks: getManualChunk,
+        },
+      },
+    },
     plugins: [
       react({
         babel: {

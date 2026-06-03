@@ -60,7 +60,7 @@ const handlers = {
 };
 
 describe("AppRoutes", () => {
-  it("renders login route", () => {
+  it("renders login route", async () => {
     render(
       <MemoryRouter initialEntries={["/login"]}>
         <AppRoutes
@@ -71,10 +71,10 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("LOGIN_PAGE")).toBeInTheDocument();
+    expect(await screen.findByText("LOGIN_PAGE")).toBeInTheDocument();
   });
 
-  it("renders register route", () => {
+  it("renders register route", async () => {
     render(
       <MemoryRouter initialEntries={["/register"]}>
         <AppRoutes
@@ -85,10 +85,10 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("REGISTER_PAGE")).toBeInTheDocument();
+    expect(await screen.findByText("REGISTER_PAGE")).toBeInTheDocument();
   });
 
-  it("renders prefixless direct target route", () => {
+  it("renders prefixless direct target route", async () => {
     render(
       <MemoryRouter initialEntries={["/@alice"]}>
         <AppRoutes
@@ -99,10 +99,12 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("CHAT_TARGET_PAGE:@alice")).toBeInTheDocument();
+    expect(
+      await screen.findByText("CHAT_TARGET_PAGE:@alice"),
+    ).toBeInTheDocument();
   });
 
-  it("renders public chat route through chat target page", () => {
+  it("renders public chat route through chat target page", async () => {
     render(
       <MemoryRouter initialEntries={["/public"]}>
         <AppRoutes
@@ -113,10 +115,12 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("CHAT_TARGET_PAGE:public")).toBeInTheDocument();
+    expect(
+      await screen.findByText("CHAT_TARGET_PAGE:public"),
+    ).toBeInTheDocument();
   });
 
-  it("keeps reserved routes above catch-all target route", () => {
+  it("keeps reserved routes above catch-all target route", async () => {
     render(
       <MemoryRouter initialEntries={["/friends"]}>
         <AppRoutes
@@ -127,10 +131,10 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("FRIENDS_PAGE")).toBeInTheDocument();
+    expect(await screen.findByText("FRIENDS_PAGE")).toBeInTheDocument();
   });
 
-  it("renders the dedicated settings route", () => {
+  it("renders the dedicated settings route", async () => {
     render(
       <MemoryRouter initialEntries={["/settings"]}>
         <AppRoutes
@@ -141,10 +145,10 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("SETTINGS_PAGE")).toBeInTheDocument();
+    expect(await screen.findByText("SETTINGS_PAGE")).toBeInTheDocument();
   });
 
-  it("normalizes user profile route by trimming one leading @", () => {
+  it("normalizes user profile route by trimming one leading @", async () => {
     render(
       <MemoryRouter initialEntries={["/users/%40%40%40%40"]}>
         <AppRoutes
@@ -155,10 +159,10 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("USER_PAGE:@@@")).toBeInTheDocument();
+    expect(await screen.findByText("USER_PAGE:@@@")).toBeInTheDocument();
   });
 
-  it("keeps reserved /direct route out of chat resolution", () => {
+  it("keeps reserved /direct route out of chat resolution", async () => {
     render(
       <MemoryRouter initialEntries={["/direct"]}>
         <AppRoutes
@@ -169,10 +173,10 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("NOT_FOUND_PAGE")).toBeInTheDocument();
+    expect(await screen.findByText("NOT_FOUND_PAGE")).toBeInTheDocument();
   });
 
-  it("renders not found for deep unmatched paths", () => {
+  it("renders not found for deep unmatched paths", async () => {
     render(
       <MemoryRouter initialEntries={["/some/deep/path"]}>
         <AppRoutes
@@ -183,6 +187,6 @@ describe("AppRoutes", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText("NOT_FOUND_PAGE")).toBeInTheDocument();
+    expect(await screen.findByText("NOT_FOUND_PAGE")).toBeInTheDocument();
   });
 });

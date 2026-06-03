@@ -1,9 +1,8 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 import { usePasswordRules } from "../hooks/usePasswordRules";
-import { HomePage } from "../pages/HomePage";
 import type { ApiError } from "../shared/api/types";
 import type { AvatarCrop } from "../shared/api/users";
 import { startGoogleAuthRedirect } from "../shared/auth/googleRedirect";
@@ -29,6 +28,8 @@ import { WsAuthProvider } from "../shared/wsAuth";
 import appStyles from "../styles/app/AppAuthPage.module.css";
 import { LoginTwoFactorModal } from "../widgets/auth/LoginTwoFactorModal";
 import { AppShell } from "../widgets/layout/AppShell";
+import { HomePage } from "./lazyPages";
+import { RouteChunkFallback } from "./RouteChunkFallback";
 import { AppRoutes } from "./routes";
 import { useAuthEntryNavigation } from "./useAuthEntryNavigation";
 
@@ -39,16 +40,15 @@ type SeoDescriptor = {
 };
 
 const DEFAULT_SEO: SeoDescriptor = {
-  title: "Devil — realtime-мессенджер",
-  description:
-    "Devil — мессенджер для личных и групповых чатов с вложениями, ролями, модерацией и realtime-статусами.",
+  title: "Devil",
+  description: "Devil - мессенджер для личных и групповых чатов.",
   robots:
     "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1",
 };
 
 const PRIVATE_ROUTE_SEO: SeoDescriptor = {
-  title: "Devil — личный раздел",
-  description: "Личный раздел пользователя Devil.",
+  title: "Личный раздел",
+  description: "Личный раздел пользователя.",
   robots: "noindex,nofollow",
 };
 
@@ -71,41 +71,40 @@ const MATCHED_ROUTE_SEO: Array<{
   {
     match: (pathname) => pathname === "/friends",
     meta: {
-      title: "Друзья — Devil",
-      description:
-        "Управляйте списком друзей, заявками и личными контактами в Devil.",
+      title: "Друзья",
+      description: "Управляйте списком друзей, заявками и личными контактами.",
       robots: "noindex,nofollow",
     },
   },
   {
     match: (pathname) => pathname === "/groups",
     meta: {
-      title: "Группы — Devil",
-      description: "Создавайте и администрируйте групповые чаты в Devil.",
+      title: "Группы",
+      description: "Создавайте и администрируйте групповые чаты.",
       robots: "noindex,nofollow",
     },
   },
   {
     match: (pathname) => isPrefixlessChatPath(pathname),
     meta: {
-      title: "Чат — Devil",
-      description: "Личные и групповые чаты Devil.",
+      title: "Чат",
+      description: "Личные и групповые чаты.",
       robots: "noindex,nofollow",
     },
   },
   {
     match: (pathname) => pathname.startsWith("/invite/"),
     meta: {
-      title: "Приглашение в группу — Devil",
-      description: "Просмотр приглашения в группу Devil.",
+      title: "Приглашение в группу",
+      description: "Просмотр приглашения в группу.",
       robots: "noindex,nofollow",
     },
   },
   {
     match: (pathname) => pathname.startsWith("/users/"),
     meta: {
-      title: "Профиль пользователя — Devil",
-      description: "Публичный профиль пользователя Devil.",
+      title: "Профиль пользователя",
+      description: "Публичный профиль пользователя.",
       robots: "noindex,nofollow",
     },
   },
@@ -579,10 +578,12 @@ function AppInner() {
   return (
     <>
       {isPromoRoute ? (
-        <HomePage
-          onNavigate={handlePromoNavigate}
-          onLoginNavigate={handlePromoAuthEntryNavigate}
-        />
+        <Suspense fallback={<RouteChunkFallback />}>
+          <HomePage
+            onNavigate={handlePromoNavigate}
+            onLoginNavigate={handlePromoAuthEntryNavigate}
+          />
+        </Suspense>
       ) : (
         <RuntimeConfigProvider>
           <DeviceProvider>

@@ -47,6 +47,7 @@ npm run test:e2e
 ## Конфигурация
 
 - `VITE_ENABLE_PWA=1` включает PWA build integration.
+- `VITE_ASSET_BASE_URL` задает public base URL для hashed JS/CSS/media assets; по умолчанию `/`, для CDN укажите URL/путь с trailing slash.
 - `VITE_BACKEND_ORIGIN` задает HTTP-адрес backend для локального Vite proxy.
 - `VITE_WS_BACKEND_ORIGIN` переопределяет WebSocket origin только в dev; обычно пустой, потому что выводится из `VITE_BACKEND_ORIGIN`.
 - Runtime-лимиты и доступность OAuth загружаются из `GET /api/meta/client-config/`.

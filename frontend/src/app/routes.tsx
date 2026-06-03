@@ -1,17 +1,8 @@
-﻿import { Navigate, Route, Routes, useParams } from "react-router-dom";
+﻿import { Suspense } from "react";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { decodePublicRefParam } from "../dto";
 import type { UserProfile } from "../entities/user/types";
-import { ChatTargetPage } from "../pages/ChatTargetPage";
-import { FriendsPage } from "../pages/FriendsPage";
-import { GroupsPage } from "../pages/GroupsPage";
-import { HomePage } from "../pages/HomePage";
-import { InvitePreviewPage } from "../pages/InvitePreviewPage";
-import { LoginPage } from "../pages/LoginPage";
-import { NotFoundPage } from "../pages/NotFoundPage";
-import { RegisterPage } from "../pages/RegisterPage";
-import { SettingsPage } from "../pages/SettingsPage";
-import { UserProfilePage } from "../pages/UserProfilePage";
 import type { AvatarCrop } from "../shared/api/users";
 import {
   isReservedChatTarget,
@@ -21,6 +12,19 @@ import {
   buildUserProfilePath,
   normalizePublicRef,
 } from "../shared/lib/publicRef";
+import {
+  ChatTargetPage,
+  FriendsPage,
+  GroupsPage,
+  HomePage,
+  InvitePreviewPage,
+  LoginPage,
+  NotFoundPage,
+  RegisterPage,
+  SettingsPage,
+  UserProfilePage,
+} from "./lazyPages";
+import { RouteChunkFallback } from "./RouteChunkFallback";
 
 type ProfileFieldErrors = Record<string, string[]>;
 type ProfileSaveResult =
@@ -157,66 +161,68 @@ export function AppRoutes({
   onProfileSave,
 }: AppRoutesProps) {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage onNavigate={onNavigate} />} />
-      <Route
-        path="/login"
-        element={
-          <LoginPage
-            onSubmit={onLogin}
-            onGoogleAuth={onGoogleOAuth}
-            onNavigate={onNavigate}
-            googleAuthDisabledReason={googleAuthDisabledReason}
-          />
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <RegisterPage
-            onSubmit={onRegister}
-            onGoogleAuth={onGoogleOAuth}
-            googleAuthDisabledReason={googleAuthDisabledReason}
-            onNavigate={onNavigate}
-            passwordRules={passwordRules}
-          />
-        }
-      />
-      <Route
-        path="/profile"
-        element={<OwnProfileRoute user={user} onNavigate={onNavigate} />}
-      />
-      <Route
-        path="/settings"
-        element={<SettingsPage user={user} onProfileSave={onProfileSave} />}
-      />
-      <Route
-        path="/friends"
-        element={<FriendsPage user={user} onNavigate={onNavigate} />}
-      />
-      <Route
-        path="/groups"
-        element={<GroupsPage user={user} onNavigate={onNavigate} />}
-      />
-      <Route
-        path="/invite/:code"
-        element={<InviteRoute onNavigate={onNavigate} />}
-      />
-      <Route
-        path="/users/:ref"
-        element={
-          <UserProfileRoute
-            user={user}
-            onNavigate={onNavigate}
-            onLogout={onLogout}
-          />
-        }
-      />
-      <Route
-        path="/:target"
-        element={<ChatTargetRoute user={user} onNavigate={onNavigate} />}
-      />
-      <Route path="*" element={<NotFoundPage onNavigate={onNavigate} />} />
-    </Routes>
+    <Suspense fallback={<RouteChunkFallback />}>
+      <Routes>
+        <Route path="/" element={<HomePage onNavigate={onNavigate} />} />
+        <Route
+          path="/login"
+          element={
+            <LoginPage
+              onSubmit={onLogin}
+              onGoogleAuth={onGoogleOAuth}
+              onNavigate={onNavigate}
+              googleAuthDisabledReason={googleAuthDisabledReason}
+            />
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <RegisterPage
+              onSubmit={onRegister}
+              onGoogleAuth={onGoogleOAuth}
+              googleAuthDisabledReason={googleAuthDisabledReason}
+              onNavigate={onNavigate}
+              passwordRules={passwordRules}
+            />
+          }
+        />
+        <Route
+          path="/profile"
+          element={<OwnProfileRoute user={user} onNavigate={onNavigate} />}
+        />
+        <Route
+          path="/settings"
+          element={<SettingsPage user={user} onProfileSave={onProfileSave} />}
+        />
+        <Route
+          path="/friends"
+          element={<FriendsPage user={user} onNavigate={onNavigate} />}
+        />
+        <Route
+          path="/groups"
+          element={<GroupsPage user={user} onNavigate={onNavigate} />}
+        />
+        <Route
+          path="/invite/:code"
+          element={<InviteRoute onNavigate={onNavigate} />}
+        />
+        <Route
+          path="/users/:ref"
+          element={
+            <UserProfileRoute
+              user={user}
+              onNavigate={onNavigate}
+              onLogout={onLogout}
+            />
+          }
+        />
+        <Route
+          path="/:target"
+          element={<ChatTargetRoute user={user} onNavigate={onNavigate} />}
+        />
+        <Route path="*" element={<NotFoundPage onNavigate={onNavigate} />} />
+      </Routes>
+    </Suspense>
   );
 }
