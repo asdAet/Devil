@@ -5,10 +5,12 @@
   max-width: 260px;
   padding: 6px 0;
   border-radius: 10px;
-  background: var(--tg-bg-surface);
-  border: 1px solid var(--color-border);
+  background: var(--color-menu-bg);
+  border: 1px solid var(--color-menu-border);
   box-shadow: 0 4px 24px var(--color-shadow-medium);
   animation: ctxEnter 120ms ease;
+  backdrop-filter: blur(var(--menu-backdrop-blur)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--menu-backdrop-blur)) saturate(1.15);
 }
 
 @keyframes ctxEnter {
@@ -30,7 +32,7 @@
   padding: 9px 14px;
   border: none;
   background: none;
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
   font-size: 13px;
   cursor: pointer;
   text-align: left;
@@ -38,15 +40,15 @@
 }
 
 .item:hover {
-  background: var(--tg-hover);
+  background: var(--color-surface-hover);
 }
 
 .item:active {
-  background: var(--tg-active);
+  background: var(--color-surface-active);
 }
 
 .danger {
-  color: var(--tg-danger);
+  color: var(--color-danger);
 }
 
 .disabled {
@@ -62,11 +64,11 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .danger .icon {
-  color: var(--tg-danger);
+  color: var(--color-danger);
 }
 
 @media (max-width: 480px) {

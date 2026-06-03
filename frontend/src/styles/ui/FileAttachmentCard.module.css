@@ -11,11 +11,11 @@
   /* border: 1px solid var(--color-border); */
   border-radius: 8px;
   background: transparent;
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
   text-decoration: none;
   transition:
-    background var(--tg-transition-fast, 150ms ease),
-    border-color var(--tg-transition-fast, 150ms ease);
+    background var(--transition-fast, 150ms ease),
+    border-color var(--transition-fast, 150ms ease);
 }
 
 .root:hover {
@@ -56,7 +56,7 @@
 .name {
   min-width: 0;
   overflow: hidden;
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 650;
   line-height: 1.25;
@@ -84,7 +84,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   font-size: 11px;
   line-height: 1.25;
 }
