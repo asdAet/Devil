@@ -233,6 +233,9 @@ class MessageReadState(models.Model):
                 name="read_state_user_room_uniq",
             ),
         ]
+        indexes = [
+            models.Index(fields=["user", "room"], name="read_state_user_room_idx"),
+        ]
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
