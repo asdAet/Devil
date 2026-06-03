@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      DJANGO_SECRET_KEY: "ci-test-secret-key-not-for-production"
     defaults:
       run:
         working-directory: backend
@@ -79,6 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      DJANGO_SECRET_KEY: "ci-test-secret-key-not-for-production"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
