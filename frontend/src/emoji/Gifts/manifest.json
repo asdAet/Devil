@@ -1282,7 +1282,7 @@
     }
   },
   "query": "gifts_emoji_by_gifts_changes_bot",
-  "pack_title": "Telegram Gift Emojis by @GiftChanges",
+  "pack_title": "Gift Emojis",
   "pack_short_name": "gifts_emoji_by_gifts_changes_bot",
   "total_files": 160
 }

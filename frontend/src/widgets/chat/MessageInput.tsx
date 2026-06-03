@@ -35,6 +35,7 @@ import {
 } from "../../shared/customEmoji";
 import { resolveIdentityLabel } from "../../shared/lib/userIdentity";
 import styles from "../../styles/chat/MessageInput.module.css";
+import { LazyCustomEmojiPicker } from "./LazyCustomEmojiPicker";
 import {
   areSameDraftOperations,
   getBeforeInputDraftOperation,
@@ -42,7 +43,6 @@ import {
   type MessageInputDraftOperation,
   supportsBeforeInputEvents,
 } from "./messageInputEvents";
-import { TelegramEmojiPicker } from "./TelegramEmojiPicker";
 import { useFocusPreservingSendButton } from "./useFocusPreservingSendButton";
 
 type Props = {
@@ -186,6 +186,8 @@ const freezeVideoPreviewPlayback = (
 const DEFAULT_PLACEHOLDER = "Сообщение...";
 const CONTROLLED_INPUT_RECONCILE_MS = 250;
 const KEYBOARD_FALLBACK_DEDUPE_MS = 750;
+const CARET_SCROLL_PADDING_PX = 8;
+const CARET_SCROLL_EPSILON_PX = 1;
 
 type DraftSelection = {
   start: number;
@@ -235,6 +237,104 @@ const serializeEditorDraft = (editor: HTMLDivElement): string => {
     : nextDraft;
 };
 
+const isRangeInsideEditor = (editor: HTMLElement, range: Range): boolean => {
+  const { commonAncestorContainer } = range;
+  return (
+    commonAncestorContainer === editor ||
+    editor.contains(commonAncestorContainer)
+  );
+};
+
+const getLastRangeRect = (range: Range): DOMRect | null => {
+  const rects = range.getClientRects();
+  if (rects.length > 0) {
+    return rects[rects.length - 1] ?? null;
+  }
+
+  const rect = range.getBoundingClientRect();
+  return rect.width > 0 || rect.height > 0 ? rect : null;
+};
+
+const getCollapsedCaretRect = (range: Range): DOMRect | null => {
+  const directRect = getLastRangeRect(range);
+  if (directRect) {
+    return directRect;
+  }
+
+  const nearbyRange = range.cloneRange();
+  const { startContainer, startOffset } = range;
+
+  if (startContainer.nodeType === Node.TEXT_NODE && startOffset > 0) {
+    nearbyRange.setStart(startContainer, startOffset - 1);
+    nearbyRange.setEnd(startContainer, startOffset);
+    return getLastRangeRect(nearbyRange);
+  }
+
+  if (startContainer instanceof Element && startOffset > 0) {
+    const previousNode = startContainer.childNodes[startOffset - 1];
+    if (previousNode) {
+      if (previousNode.nodeType === Node.TEXT_NODE) {
+        const previousTextLength = previousNode.textContent?.length ?? 0;
+        if (previousTextLength > 0) {
+          nearbyRange.setStart(previousNode, previousTextLength - 1);
+          nearbyRange.setEnd(previousNode, previousTextLength);
+          return getLastRangeRect(nearbyRange);
+        }
+      }
+
+      nearbyRange.selectNode(previousNode);
+      return getLastRangeRect(nearbyRange);
+    }
+  }
+
+  return null;
+};
+
+const getCaretViewportRect = (editor: HTMLElement): DOMRect | null => {
+  const selection = editor.ownerDocument.defaultView?.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return null;
+  }
+
+  const range = selection.getRangeAt(0);
+  if (!isRangeInsideEditor(editor, range)) {
+    return null;
+  }
+
+  return range.collapsed
+    ? getCollapsedCaretRect(range)
+    : getLastRangeRect(range);
+};
+
+const scrollEditorCaretIntoView = (editor: HTMLElement): void => {
+  if (editor.scrollHeight <= editor.clientHeight) {
+    return;
+  }
+
+  const caretRect = getCaretViewportRect(editor);
+  if (!caretRect) {
+    return;
+  }
+
+  const editorRect = editor.getBoundingClientRect();
+  const visibleTop = editorRect.top + CARET_SCROLL_PADDING_PX;
+  const visibleBottom = editorRect.bottom - CARET_SCROLL_PADDING_PX;
+  let nextScrollTop = editor.scrollTop;
+
+  if (caretRect.top < visibleTop) {
+    nextScrollTop -= visibleTop - caretRect.top;
+  } else if (caretRect.bottom > visibleBottom) {
+    nextScrollTop += caretRect.bottom - visibleBottom;
+  }
+
+  const maxScrollTop = editor.scrollHeight - editor.clientHeight;
+  nextScrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+
+  if (Math.abs(nextScrollTop - editor.scrollTop) > CARET_SCROLL_EPSILON_PX) {
+    editor.scrollTop = nextScrollTop;
+  }
+};
+
 const decorateDraftParts = (parts: DraftPart[]): DecoratedDraftPart[] => {
   let visualCursor = 0;
 
@@ -259,7 +359,9 @@ const renderTextDraftPart = (value: string, keyPrefix: string) =>
 
     if (segment.length > 0) {
       nodes.push(
-        <Fragment key={`${keyPrefix}-text-${segmentIndex}`}>{segment}</Fragment>,
+        <Fragment key={`${keyPrefix}-text-${segmentIndex}`}>
+          {segment}
+        </Fragment>,
       );
     }
 
@@ -305,15 +407,18 @@ export function MessageInput({
   const editorRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const controlledInputRef = useRef<PendingControlledInput | null>(null);
-  const keyboardFallbackOperationRef =
-    useRef<PendingKeyboardOperation | null>(null);
+  const caretScrollFrameRef = useRef<number | null>(null);
+  const keyboardFallbackOperationRef = useRef<PendingKeyboardOperation | null>(
+    null,
+  );
   const pendingSelectionRef = useRef<DraftSelection | null>(null);
   const restoreSelectionRef = useRef(false);
   const focusEditorAfterSyncRef = useRef(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [editorDomVersion, setEditorDomVersion] = useState(0);
-  const [editorSelection, setEditorSelection] =
-    useState<DraftSelection | null>(null);
+  const [editorSelection, setEditorSelection] = useState<DraftSelection | null>(
+    null,
+  );
 
   const uploading = uploadProgress !== null && uploadProgress !== undefined;
   const uploadPercent = uploading
@@ -346,16 +451,42 @@ export function MessageInput({
   const beforeInputSupported = useMemo(() => supportsBeforeInputEvents(), []);
   const draftParts = useMemo(() => parseCustomEmojiText(draft), [draft]);
 
-  const getFallbackSelection = useCallback(
-    () => {
-      const draftLength = getCustomEmojiDraftLength(draft);
-      return {
-        start: draftLength,
-        end: draftLength,
-      };
+  const scheduleCaretScrollIntoView = useCallback(() => {
+    if (typeof window === "undefined" || caretScrollFrameRef.current !== null) {
+      return;
+    }
+
+    caretScrollFrameRef.current = window.requestAnimationFrame(() => {
+      caretScrollFrameRef.current = null;
+
+      const editor = editorRef.current;
+      if (!editor || editor.ownerDocument.activeElement !== editor) {
+        return;
+      }
+
+      scrollEditorCaretIntoView(editor);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (
+        typeof window !== "undefined" &&
+        caretScrollFrameRef.current !== null
+      ) {
+        window.cancelAnimationFrame(caretScrollFrameRef.current);
+      }
     },
-    [draft],
+    [],
   );
+
+  const getFallbackSelection = useCallback(() => {
+    const draftLength = getCustomEmojiDraftLength(draft);
+    return {
+      start: draftLength,
+      end: draftLength,
+    };
+  }, [draft]);
 
   const syncDraftSelection = useCallback(
     (focusEditor: boolean) => {
@@ -377,8 +508,9 @@ export function MessageInput({
       setEditorSelection(selection);
       restoreSelectionRef.current = false;
       focusEditorAfterSyncRef.current = false;
+      scheduleCaretScrollIntoView();
     },
-    [getFallbackSelection],
+    [getFallbackSelection, scheduleCaretScrollIntoView],
   );
 
   const captureEditorSelection = useCallback(() => {
@@ -391,8 +523,9 @@ export function MessageInput({
     pendingSelectionRef.current =
       getCustomEmojiDraftSelection(editor) ?? getFallbackSelection();
     setEditorSelection(pendingSelectionRef.current);
+    scheduleCaretScrollIntoView();
     return pendingSelectionRef.current;
-  }, [getFallbackSelection]);
+  }, [getFallbackSelection, scheduleCaretScrollIntoView]);
 
   const commitDraftChange = useCallback(
     (
@@ -411,10 +544,7 @@ export function MessageInput({
   );
 
   const replaceEditorSelection = useCallback(
-    (
-      insertion: string,
-      focusEditor = true,
-    ): DraftMutationResult => {
+    (insertion: string, focusEditor = true): DraftMutationResult => {
       const selection =
         captureEditorSelection() ??
         pendingSelectionRef.current ??
@@ -451,16 +581,13 @@ export function MessageInput({
     [captureEditorSelection, commitDraftChange, draft, getFallbackSelection],
   );
 
-  const rememberControlledInput = useCallback(
-    (result: DraftMutationResult) => {
-      controlledInputRef.current = {
-        expiresAt: getMonotonicTimestamp() + CONTROLLED_INPUT_RECONCILE_MS,
-        nextSelection: result.nextSelection,
-        nextValue: result.nextValue,
-      };
-    },
-    [],
-  );
+  const rememberControlledInput = useCallback((result: DraftMutationResult) => {
+    controlledInputRef.current = {
+      expiresAt: getMonotonicTimestamp() + CONTROLLED_INPUT_RECONCILE_MS,
+      nextSelection: result.nextSelection,
+      nextValue: result.nextValue,
+    };
+  }, []);
 
   const consumeControlledInput = useCallback(() => {
     const pendingControlledInput = controlledInputRef.current;
@@ -552,13 +679,14 @@ export function MessageInput({
 
       pendingSelectionRef.current = selection;
       setEditorSelection(selection);
+      scheduleCaretScrollIntoView();
     };
 
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, []);
+  }, [scheduleCaretScrollIntoView]);
 
   useEffect(() => {
     if (!beforeInputSupported) {
@@ -676,11 +804,7 @@ export function MessageInput({
   );
 
   const commitSerializedEditorDraft = useCallback(
-    (
-      editor: HTMLDivElement,
-      focusEditor: boolean,
-      repairNativeDom = false,
-    ) => {
+    (editor: HTMLDivElement, focusEditor: boolean, repairNativeDom = false) => {
       const normalizedDraft = serializeEditorDraft(editor);
       const selection =
         getCustomEmojiDraftSelection(editor) ?? getFallbackSelection();
@@ -836,7 +960,9 @@ export function MessageInput({
 
   const handleEditorCopy = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
-      const selectedContent = serializeCustomEmojiSelection(event.currentTarget);
+      const selectedContent = serializeCustomEmojiSelection(
+        event.currentTarget,
+      );
       if (!selectedContent) {
         return;
       }
@@ -854,7 +980,9 @@ export function MessageInput({
       }
 
       const selection = getCustomEmojiDraftSelection(event.currentTarget);
-      const selectedContent = serializeCustomEmojiSelection(event.currentTarget);
+      const selectedContent = serializeCustomEmojiSelection(
+        event.currentTarget,
+      );
       if (!selection || !selectedContent) {
         return;
       }
@@ -920,7 +1048,11 @@ export function MessageInput({
         .join(" ")}
     >
       {rateLimitActive && (
-        <div className={styles.rateLimitBanner} role="status" aria-live="polite">
+        <div
+          className={styles.rateLimitBanner}
+          role="status"
+          aria-live="polite"
+        >
           Йоу, не так быстро, Вы отправляете сообщения слишком быстро!
         </div>
       )}
@@ -940,7 +1072,9 @@ export function MessageInput({
               <div
                 className={[
                   styles.uploadBarFill,
-                  uploadIsIndeterminate ? styles.uploadBarFillIndeterminate : "",
+                  uploadIsIndeterminate
+                    ? styles.uploadBarFillIndeterminate
+                    : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -990,7 +1124,7 @@ export function MessageInput({
       )}
 
       {emojiPickerOpen && customEmojiEnabled && (
-        <TelegramEmojiPicker
+        <LazyCustomEmojiPicker
           onSelect={handleCustomEmojiSelect}
           onClose={() => setEmojiPickerOpen(false)}
         />

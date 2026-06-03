@@ -30,8 +30,8 @@ function createTouchPointerEvent(type: string, pointerId = 1): Event {
   return event;
 }
 
-vi.mock("./TelegramEmojiPicker", () => ({
-  TelegramEmojiPicker: ({
+vi.mock("./CustomEmojiPicker", () => ({
+  CustomEmojiPicker: ({
     onSelect,
   }: {
     onSelect: (emoji: CustomEmoji) => void;
@@ -138,11 +138,13 @@ describe("MessageInput", () => {
     expect(screen.queryByText("VIDEO")).not.toBeInTheDocument();
   });
 
-  it("renders selected custom emoji directly in the rich editor", () => {
+  it("renders selected custom emoji directly in the rich editor", async () => {
     render(<ControlledMessageInput />);
 
     fireEvent.click(screen.getByTestId("chat-emoji-button"));
-    fireEvent.click(screen.getByRole("button", { name: "Pick custom emoji" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pick custom emoji" }),
+    );
 
     expect(screen.getByTestId("draft-value")).toHaveTextContent(
       mockCustomEmoji.token,
@@ -201,12 +203,14 @@ describe("MessageInput", () => {
     expect(editor).toHaveFocus();
   });
 
-  it("keeps the caret after an inserted custom emoji", () => {
+  it("keeps the caret after an inserted custom emoji", async () => {
     render(<ControlledMessageInput />);
 
     const editor = screen.getByTestId("chat-message-input");
     fireEvent.click(screen.getByTestId("chat-emoji-button"));
-    fireEvent.click(screen.getByRole("button", { name: "Pick custom emoji" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pick custom emoji" }),
+    );
     fireEvent.keyDown(editor, { key: "a" });
 
     expect(screen.getByTestId("draft-value").textContent).toBe(
@@ -226,12 +230,14 @@ describe("MessageInput", () => {
     expect(editor.querySelector("br")).toBeTruthy();
   });
 
-  it("renders a visible empty line immediately after Shift+Enter following a custom emoji", () => {
+  it("renders a visible empty line immediately after Shift+Enter following a custom emoji", async () => {
     render(<ControlledMessageInput />);
 
     const editor = screen.getByTestId("chat-message-input");
     fireEvent.click(screen.getByTestId("chat-emoji-button"));
-    fireEvent.click(screen.getByRole("button", { name: "Pick custom emoji" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pick custom emoji" }),
+    );
     fireEvent.keyDown(editor, { key: "Enter", shiftKey: true });
 
     const sentinel = editor.querySelector(
