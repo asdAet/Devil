@@ -2,11 +2,13 @@
   display: flex;
   flex-direction: column;
   height: var(--app-height, 100vh);
-  background: var(--tg-bg-secondary);
+  background: var(--color-page-bg);
   border-left: 1px solid var(--color-border);
   overflow: hidden;
   animation: panelSlideIn 220ms ease;
-  transition: transform 220ms ease, opacity 220ms ease;
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
 }
 
 .panelHidden {
@@ -30,10 +32,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--color-border);
-  background: var(--tg-bg-primary);
+  background: var(--color-app-bg);
+
+  height: calc(var(--safe-top, 0px) + var(--app-shell-top-row-size));
+  padding: calc(var(--safe-top, 0px) + 6px) 8px 6px;
 }
 
 .headerTitle {
@@ -51,14 +55,14 @@
   border-radius: 50%;
   border: none;
   background: none;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .closeBtn:hover {
   background: var(--color-surface-hover);
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
 }
 
 .body {
@@ -80,7 +84,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   font-size: 14px;
   text-align: center;
   gap: 12px;
@@ -97,7 +101,10 @@
     position: fixed;
     top: var(--safe-top, 0px);
     right: var(--safe-right, 0px);
-    width: min(440px, calc(100vw - var(--safe-left, 0px) - var(--safe-right, 0px)));
+    width: min(
+      440px,
+      calc(100vw - var(--safe-left, 0px) - var(--safe-right, 0px))
+    );
     max-width: 92vw;
     height: calc(var(--app-height, 100vh) - var(--safe-top, 0px));
     z-index: 90;

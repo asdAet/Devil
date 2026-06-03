@@ -87,7 +87,7 @@ describe("Sidebar", () => {
     conversationListMock.setSearchQuery.mockReset();
     conversationListMock.refresh.mockReset();
     window.localStorage.clear();
-    document.documentElement.style.removeProperty("--tg-sidebar-w");
+    document.documentElement.style.removeProperty("--app-sidebar-width");
   });
 
   it("navigates to remembered direct when logo button clicked", () => {
@@ -229,7 +229,7 @@ describe("Sidebar", () => {
     fireEvent.mouseUp(window);
 
     expect(
-      document.documentElement.style.getPropertyValue("--tg-sidebar-w"),
+      document.documentElement.style.getPropertyValue("--app-sidebar-width"),
     ).toBe("440px");
     expect(window.localStorage.getItem("ui.sidebar.width")).toBe("440");
   });

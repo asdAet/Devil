@@ -3,17 +3,20 @@
   --app-shell-bottom-row-size: calc(var(--touch-target-min, 44px) + 16px + 1px);
 
   display: grid;
-  grid-template-columns: var(--tg-sidebar-w, 360px) minmax(0, 1fr);
+  grid-template-columns: var(--app-sidebar-width, 360px) minmax(0, 1fr);
   height: var(--app-height, 100vh);
   min-height: var(--app-height, 100vh);
   overflow: hidden;
-  color: var(--tg-text-primary);
-  background: var(--tg-bg-chat);
-  transition: grid-template-columns var(--tg-transition);
+  color: var(--color-text-primary);
+  background: var(--color-chat-bg);
+  transition: grid-template-columns var(--transition);
 }
 
 .shell.withInfoPanel {
-  grid-template-columns: var(--tg-sidebar-w, 360px) minmax(0, 1fr) minmax(0, var(--tg-info-w, 360px));
+  grid-template-columns: var(--app-sidebar-width, 360px) minmax(0, 1fr) minmax(
+      0,
+      var(--app-info-panel-width, 360px)
+    );
 }
 
 .sidebarPane {
@@ -35,7 +38,7 @@
   overflow: hidden;
   min-width: 0;
   position: relative;
-  background: var(--tg-bg-chat);
+  background: var(--color-chat-bg);
 }
 
 .mainInner {
@@ -71,7 +74,9 @@
 @media (max-width: 768px) {
   .shell {
     --app-shell-top-row-size: calc(45px + 12px + 1px);
-    --app-shell-bottom-row-size: calc(var(--touch-target-min, 44px) + 12px + 1px);
+    --app-shell-bottom-row-size: calc(
+      var(--touch-target-min, 44px) + 12px + 1px
+    );
 
     grid-template-columns: 1fr;
     position: relative;
@@ -143,7 +148,7 @@
     border: 0;
     border-radius: 12px;
     background: var(--color-surface-hover);
-    color: var(--tg-text-primary);
+    color: var(--color-text-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -154,7 +159,7 @@
     min-width: 0;
     font-size: 14px;
     font-weight: 700;
-    color: var(--tg-text-primary);
+    color: var(--color-text-primary);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;

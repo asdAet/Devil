@@ -37,7 +37,7 @@ type Props = {
   onCloseMobileDrawer?: () => void;
 };
 
-const SIDEBAR_WIDTH_VAR = "--tg-sidebar-w";
+const SIDEBAR_WIDTH_VAR = "--app-sidebar-width";
 const SIDEBAR_WIDTH_STORAGE_KEY = "ui.sidebar.width";
 const SIDEBAR_DEFAULT_WIDTH = 360;
 const SIDEBAR_MIN_WIDTH = 320;
@@ -369,6 +369,7 @@ export function Sidebar({ user, onNavigate, onCloseMobileDrawer }: Props) {
         <div className={styles.sidebarSearch}>
           <input
             type="text"
+            name="sidebarSearch"
             className={styles.searchInput}
             placeholder="Поиск"
             aria-label="Поиск"

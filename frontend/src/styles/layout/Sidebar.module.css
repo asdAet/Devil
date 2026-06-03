@@ -9,7 +9,7 @@
   --text-main: var(--color-text-primary);
   --text-muted: var(--color-text-secondary);
   --text-soft: var(--color-text-soft);
-  --brand: var(--color-info);
+  --brand: var(--brand-primary);
   --brand-hover: var(--color-info);
   --green: var(--color-success);
   --border: var(--color-border);
@@ -56,9 +56,9 @@
   color: var(--text-soft);
   cursor: pointer;
   transition:
-    background var(--tg-transition-fast, 150ms),
-    border-color var(--tg-transition-fast, 150ms),
-    color var(--tg-transition-fast, 150ms);
+    background var(--transition-fast, 150ms),
+    border-color var(--transition-fast, 150ms),
+    color var(--transition-fast, 150ms);
 }
 
 .mobileCloseButton svg {
@@ -133,9 +133,9 @@
   cursor: pointer;
   isolation: isolate;
   transition:
-    background var(--tg-transition-fast, 150ms),
-    border-radius var(--tg-transition-fast, 150ms),
-    transform var(--tg-transition-fast, 150ms);
+    background var(--transition-fast, 150ms),
+    border-radius var(--transition-fast, 150ms),
+    transform var(--transition-fast, 150ms);
 }
 
 .guildButton:hover {
@@ -354,8 +354,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background var(--tg-transition-fast, 150ms),
-    color var(--tg-transition-fast, 150ms);
+    background var(--transition-fast, 150ms),
+    color var(--transition-fast, 150ms);
 }
 
 .dmLink:hover {
@@ -459,7 +459,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: background var(--tg-transition-fast, 150ms);
+  transition: background var(--transition-fast, 150ms);
 }
 
 .userProfileButton:hover {
@@ -507,8 +507,8 @@
   font-size: 16px;
   line-height: 1;
   transition:
-    background var(--tg-transition-fast, 150ms),
-    color var(--tg-transition-fast, 150ms);
+    background var(--transition-fast, 150ms),
+    color var(--transition-fast, 150ms);
 }
 
 .controlButton:hover {
@@ -555,7 +555,9 @@
 @media (max-width: 768px) {
   .sidebar {
     --header-height: calc(var(--safe-top, 0px) + var(--app-shell-top-row-size));
-    --panel-height: calc(var(--safe-bottom, 0px) + var(--app-shell-bottom-row-size));
+    --panel-height: calc(
+      var(--safe-bottom, 0px) + var(--app-shell-bottom-row-size)
+    );
     --rail-width: 64px;
     border-right: none;
     grid-template-rows: minmax(0, 1fr) var(--panel-height);
