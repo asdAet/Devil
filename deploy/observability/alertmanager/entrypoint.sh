@@ -2,6 +2,20 @@
 set -eu
 
 receiver_name="null"
+telegram_receiver=""
+
+if [ -n "${ALERTMANAGER_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${ALERTMANAGER_TELEGRAM_CHAT_ID:-}" ]; then
+  receiver_name="telegram"
+  telegram_receiver=$(cat <<EOF
+  - name: "telegram"
+    telegram_configs:
+      - bot_token: "${ALERTMANAGER_TELEGRAM_BOT_TOKEN}"
+        chat_id: ${ALERTMANAGER_TELEGRAM_CHAT_ID}
+        send_resolved: true
+        message: '{{ template "telegram.devils.message" . }}'
+EOF
+)
+fi
 
 cat > /etc/alertmanager/alertmanager.yml <<EOF
 global:
@@ -33,6 +47,7 @@ inhibit_rules:
 
 receivers:
   - name: "null"
+${telegram_receiver}
 EOF
 
 exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
