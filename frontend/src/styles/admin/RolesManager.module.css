@@ -13,14 +13,14 @@
 .title {
   font-size: 15px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   flex: 1;
 }
 
 .addBtn {
   background: none;
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 600;
   padding: 4px 12px;
@@ -55,13 +55,13 @@
 .roleName {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   flex: 1;
 }
 
 .roleDefault {
   font-size: 10px;
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   background: var(--color-surface-active);
   border-radius: 4px;
   padding: 1px 6px;
@@ -75,7 +75,7 @@
 .roleActionBtn {
   background: none;
   border: none;
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -84,7 +84,7 @@
 
 .roleActionBtn:hover {
   background: var(--color-surface-hover);
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .roleActionBtnDanger:hover {
@@ -106,13 +106,13 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   font-size: 13px;
   outline: none;
 }
 
 .createInput:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-primary);
 }
 
 .createColorInput {
@@ -126,7 +126,7 @@
 }
 
 .createSubmitBtn {
-  background: var(--color-accent);
+  background: var(--color-primary);
   border: none;
   color: var(--color-page-bg);
   font-size: 12px;
@@ -144,7 +144,7 @@
 .centered {
   padding: 24px 20px;
   text-align: center;
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
