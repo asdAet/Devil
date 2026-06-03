@@ -3,7 +3,6 @@
 
 
 import os
-import secrets
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -180,10 +179,7 @@ TESTING = "test" in sys.argv
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
-    if DEBUG:
-        SECRET_KEY = secrets.token_urlsafe(50)
-    else:
-        raise ImproperlyConfigured("DJANGO_SECRET_KEY должен быть задан в production.")
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY должен быть задан в .env.")
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
@@ -349,7 +345,14 @@ def _database_from_url(url: str) -> dict:
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
-    DATABASES = {"default": _database_from_url(DATABASE_URL)}
+    db_config = _database_from_url(DATABASE_URL)
+    # Add connection pooling for production performance
+    db_config["CONN_MAX_AGE"] = env_int("DJANGO_DB_CONN_MAX_AGE", 600, minimum=0)
+    db_config["OPTIONS"] = {
+        "connect_timeout": 10,
+        "options": "-c statement_timeout=30000",  # 30s query timeout
+    }
+    DATABASES = {"default": db_config}
 else:
     db_engine = os.getenv("DJANGO_DB_ENGINE", "")
     if db_engine:
@@ -361,6 +364,11 @@ else:
                 "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", ""),
                 "HOST": os.getenv("DJANGO_DB_HOST", ""),
                 "PORT": os.getenv("DJANGO_DB_PORT", ""),
+                "CONN_MAX_AGE": env_int("DJANGO_DB_CONN_MAX_AGE", 600, minimum=0),
+                "OPTIONS": {
+                    "connect_timeout": 10,
+                    "options": "-c statement_timeout=30000",
+                },
             }
         }
     else:

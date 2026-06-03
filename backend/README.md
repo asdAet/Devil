@@ -19,11 +19,12 @@ Django backend для API, WebSocket realtime и доменной логики D
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt
+copy ..\example.env ..\.env
 python manage.py migrate
 python manage.py runserver 127.0.0.1:8000
 ```
 
-В debug-режиме используется SQLite по умолчанию. Если `DJANGO_SECRET_KEY` не задан, он генерируется автоматически.
+В debug-режиме используется SQLite по умолчанию. `DJANGO_SECRET_KEY` обязателен и должен приходить из `.env` или переменных окружения.
 
 ## Конфигурация
 
