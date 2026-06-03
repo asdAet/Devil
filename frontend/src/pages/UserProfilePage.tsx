@@ -13,7 +13,6 @@ import { useUserProfile } from "../hooks/useUserProfile";
 import {
   avatarFallback,
   formatFullName,
-  formatLastSeen,
   formatRegistrationDate,
 } from "../shared/lib/format";
 import {
@@ -22,7 +21,6 @@ import {
   normalizePublicRef,
 } from "../shared/lib/publicRef";
 import { resolveIdentityLabel } from "../shared/lib/userIdentity";
-import { usePresence } from "../shared/presence";
 import { AvatarMedia, Button, Card, PageState, Skeleton } from "../shared/ui";
 import styles from "../styles/pages/UserProfilePage.module.css";
 
@@ -36,14 +34,6 @@ type Props = {
   currentUser: UserProfile | null;
   onNavigate: (path: string) => void;
 };
-
-/**
- * Нормализует actor ref.
- * @param value Входное значение для преобразования.
- * @returns Нормализованное значение после обработки входа.
- */
-const normalizeActorRef = (value: string): string =>
-  normalizePublicRef(value).toLowerCase();
 
 function UserProfileSkeleton() {
   return (
@@ -83,7 +73,6 @@ export function UserProfilePage({
   onLogout,
 }: Props) {
   const { user, loading, error } = useUserProfile(username);
-  const { online: presenceOnline, status: presenceStatus } = usePresence();
   const currentPublicRef = normalizePublicRef(currentUser?.publicRef || "");
   const routePublicRef = normalizePublicRef(username);
   const isSelfRoute =
@@ -399,12 +388,6 @@ export function UserProfilePage({
     ) || resolveIdentityLabel(profileUser, "Без имени");
   const publicRef = (profileUser.publicRef || routePublicRef).trim();
   const avatarIdentity = resolveIdentityLabel(profileUser, "user");
-  const normalizedTargetRef = normalizeActorRef(publicRef);
-  const isUserOnline =
-    presenceStatus === "online" &&
-    presenceOnline.some(
-      (entry) => normalizeActorRef(entry.publicRef) === normalizedTargetRef,
-    );
 
   return (
     <Card wide className={styles.profileCard}>
@@ -413,11 +396,9 @@ export function UserProfilePage({
         <div
           className={[
             styles.profileAvatarWrapper,
-            isUserOnline ? styles.online : "",
           ]
             .filter(Boolean)
             .join(" ")}
-          data-online={isUserOnline ? "true" : "false"}
         >
           <div
             className={[
@@ -448,26 +429,15 @@ export function UserProfilePage({
         </div>
 
         <div className={styles.profileSummary}>
-          <p className={styles.eyebrowProfile}>Профиль пользователя</p>
           <h1 className={styles.profileName}>{fullName}</h1>
           {publicRef && (
             <p className={styles.usernameHandle}>
+              <span style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                ID:
+              </span>{" "}
               {formatPublicRef(publicRef)}
             </p>
           )}
-
-          <span
-            className={[
-              styles.statusChip,
-              isUserOnline ? styles.statusChipOnline : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {isUserOnline
-              ? "В сети"
-              : `Последний раз в сети: ${formatLastSeen(profileUser.lastSeen) || "—"}`}
-          </span>
         </div>
       </section>
 
@@ -557,14 +527,14 @@ export function UserProfilePage({
             <h2>Аккаунт</h2>
           </header>
           <dl className={styles.profileMetaGrid}>
-            <div>
+            {/* <div>
               <dt>Статус</dt>
               <dd>
                 {isUserOnline
                   ? "В сети"
                   : `Последний раз в сети: ${formatLastSeen(profileUser.lastSeen) || "—"}`}
               </dd>
-            </div>
+            </div> */}
             <div>
               <dt>Регистрация</dt>
               <dd>{formatRegistrationDate(profileUser.registeredAt) || "—"}</dd>

@@ -63,21 +63,6 @@
   justify-content: center;
 }
 
-.online::after {
-  content: "";
-  position: absolute;
-  right: 7px;
-  bottom: 9px;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-round);
-  background: var(--color-success);
-  border: 3px solid var(--color-surface);
-  box-shadow: 0 0 0 1px var(--color-border-success);
-  pointer-events: none;
-  z-index: 2;
-}
-
 .profileAvatar {
   position: relative;
   width: 100%;
@@ -124,16 +109,6 @@
   justify-items: start;
 }
 
-.eyebrowProfile {
-  margin: 0;
-  color: var(--color-text-soft);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
 .profileName {
   max-width: 100%;
   margin: 0;
@@ -151,28 +126,6 @@
   font-size: 15px;
   line-height: 1.35;
   overflow-wrap: anywhere;
-}
-
-.statusChip {
-  display: inline-flex;
-  max-width: 100%;
-  min-height: 30px;
-  align-items: center;
-  padding: 0 11px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-elevated);
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.statusChipOnline {
-  border-color: var(--color-border-success);
-  background: var(--color-success-soft);
-  color: var(--color-success);
 }
 
 .sectionHeader {

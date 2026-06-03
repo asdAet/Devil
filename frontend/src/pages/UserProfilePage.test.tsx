@@ -175,7 +175,7 @@ describe("UserProfilePage", () => {
     expect(screen.queryByTestId("send-dm-button")).toBeNull();
   });
 
-  it("shows online label when user is online", () => {
+  it("does not render an online marker in the profile hero", () => {
     presenceMock.online = [
       { publicRef: "alice", username: "alice", profileImage: null },
     ];
@@ -189,7 +189,7 @@ describe("UserProfilePage", () => {
       />,
     );
 
-    expect(container.querySelector('[data-online="true"]')).not.toBeNull();
+    expect(container.querySelector('[data-online="true"]')).toBeNull();
   });
 
   it("shows last seen label when user is offline", () => {
@@ -228,7 +228,7 @@ describe("UserProfilePage", () => {
       registeredAt: null,
     };
 
-    const { container } = render(
+    render(
       <UserProfilePage
         user={makeUser("bob")}
         currentUser={makeUser("bob")}
@@ -248,7 +248,7 @@ describe("UserProfilePage", () => {
     );
     expect(lightboxImage?.style.width).toBe("");
 
-    const circleImage = container.querySelector("[data-online] img");
+    const circleImage = openPreviewButton.querySelector("img");
     expect(circleImage).not.toBeNull();
   });
 });
