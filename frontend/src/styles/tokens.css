@@ -19,6 +19,7 @@
   --palette-graphite-160: #e4e6e7;
   --palette-white: #f7f8f8;
 
+  --brand-primary: #1e1e1e;
   --palette-cyan: #9ecfd8;
   --palette-cyan-strong: #c9f1f5;
   --palette-green: #58cf8f;
@@ -30,6 +31,8 @@
 
   --color-message-own-bg: #242530;
   --color-user-name-bg: #9bbad1;
+
+  --chat-message-ifileAttachments-bg: var(--color-surface-hover);
 
   --color-page-bg: var(--palette-black);
   --color-app-bg: var(--palette-graphite-950);
@@ -85,6 +88,12 @@
     transparent
   );
   --color-border-info: color-mix(in srgb, var(--palette-cyan) 42%, transparent);
+  --color-menu-bg: color-mix(in srgb, var(--palette-black) 0%, transparent);
+  --color-menu-border: color-mix(
+    in srgb,
+    var(--palette-white) 10%,
+    transparent
+  );
 
   --color-text-primary: var(--palette-white);
   --color-text-secondary: var(--palette-graphite-250);
@@ -122,9 +131,7 @@
   --color-online: var(--palette-green);
 
   --color-message-in-bg: var(--palette-graphite-800);
-  --color-message-in-text: var(--color-text-primary);
-  --color-message-out-bg: var(--palette-graphite-680);
-  --color-message-out-text: var(--color-text-primary);
+  --color-message-in-text: var(--palette-white);
   --color-message-reply-bg: color-mix(
     in srgb,
     var(--palette-white) 8%,
@@ -213,8 +220,8 @@
 
   --font-app: "Manrope", "Segoe UI", sans-serif;
 
-  --tg-sidebar-w: 360px;
-  --tg-info-w: 360px;
+  --app-sidebar-width: 360px;
+  --app-info-panel-width: 360px;
   --bp-compact: 480px;
   --bp-phone: 768px;
   --bp-tablet: 1024px;
@@ -233,52 +240,9 @@
   --touch-target-min: 44px;
 
   --z-modal: 100;
+  --menu-backdrop-blur: 18px;
   --transition: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 150ms ease;
-
-  /* Backward-compatible aliases. */
-  --tg-primary: var(--color-primary);
-  --tg-primary-hover: var(--color-primary-hover);
-  --tg-primary-light: var(--color-primary-soft);
-  --tg-bg-primary: var(--color-app-bg);
-  --tg-bg-secondary: var(--color-page-bg);
-  --tg-bg-surface: var(--color-surface);
-  --tg-bg-sidebar: var(--color-sidebar-bg);
-  --tg-bg-chat: var(--color-chat-bg);
-  --tg-bg-input: var(--color-input-bg);
-  --tg-msg-out-bg: var(--color-message-out-bg);
-  --tg-msg-in-bg: var(--color-message-in-bg);
-  --tg-msg-out-text: var(--color-message-out-text);
-  --tg-msg-in-text: var(--color-message-in-text);
-  --tg-msg-replay-bg: var(--color-message-reply-bg);
-  --tg-text-primary: var(--color-text-primary);
-  --tg-text-secondary: var(--color-text-muted);
-  --tg-text-link: var(--color-text-link);
-  --tg-border: var(--color-border);
-  --tg-danger: var(--color-danger);
-  --tg-success: var(--color-success);
-  --tg-online: var(--color-online);
-  --tg-warning: var(--color-warning);
-  --tg-unread-badge: var(--color-unread);
-  --tg-hover: var(--color-surface-hover);
-  --tg-active: var(--color-surface-active);
-  --tg-ripple: var(--color-surface-active);
-  --tg-shadow: var(--shadow-panel);
-  --tg-shadow-lg: var(--shadow-card);
-  --tg-radius-sm: var(--radius-sm);
-  --tg-radius-md: var(--radius-md);
-  --tg-radius-lg: var(--radius-lg);
-  --tg-radius-bubble: var(--radius-bubble);
-  --tg-radius-round: var(--radius-round);
-  --tg-font: var(--font-app);
-  --tg-transition: var(--transition);
-  --tg-transition-fast: var(--transition-fast);
-
-  --color-text: var(--color-text-primary);
-  --color-muted: var(--color-text-muted);
-  --color-surface-border: var(--color-border);
-  --color-accent: var(--color-primary);
-  --color-accent-2: var(--color-primary-hover);
 }
 
 @supports (height: 100dvh) {

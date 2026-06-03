@@ -1,11 +1,11 @@
 @import "./tokens.css";
 
 :root {
-  font-family: var(--tg-font);
+  font-family: var(--font-app);
   line-height: 1.5;
   font-weight: 400;
-  color: var(--tg-text-primary);
-  background-color: var(--tg-bg-secondary);
+  color: var(--color-text-primary);
+  background-color: var(--color-page-bg);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -26,8 +26,8 @@ body {
   margin: 0;
   width: 100%;
   min-height: var(--app-height);
-  background: var(--tg-bg-secondary);
-  color: var(--tg-text-primary);
+  background: var(--color-page-bg);
+  color: var(--color-text-primary);
   overflow-x: hidden;
 }
 
@@ -39,7 +39,7 @@ body {
 }
 
 a {
-  color: var(--tg-text-link);
+  color: var(--color-text-link);
   text-decoration: none;
 }
 
