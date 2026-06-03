@@ -3,16 +3,16 @@ import styles from "../styles/pages/HomePage.module.css";
 
 const benefits = [
   {
-    title: "Публичный чат видно без аккаунта",
-    text: "Новый человек может сразу открыть общий чат и понять, что происходит. Авторизация нужна только когда он решит написать сам.",
+    title: "Без регистрации",
+    text: "Публичный чат открыт сразу. Авторизация нужна только чтобы написать самому или открыть личную переписку.",
   },
   {
-    title: "Действия с сообщением под рукой",
-    text: "На сообщение можно быстро ответить, скопировать текст, поставить реакцию или открыть профиль автора, не перегружая сам чат лишними кнопками.",
+    title: "Быстрые действия с каждым сообщением",
+    text: "Ответить, скопировать, поставить реакцию — всё рядом, без лишних экранов.",
   },
   {
-    title: "Личные и группы разделены",
-    text: "Личные чаты не смешиваются с группами. Доступы, файлы и реакции остаются внутри нужной переписки.",
+    title: "Личные чаты отдельно от групп",
+    text: "Личная переписка не смешивается с групповой. Файлы, доступы и реакции — у каждого чата свои.",
   },
 ];
 
@@ -72,8 +72,8 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
         </div>
 
         <nav className={styles.navLinks} aria-label="Главная навигация">
-          <a href="#about">О Devil</a>
-          <a href="#benefits">Что умеет</a>
+          <a href="#about">О проекте</a>
+          <a href="#benefits">Возможности</a>
           <a href="#contacts">Контакты</a>
           <a href="/public">Публичный чат</a>
         </nav>
@@ -89,14 +89,13 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
 
       <section className={styles.hero} aria-labelledby="home-title">
         <div className={styles.heroContent}>
-          <p className={styles.sectionKicker}>Публичный чат, личные и группы</p>
+          <p className={styles.sectionKicker}>Мессенджер в реальном времени</p>
           <h1 id="home-title" className={styles.heroTitle}>
             Devil
           </h1>
           <p className={styles.heroLead}>
-            Откройте общий чат без аккаунта, а после входа пишите в личные и
-            группы, отправляйте файлы, реакции и смотрите картинки с удобным
-            приближением.
+            Публичный чат открыт для всех без регистрации. После входа — личные
+            переписки, группы, файлы и реакции.
           </p>
           <div className={styles.heroActions}>
             <Button
@@ -104,7 +103,7 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
               className={styles.primaryAction}
               onClick={handleLoginNavigate}
             >
-              Войти в Devil
+              Открыть Devil
             </Button>
           </div>
         </div>
@@ -133,15 +132,11 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
               <span>18 участников в сети</span>
             </div>
             <div className={styles.messageList}>
-              <span className={styles.messageIncoming}>
-                Камилла отправила фото и реакцию
-              </span>
+              <span className={styles.messageIncoming}>Когда созвон?</span>
               <span className={styles.messageOutgoing}>
-                Открыл с телефона, приближение работает
+                В 19:00, скидываю ссылку
               </span>
-              <span className={styles.messageIncoming}>
-                Доступ в группе уже обновлен
-              </span>
+              <span className={styles.messageIncoming}>Принял 👍</span>
             </div>
             <div className={styles.previewComposer}>
               <span>Сообщение...</span>
@@ -160,12 +155,12 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
           <img src="/MINI-direct-logo-avatar.png" alt="" loading="lazy" />
         </div>
         <div className={styles.aboutCopy}>
-          <p className={styles.sectionKicker}>О продукте</p>
-          <h2 id="about-title">Чат, который можно сразу показать людям</h2>
+          <p className={styles.sectionKicker}>Как это работает</p>
+          <h2 id="about-title">Открытый для гостей. Закрытый для своих.</h2>
           <p className={styles.aboutText}>
-            Devil подходит для открытого общения и закрытых переписок: гостям
-            можно дать ссылку на публичный чат, а после входа доступны личные,
-            группы, файлы, реакции и аккуратный просмотр картинок на телефоне.
+            Дайте гостю ссылку — зайдёт без регистрации и увидит общий чат.
+            Создайте группу для команды или напишите в личку — всё в одном
+            месте.
           </p>
           <div
             id="benefits"
@@ -173,7 +168,7 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
             aria-labelledby="benefits-title"
           >
             <h3 id="benefits-title" className={styles.benefitsTitle}>
-              Что умеет Devil
+              Возможности
             </h3>
             {benefits.map((item) => (
               <article className={styles.benefitCard} key={item.title}>

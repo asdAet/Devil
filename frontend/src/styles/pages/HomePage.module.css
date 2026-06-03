@@ -3,14 +3,15 @@
   isolation: isolate;
   min-height: 100%;
   overflow-x: clip;
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
   background:
-    radial-gradient(
-      circle at 70% 12%,
-      var(--color-info-soft),
-      transparent 34%
-    ),
-    linear-gradient(135deg, var(--color-page-bg) 0%, var(--color-app-bg) 48%, var(--color-app-bg) 100%);
+    radial-gradient(circle at 70% 12%, var(--color-info-soft), transparent 34%),
+    linear-gradient(
+      135deg,
+      var(--color-page-bg) 0%,
+      var(--color-app-bg) 48%,
+      var(--color-app-bg) 100%
+    );
 }
 
 .home::before {
@@ -46,11 +47,7 @@
       var(--color-shadow-medium) 52%,
       var(--color-chat-bg) 100%
     ),
-    radial-gradient(
-      circle at 24% 86%,
-      var(--color-info-soft),
-      transparent 28%
-    );
+    radial-gradient(circle at 24% 86%, var(--color-info-soft), transparent 28%);
 }
 
 .hero,
@@ -283,7 +280,7 @@
 }
 
 .chatHeader span {
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -302,7 +299,7 @@
   border-radius: 8px;
   font-size: 14px;
   line-height: 1.45;
-  box-shadow: var(--tg-shadow, 0 1px 2px var(--color-shadow-medium));
+  box-shadow: var(--shadow-panel, 0 1px 2px var(--color-shadow-medium));
 }
 
 .messageIncoming {
@@ -313,7 +310,7 @@
 
 .messageOutgoing {
   align-self: flex-end;
-  background: var(--color-message-out-bg);
+  background: var(--color-message-own-bg);
   color: var(--color-text-primary);
 }
 
@@ -327,7 +324,7 @@
   border: 1px solid var(--color-info-soft);
   border-radius: 8px;
   background: var(--color-surface-hover);
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
