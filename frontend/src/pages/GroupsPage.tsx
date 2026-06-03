@@ -103,6 +103,7 @@ export function GroupsPage({ user, onNavigate }: Props) {
       <div className={styles.searchRow}>
         <input
           className={styles.searchInput}
+          name="groupsSearch"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Поиск групп..."
@@ -126,7 +127,11 @@ export function GroupsPage({ user, onNavigate }: Props) {
         {!loading &&
           !error &&
           groups.map((g) => (
-            <GroupListItem key={g.roomId} group={g} onClick={handleGroupClick} />
+            <GroupListItem
+              key={g.roomId}
+              group={g}
+              onClick={handleGroupClick}
+            />
           ))}
       </div>
 

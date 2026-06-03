@@ -18,19 +18,19 @@
 .inviteGroupName {
   font-size: 22px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   margin-bottom: 8px;
 }
 
 .inviteGroupDesc {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   margin-bottom: 16px;
 }
 
 .inviteMeta {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   margin-bottom: 24px;
 }
 
@@ -41,7 +41,7 @@
 }
 
 .inviteJoinBtn {
-  background: var(--color-accent);
+  background: var(--color-primary);
   border: none;
   color: var(--color-page-bg);
   font-size: 15px;
