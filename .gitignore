@@ -217,3 +217,4 @@ test_pytest.txt
 test_e2e.txt
 test_unit.txt
 CLAUDE.md
+backend/coverage.txt

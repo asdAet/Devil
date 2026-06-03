@@ -1,8 +1,8 @@
 ﻿# Справочник Frontend
 
-Сгенерировано: 2026-04-22T14:14:13Z
+Сгенерировано: 2026-06-03T13:18:02Z
 
-Всего модулей: 253
+Всего модулей: 339
 
 ## `frontend/src/adapters/apiService/acceptFriendRequest.ts`
 
@@ -155,6 +155,28 @@
     - Описание: Идентификатор связи дружбы.
 - Возвращает: `Promise<void>`
   - Описание: Промис, который завершается после успешного выполнения операции `cancel outgoing friend request`.
+
+## `frontend/src/adapters/apiService/confirmLoginTwoFactor.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export async function confirmLoginTwoFactor( apiClient: AxiosInstance, input: TwoFactorLoginInput, ): Promise<SessionResponse> {`
+
+- Вид: асинхронная функция
+- Кратко: Асинхронная функция `confirmLoginTwoFactor`.
+- Параметры: 2
+  - `apiClient`
+    - Формат: `AxiosInstance`
+    - Вид: обязательный
+    - Описание: Параметр `apiClient` в формате `AxiosInstance`.
+  - `input`
+    - Формат: `TwoFactorLoginInput`
+    - Вид: обязательный
+    - Описание: Параметр `input` в формате `TwoFactorLoginInput`.
+- Возвращает: `Promise<SessionResponse>`
+  - Описание: Промис с результатом операции в формате `SessionResponse`.
 
 ## `frontend/src/adapters/apiService/createGroup.ts`
 
@@ -1502,6 +1524,84 @@
 - Возвращает: `Promise<SearchResult>`
   - Описание: Промис с результатом операции в формате `SearchResult`.
 
+## `frontend/src/adapters/apiService/security.ts`
+
+- Экспортируемые объявления: 5
+
+### Объявления
+
+#### `export async function getSecuritySettings( apiClient: AxiosInstance, ): Promise<{ security: SecuritySettings }> {`
+
+- Вид: асинхронная функция
+- Кратко: Асинхронная функция `getSecuritySettings`.
+- Параметры: 1
+  - `apiClient`
+    - Формат: `AxiosInstance`
+    - Вид: обязательный
+    - Описание: Параметр `apiClient` в формате `AxiosInstance`.
+- Возвращает: `Promise<`
+  - Описание: Результат функции в формате `Promise<`.
+
+#### `export async function changePassword( apiClient: AxiosInstance, input: ChangePasswordInput, ): Promise<{ security: SecuritySettings }> {`
+
+- Вид: асинхронная функция
+- Кратко: Асинхронная функция `changePassword`.
+- Параметры: 2
+  - `apiClient`
+    - Формат: `AxiosInstance`
+    - Вид: обязательный
+    - Описание: Параметр `apiClient` в формате `AxiosInstance`.
+  - `input`
+    - Формат: `ChangePasswordInput`
+    - Вид: обязательный
+    - Описание: Параметр `input` в формате `ChangePasswordInput`.
+- Возвращает: `Promise<`
+  - Описание: Результат функции в формате `Promise<`.
+
+#### `export async function beginTwoFactorSetup( apiClient: AxiosInstance, ): Promise<{ setup: TwoFactorSetup }> {`
+
+- Вид: асинхронная функция
+- Кратко: Асинхронная функция `beginTwoFactorSetup`.
+- Параметры: 1
+  - `apiClient`
+    - Формат: `AxiosInstance`
+    - Вид: обязательный
+    - Описание: Параметр `apiClient` в формате `AxiosInstance`.
+- Возвращает: `Promise<`
+  - Описание: Результат функции в формате `Promise<`.
+
+#### `export async function confirmTwoFactor( apiClient: AxiosInstance, input: TwoFactorLoginInput, ): Promise<{ security: SecuritySettings }> {`
+
+- Вид: асинхронная функция
+- Кратко: Асинхронная функция `confirmTwoFactor`.
+- Параметры: 2
+  - `apiClient`
+    - Формат: `AxiosInstance`
+    - Вид: обязательный
+    - Описание: Параметр `apiClient` в формате `AxiosInstance`.
+  - `input`
+    - Формат: `TwoFactorLoginInput`
+    - Вид: обязательный
+    - Описание: Параметр `input` в формате `TwoFactorLoginInput`.
+- Возвращает: `Promise<`
+  - Описание: Результат функции в формате `Promise<`.
+
+#### `export async function disableTwoFactor( apiClient: AxiosInstance, input: TwoFactorLoginInput, ): Promise<{ security: SecuritySettings }> {`
+
+- Вид: асинхронная функция
+- Кратко: Асинхронная функция `disableTwoFactor`.
+- Параметры: 2
+  - `apiClient`
+    - Формат: `AxiosInstance`
+    - Вид: обязательный
+    - Описание: Параметр `apiClient` в формате `AxiosInstance`.
+  - `input`
+    - Формат: `TwoFactorLoginInput`
+    - Вид: обязательный
+    - Описание: Параметр `input` в формате `TwoFactorLoginInput`.
+- Возвращает: `Promise<`
+  - Описание: Результат функции в формате `Promise<`.
+
 ## `frontend/src/adapters/apiService/sendFriendRequest.ts`
 
 - Экспортируемые объявления: 1
@@ -1882,24 +1982,213 @@
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `App`.
 
+## `frontend/src/app/lazyPages.ts`
+
+- Экспортируемые объявления: 10
+
+### Объявления
+
+#### `export const ChatTargetPage = lazy(() => import("../pages/ChatTargetPage").then((module) => ({ default: module.ChatTargetPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `ChatTargetPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/ChatTargetPage").then((module) => ({ default: module.ChatTargetPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `ChatTargetPage`.
+
+#### `export const FriendsPage = lazy(() => import("../pages/FriendsPage").then((module) => ({ default: module.FriendsPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `FriendsPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/FriendsPage").then((module) => ({ default: module.FriendsPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `FriendsPage`.
+
+#### `export const GroupsPage = lazy(() => import("../pages/GroupsPage").then((module) => ({ default: module.GroupsPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `GroupsPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/GroupsPage").then((module) => ({ default: module.GroupsPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `GroupsPage`.
+
+#### `export const HomePage = lazy(() => import("../pages/HomePage").then((module) => ({ default: module.HomePage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `HomePage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/HomePage").then((module) => ({ default: module.HomePage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `HomePage`.
+
+#### `export const InvitePreviewPage = lazy(() => import("../pages/InvitePreviewPage").then((module) => ({ default: module.InvitePreviewPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `InvitePreviewPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/InvitePreviewPage").then((module) => ({ default: module.InvitePreviewPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `InvitePreviewPage`.
+
+#### `export const LoginPage = lazy(() => import("../pages/LoginPage").then((module) => ({ default: module.LoginPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `LoginPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/LoginPage").then((module) => ({ default: module.LoginPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `LoginPage`.
+
+#### `export const NotFoundPage = lazy(() => import("../pages/NotFoundPage").then((module) => ({ default: module.NotFoundPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `NotFoundPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/NotFoundPage").then((module) => ({ default: module.NotFoundPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `NotFoundPage`.
+
+#### `export const RegisterPage = lazy(() => import("../pages/RegisterPage").then((module) => ({ default: module.RegisterPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `RegisterPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/RegisterPage").then((module) => ({ default: module.RegisterPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `RegisterPage`.
+
+#### `export const SettingsPage = lazy(() => import("../pages/SettingsPage").then((module) => ({ default: module.SettingsPage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `SettingsPage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/SettingsPage").then((module) => ({ default: module.SettingsPage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `SettingsPage`.
+
+#### `export const UserProfilePage = lazy(() => import("../pages/UserProfilePage").then((module) => ({ default: module.UserProfilePage, })), );`
+
+- Вид: функция
+- Кратко: React-компонент `UserProfilePage`.
+- Параметры: 1
+  - `()`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `> import("../pages/UserProfilePage").then((module) => ({ default: module.UserProfilePage, }))`
+    - Описание: Параметр `()`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `UserProfilePage`.
+
+## `frontend/src/app/RouteChunkFallback.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function RouteChunkFallback() {`
+
+- Вид: функция
+- Кратко: React-компонент `RouteChunkFallback`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `RouteChunkFallback`.
+
 ## `frontend/src/app/routes.tsx`
 
 - Экспортируемые объявления: 1
 
 ### Объявления
 
-#### `export function AppRoutes({ user, error, passwordRules, googleAuthDisabledReason, onNavigate, onLogin, onGoogleOAuth, onRegister, onLogout, onProfileSave, }: AppRoutesProps) {`
+#### `export function AppRoutes({ user, passwordRules, googleAuthDisabledReason, onNavigate, onLogin, onGoogleOAuth, onRegister, onLogout, onProfileSave, }: AppRoutesProps) {`
 
 - Вид: функция
 - Кратко: React-компонент `AppRoutes`.
 - Детали: Компонент принимает готовые auth- и navigation-колбэки из верхнего уровня, а затем прокидывает их в конкретные страницы: вход, регистрацию, профиль, настройки, друзей, группы, приглашения и канонический маршрут чата по target.
 - Параметры: 1
-  - `{ user, error, passwordRules, googleAuthDisabledReason, onNavigate, onLogin, onGoogleOAuth, onRegister, onLogout, onProfileSave, }`
+  - `{ user, passwordRules, googleAuthDisabledReason, onNavigate, onLogin, onGoogleOAuth, onRegister, onLogout, onProfileSave, }`
     - Формат: `AppRoutesProps`
     - Вид: обязательный
     - Описание: Объект параметров в формате `AppRoutesProps`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `AppRoutes`.
+
+## `frontend/src/app/useAuthEntryNavigation.ts`
+
+- Экспортируемые объявления: 3
+
+### Объявления
+
+#### `export const AUTH_ENTRY_LOGIN_PATH = "/login";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `AUTH_ENTRY_LOGIN_PATH`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const resolveAuthEntryPath = ( session: Pick<SessionResponseDto, "authenticated" | "user"> | null, ): string =>`
+
+- Вид: функция
+- Кратко: Функция `resolveAuthEntryPath`.
+- Параметры: 1
+  - `session`
+    - Формат: `Pick<SessionResponseDto, "authenticated" | "user"> | null`
+    - Вид: обязательный
+    - Описание: Параметр `session` в формате `Pick<SessionResponseDto, "authenticated" | "user"> | null`.
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export function useAuthEntryNavigation(onNavigate: (path: string) => void) {`
+
+- Вид: функция
+- Кратко: Хук `useAuthEntryNavigation`.
+- Параметры: 1
+  - `onNavigate`
+    - Формат: `(path: string)`
+    - Вид: обязательный
+    - Значение по умолчанию: `> void`
+    - Описание: Колбэк события `navigate`.
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
 
 ## `frontend/src/App.tsx`
 
@@ -2049,7 +2338,7 @@
 
 ## `frontend/src/dto/http/auth.ts`
 
-- Экспортируемые объявления: 12
+- Экспортируемые объявления: 17
 
 ### Объявления
 
@@ -2113,6 +2402,30 @@
 - Возвращает: `SessionResponseDto`
   - Описание: Нормализованные данные после декодирования.
 
+#### `export const decodeSecuritySettingsResponse = ( input: unknown, ): { security: SecuritySettingsDto } => {`
+
+- Вид: функция
+- Кратко: Функция `decodeSecuritySettingsResponse`.
+- Параметры: 1
+  - `input`
+    - Формат: `unknown`
+    - Вид: обязательный
+    - Описание: Параметр `input` произвольного формата.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const decodeTwoFactorSetupResponse = ( input: unknown, ): { setup: TwoFactorSetupDto } =>`
+
+- Вид: функция
+- Кратко: Функция `decodeTwoFactorSetupResponse`.
+- Параметры: 1
+  - `input`
+    - Формат: `unknown`
+    - Вид: обязательный
+    - Описание: Параметр `input` произвольного формата.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
 #### `export const decodeProfileEnvelopeResponse = ( input: unknown, ): ProfileEnvelopeDto => {`
 
 - Вид: функция
@@ -2148,6 +2461,42 @@
     - Описание: Входной объект с параметрами операции.
 - Возвращает: `LoginRequestDto`
   - Описание: Нормализованные данные после декодирования.
+
+#### `export const buildTwoFactorLoginRequestDto = ( input: unknown, ): TwoFactorLoginRequestDto =>`
+
+- Вид: функция
+- Кратко: Функция `buildTwoFactorLoginRequestDto`.
+- Параметры: 1
+  - `input`
+    - Формат: `unknown`
+    - Вид: обязательный
+    - Описание: Параметр `input` произвольного формата.
+- Возвращает: `TwoFactorLoginRequestDto`
+  - Описание: Результат функции в формате `TwoFactorLoginRequestDto`.
+
+#### `export const buildChangePasswordRequestDto = ( input: unknown, ): ChangePasswordRequestDto =>`
+
+- Вид: функция
+- Кратко: Функция `buildChangePasswordRequestDto`.
+- Параметры: 1
+  - `input`
+    - Формат: `unknown`
+    - Вид: обязательный
+    - Описание: Параметр `input` произвольного формата.
+- Возвращает: `ChangePasswordRequestDto`
+  - Описание: Результат функции в формате `ChangePasswordRequestDto`.
+
+#### `export const buildTwoFactorCodeRequestDto = ( input: unknown, ): TwoFactorCodeRequestDto =>`
+
+- Вид: функция
+- Кратко: Функция `buildTwoFactorCodeRequestDto`.
+- Параметры: 1
+  - `input`
+    - Формат: `unknown`
+    - Вид: обязательный
+    - Описание: Параметр `input` произвольного формата.
+- Возвращает: `TwoFactorCodeRequestDto`
+  - Описание: Результат функции в формате `TwoFactorCodeRequestDto`.
 
 #### `export const buildRegisterRequestDto = (input: unknown): RegisterRequestDto =>`
 
@@ -2900,6 +3249,508 @@
 
 - Экспортируемые объявления: 0
 
+## `frontend/src/generated/customEmojiAssetChunks/adaptive_000_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/adaptive_000_001.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_001.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_002.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_003.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_004.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_005.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_006.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/animated_001_007.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/creepyemoji_002_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/gifts_003_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/gifts_003_001.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/mad_004_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/mad_004_001.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/method_005_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/method_005_001.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/minecraft_006_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/steampunk_007_000.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiAssetChunks/steampunk_007_001.assets.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const resolveCustomEmojiAssetSrc = (id: string): string | null =>`
+
+- Вид: функция
+- Кратко: Функция `resolveCustomEmojiAssetSrc`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+## `frontend/src/generated/customEmojiManifest.generated.ts`
+
+- Экспортируемые объявления: 3
+
+### Объявления
+
+#### `export const customEmojiPackManifests = [ { id: "Adaptive", name: "Adaptive", preview: { id: "Adaptive/1.webp", packId: "Adaptive", packName: "Adaptive", fileName: "1.webp", assetKind: "webp", assetChunkId: "adaptive_000_000", label: "Adaptive 1", src: null, token: "[[ce:Adaptive%2F1.webp]]" }, emojiCount: 199 },`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPackManifests`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const customEmojiPackIndexLoaders = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPackIndexLoaders`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const customEmojiAssetChunkLoaders = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiAssetChunkLoaders`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/adaptive_000.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/animated_001.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/creepyemoji_002.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/gifts_003.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/mad_004.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/method_005.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/minecraft_006.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/generated/customEmojiPackIndexes/steampunk_007.index.generated.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const customEmojiPack = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `customEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
 ## `frontend/src/hooks/useAuth.ts`
 
 - Экспортируемые объявления: 1
@@ -3133,6 +3984,48 @@
 - Возвращает: не указан
   - Описание: Верхний слой поиска или `null`, если поиск закрыт.
 
+## `frontend/src/pages/chatRoomPage/ChatRoomLoadingState.tsx`
+
+- Экспортируемые объявления: 3
+
+### Объявления
+
+#### `export function ChatHistorySkeleton({ compact = false, }: ChatHistorySkeletonProps) {`
+
+- Вид: функция
+- Кратко: Показывает skeleton-ленту сообщений без демонтажа контейнера прокрутки.
+- Параметры: 1
+  - `{ compact = false, }`
+    - Формат: `ChatHistorySkeletonProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `ChatHistorySkeletonProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `ChatHistorySkeleton`.
+
+#### `export function ChatComposerSkeleton({ compact = false, }: ChatComposerSkeletonProps) {`
+
+- Вид: функция
+- Кратко: Показывает placeholder нижней панели ввода во время первичной загрузки чата.
+- Параметры: 1
+  - `{ compact = false, }`
+    - Формат: `ChatComposerSkeletonProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `ChatComposerSkeletonProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `ChatComposerSkeleton`.
+
+#### `export function ChatRoomLoadingShell({ showComposer = true, headerActionSlots = 2, }: ChatRoomLoadingShellProps) {`
+
+- Вид: функция
+- Кратко: React-компонент `ChatRoomLoadingShell`.
+- Параметры: 1
+  - `{ showComposer = true, headerActionSlots = 2, }`
+    - Формат: `ChatRoomLoadingShellProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `ChatRoomLoadingShellProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `ChatRoomLoadingShell`.
+
 ## `frontend/src/pages/chatRoomPage/ChatRoomPageView.tsx`
 
 - Экспортируемые объявления: 1
@@ -3204,6 +4097,94 @@
     - Описание: Параметр `attachmentId` в формате `number`.
 - Возвращает: `ChatLightboxSession | null`
   - Описание: Результат функции в формате `ChatLightboxSession | null`.
+
+## `frontend/src/pages/chatRoomPage/optimisticMessages.ts`
+
+- Экспортируемые объявления: 5
+
+### Объявления
+
+#### `export const createClientMessageId = (): string => {`
+
+- Вид: функция
+- Кратко: Функция `createClientMessageId`.
+- Параметры: нет
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export const createOptimisticTextMessage = ({ id, clientMessageId, content, user, currentActorRef, replyTo, createdAt, }: CreateOptimisticTextMessageParams): Message => ({ id, clientMessageId, deliveryStatus: "pending", publicRef: user.publicRef || currentActorRef, username: user.username, displayName: (user.name || "").trim() || user.username,`
+
+- Вид: функция
+- Кратко: Функция `createOptimisticTextMessage`.
+- Параметры: 1
+  - `{ id, clientMessageId, content, user, currentActorRef, replyTo, createdAt, }`
+    - Формат: `CreateOptimisticTextMessageParams`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `CreateOptimisticTextMessageParams`.
+- Возвращает: `Message`
+  - Описание: Результат функции в формате `Message`.
+
+#### `export const isOptimisticMessage = (message: Message): boolean =>`
+
+- Вид: функция
+- Кратко: Функция `isOptimisticMessage`.
+- Параметры: 1
+  - `message`
+    - Формат: `Message`
+    - Вид: обязательный
+    - Описание: Параметр `message` в формате `Message`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+#### `export const removeOptimisticMessage = ( messages: Message[], clientMessageId: string | null | undefined, ): Message[] => {`
+
+- Вид: функция
+- Кратко: Функция `removeOptimisticMessage`.
+- Параметры: 2
+  - `messages`
+    - Формат: `Message[]`
+    - Вид: обязательный
+    - Описание: Параметр `messages` в формате `Message[]`.
+  - `clientMessageId`
+    - Формат: `string | null | undefined`
+    - Вид: обязательный
+    - Описание: Параметр `clientMessageId` в формате `string | null | undefined`.
+- Возвращает: `Message[]`
+  - Описание: Результат функции в формате `Message[]`.
+
+#### `export const reconcileOptimisticMessage = ( messages: Message[], serverMessage: Message, ): Message[] => {`
+
+- Вид: функция
+- Кратко: Функция `reconcileOptimisticMessage`.
+- Параметры: 2
+  - `messages`
+    - Формат: `Message[]`
+    - Вид: обязательный
+    - Описание: Параметр `messages` в формате `Message[]`.
+  - `serverMessage`
+    - Формат: `Message`
+    - Вид: обязательный
+    - Описание: Параметр `serverMessage` в формате `Message`.
+- Возвращает: `Message[]`
+  - Описание: Результат функции в формате `Message[]`.
+
+## `frontend/src/pages/chatRoomPage/timelineRender.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const groupTimelineByDay = ( timeline: readonly TimelineItem[], ): TimelineRenderBlock[] => {`
+
+- Вид: функция
+- Кратко: Функция `groupTimelineByDay`.
+- Параметры: 1
+  - `timeline`
+    - Формат: `readonly TimelineItem[]`
+    - Вид: обязательный
+    - Описание: Параметр `timeline` в формате `readonly TimelineItem[]`.
+- Возвращает: `TimelineRenderBlock[]`
+  - Описание: Результат функции в формате `TimelineRenderBlock[]`.
 
 ## `frontend/src/pages/chatRoomPage/types.ts`
 
@@ -3299,12 +4280,12 @@
 
 ### Объявления
 
-#### `export function useChatRoomPageRealtime({ wsUrl, roomIdForRequests, roomKind, maxMessageLength, currentActorRef, readStateEnabled, user, setMessages, setRoomError, onIncomingForeignMessage, }: UseChatRoomPageRealtimeOptions): UseChatRoomPageRealtimeResult {`
+#### `export function useChatRoomPageRealtime({ roomRealtimeId, roomIdForRequests, roomKind, maxMessageLength, currentActorRef, readStateEnabled, user, setMessages, setRoomError, onIncomingForeignMessage, }: UseChatRoomPageRealtimeOptions): UseChatRoomPageRealtimeResult {`
 
 - Вид: функция
 - Кратко: Хук `useChatRoomPageRealtime`.
 - Параметры: 1
-  - `{ wsUrl, roomIdForRequests, roomKind, maxMessageLength, currentActorRef, readStateEnabled, user, setMessages, setRoomError, onIncomingForeignMessage, }`
+  - `{ roomRealtimeId, roomIdForRequests, roomKind, maxMessageLength, currentActorRef, readStateEnabled, user, setMessages, setRoomError, onIncomingForeignMessage, }`
     - Формат: `UseChatRoomPageRealtimeOptions`
     - Вид: обязательный
     - Описание: Объект параметров в формате `UseChatRoomPageRealtimeOptions`.
@@ -3358,6 +4339,24 @@
 ## `frontend/src/pages/chatRoomPage/useChatRoomPageViewModel.types.ts`
 
 - Экспортируемые объявления: 0
+
+## `frontend/src/pages/chatRoomPage/useChatScrollHeightAnchor.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function useChatViewportAnchor({ listRef, enabled, isAtBottomRef, beginProgrammaticScroll, endProgrammaticScroll, scheduleViewportReadSync, shouldSuspend, bottomThresholdPx = DEFAULT_BOTTOM_THRESHOLD_PX, }: UseChatViewportAnchorOptions): void {`
+
+- Вид: функция
+- Кратко: Хук `useChatViewportAnchor`.
+- Параметры: 1
+  - `{ listRef, enabled, isAtBottomRef, beginProgrammaticScroll, endProgrammaticScroll, scheduleViewportReadSync, shouldSuspend, bottomThresholdPx = DEFAULT_BOTTOM_THRESHOLD_PX, }`
+    - Формат: `UseChatViewportAnchorOptions`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `UseChatViewportAnchorOptions`.
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
 
 ## `frontend/src/pages/chatRoomPage/useFileDropZone.ts`
 
@@ -3647,7 +4646,6 @@
 
 - Вид: функция
 - Кратко: React-компонент `ChatTargetPage`.
-- Детали: Страница нужна как мост между канонической внешней навигацией по public target и внутренним room-id transport: сначала дергает `resolveChatTarget`, а затем либо показывает `ChatRoomPage`, либо выводит понятную ошибку доступа.
 - Параметры: 1
   - `{ user, target, onNavigate }`
     - Формат: `Props`
@@ -3699,12 +4697,12 @@
 
 ### Объявления
 
-#### `export function HomePage({ user, onNavigate }: Props) {`
+#### `export function HomePage({ onNavigate, onLoginNavigate }: Props) {`
 
 - Вид: функция
 - Кратко: React-компонент `HomePage`.
 - Параметры: 1
-  - `{ user, onNavigate }`
+  - `{ onNavigate, onLoginNavigate }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
@@ -3735,12 +4733,12 @@
 
 ### Объявления
 
-#### `export function LoginPage({ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, error = null, }: Props) {`
+#### `export function LoginPage({ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, }: Props) {`
 
 - Вид: функция
 - Кратко: Рендерит экран входа и прокидывает действия пользователя в auth-форму.
 - Параметры: 1
-  - `{ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, error = null, }`
+  - `{ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
@@ -3757,7 +4755,6 @@
 
 - Вид: функция
 - Кратко: Отображает fallback-экран для неизвестных или невалидных маршрутов.
-- Детали: Страница не пытается восстановить контекст автоматически: она явно сообщает пользователю, что путь не найден, и предлагает вернуться на главную.
 - Параметры: 1
   - `{ onNavigate }`
     - Формат: `Props`
@@ -3790,12 +4787,12 @@
 
 ### Объявления
 
-#### `export function RegisterPage({ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, error = null, passwordRules = [], }: Props) {`
+#### `export function RegisterPage({ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, passwordRules = [], }: Props) {`
 
 - Вид: функция
 - Кратко: Рендерит экран регистрации и передает действия пользователя в auth-форму.
 - Параметры: 1
-  - `{ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, error = null, passwordRules = [], }`
+  - `{ onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, passwordRules = [], }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
@@ -3808,12 +4805,12 @@
 
 ### Объявления
 
-#### `export function SettingsPage({ user, onNavigate, onLogout }: Props) {`
+#### `export function SettingsPage({ user, onProfileSave }: Props) {`
 
 - Вид: функция
 - Кратко: React-компонент `SettingsPage`.
 - Параметры: 1
-  - `{ user, onNavigate, onLogout }`
+  - `{ user, onProfileSave }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
@@ -3907,32 +4904,50 @@
 
 ## `frontend/src/shared/auth/googleRedirect.ts`
 
-- Экспортируемые объявления: 2
+- Экспортируемые объявления: 3
 
 ### Объявления
 
-#### `export const buildGoogleAuthRedirectUrl = (returnTo: string): string => {`
+#### `export const GOOGLE_AUTH_SUCCESS_RETURN_PATH = "/public";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `GOOGLE_AUTH_SUCCESS_RETURN_PATH`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const buildGoogleAuthRedirectUrl = ( returnTo: string, options: GoogleAuthRedirectOptions = {}, ): string => {`
 
 - Вид: функция
 - Кратко: Функция `buildGoogleAuthRedirectUrl`.
-- Параметры: 1
+- Параметры: 2
   - `returnTo`
     - Формат: `string`
     - Вид: обязательный
-    - Описание: Путь SPA, к которому backend может вернуть пользователя при ошибке.
+    - Описание: Путь SPA для успешного входа после callback.
+  - `options`
+    - Формат: `GoogleAuthRedirectOptions`
+    - Вид: обязательный
+    - Значение по умолчанию: `{}`
+    - Описание: Дополнительные безопасные пути возврата.
 - Возвращает: `string`
   - Описание: Абсолютно безопасный относительный URL для перехода на backend.
 
-#### `export const startGoogleAuthRedirect = (returnTo: string): void => {`
+#### `export const startGoogleAuthRedirect = ( returnTo: string, options: GoogleAuthRedirectOptions = {}, ): void => {`
 
 - Вид: функция
 - Кратко: Функция `startGoogleAuthRedirect`.
 - Детали: Фронтенд не получает OAuth-токены напрямую и не открывает popup-окно. Вместо этого браузер уходит на backend endpoint, который сам начинает Google OAuth, принимает callback и создает серверную сессию.
-- Параметры: 1
+- Параметры: 2
   - `returnTo`
     - Формат: `string`
     - Вид: обязательный
-    - Описание: Путь SPA, к которому backend может вернуть пользователя при ошибке.
+    - Описание: Путь SPA для успешного входа после callback.
+  - `options`
+    - Формат: `GoogleAuthRedirectOptions`
+    - Вид: обязательный
+    - Значение по умолчанию: `{}`
+    - Описание: Дополнительные безопасные пути возврата.
 - Возвращает: `void`
   - Описание: Ничего не возвращает; эффект достигается побочным действием.
 
@@ -4085,6 +5100,72 @@
     - Описание: Объект параметров в формате `UseReadTrackerParams`.
 - Возвращает: не указан
   - Описание: Публичный API хука: состояние и доступные обработчики.
+
+## `frontend/src/shared/chatRealtime/ChatRealtimeProvider.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function ChatRealtimeProvider({ ready = true, children, }: ProviderProps) {`
+
+- Вид: функция
+- Кратко: Провайдер `ChatRealtimeProvider`.
+- Параметры: 1
+  - `{ ready = true, children, }`
+    - Формат: `ProviderProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `ProviderProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `ChatRealtimeProvider`.
+
+## `frontend/src/shared/chatRealtime/context.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const FALLBACK_CHAT_REALTIME: ChatRealtimeContextValue = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `FALLBACK_CHAT_REALTIME`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const ChatRealtimeContext = createContext<ChatRealtimeContextValue>( FALLBACK_CHAT_REALTIME, );`
+
+- Вид: константа
+- Кратко: Хранит константное значение `ChatRealtimeContext`.
+- Параметры: 1
+  - `FALLBACK_CHAT_REALTIME`
+    - Формат: не указан
+    - Вид: обязательный
+    - Описание: Параметр `FALLBACK_CHAT_REALTIME`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/shared/chatRealtime/index.ts`
+
+- Экспортируемые объявления: 0
+
+## `frontend/src/shared/chatRealtime/useChatRealtimeRoom.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function useChatRealtimeRoom({ roomId, enabled = true, onMessage, onOpen, onClose, onError, }: UseChatRealtimeRoomOptions): UseChatRealtimeRoomResult {`
+
+- Вид: функция
+- Кратко: Хук `useChatRealtimeRoom`.
+- Параметры: 1
+  - `{ roomId, enabled = true, onMessage, onOpen, onClose, onError, }`
+    - Формат: `UseChatRealtimeRoomOptions`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `UseChatRealtimeRoomOptions`.
+- Возвращает: `UseChatRealtimeRoomResult`
+  - Описание: Результат функции в формате `UseChatRealtimeRoomResult`.
 
 ## `frontend/src/shared/config/limits.ts`
 
@@ -4307,6 +5388,509 @@
 - Возвращает: `void`
   - Описание: Ничего не возвращает; эффект достигается побочным действием.
 
+## `frontend/src/shared/customEmoji.ts`
+
+- Экспортируемые объявления: 0
+
+## `frontend/src/shared/customEmoji.types.ts`
+
+- Экспортируемые объявления: 0
+
+## `frontend/src/shared/customEmojiCatalog.ts`
+
+- Экспортируемые объявления: 7
+
+### Объявления
+
+#### `export const buildCustomEmojiCatalog = ( packManifests: readonly CustomEmojiPackManifest[], packIndexLoaders: Record<string, CustomEmojiPackIndexLoader> = {}, assetChunkLoaders: Record<string, CustomEmojiAssetChunkLoader> = {}, ): {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `buildCustomEmojiCatalog`.
+- Параметры: 3
+  - `packManifests`
+    - Формат: `readonly CustomEmojiPackManifest[]`
+    - Вид: обязательный
+    - Описание: Параметр `packManifests` в формате `readonly CustomEmojiPackManifest[]`.
+  - `packIndexLoaders`
+    - Формат: `Record<string, CustomEmojiPackIndexLoader>`
+    - Вид: обязательный
+    - Значение по умолчанию: `{}`
+    - Описание: Параметр `packIndexLoaders` в формате `Record<string, CustomEmojiPackIndexLoader>`.
+  - `assetChunkLoaders`
+    - Формат: `Record<string, CustomEmojiAssetChunkLoader>`
+    - Вид: обязательный
+    - Значение по умолчанию: `{}`
+    - Описание: Параметр `assetChunkLoaders` в формате `Record<string, CustomEmojiAssetChunkLoader>`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const getCustomEmojiById = catalog.getCustomEmojiById;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `getCustomEmojiById`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const getCustomEmojiPacks = catalog.getCustomEmojiPacks;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `getCustomEmojiPacks`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const getCustomEmojiPackSummaries = catalog.getCustomEmojiPackSummaries;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `getCustomEmojiPackSummaries`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const hasCustomEmojiPacks = catalog.hasCustomEmojiPacks;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `hasCustomEmojiPacks`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const loadCustomEmojiById = catalog.loadCustomEmojiById;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `loadCustomEmojiById`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const loadCustomEmojiPack = catalog.loadCustomEmojiPack;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `loadCustomEmojiPack`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/shared/customEmojiImageLoader.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const loadCustomEmojiImage = (src: string): Promise<void> => {`
+
+- Вид: функция
+- Кратко: Функция `loadCustomEmojiImage`.
+- Параметры: 1
+  - `src`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `src` в формате `string`.
+- Возвращает: `Promise<void>`
+  - Описание: Промис, который завершается после успешного выполнения операции `load custom emoji image`.
+
+#### `export const isCustomEmojiImageReady = (src: string): boolean =>`
+
+- Вид: функция
+- Кратко: Функция `isCustomEmojiImageReady`.
+- Параметры: 1
+  - `src`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `src` в формате `string`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+## `frontend/src/shared/customEmojiLoadQueue.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const enqueueCustomEmojiLoadTask = <T>( task: CustomEmojiLoadTask<T>, ): Promise<T> => {`
+
+- Вид: функция
+- Кратко: Функция `enqueueCustomEmojiLoadTask`.
+- Параметры: 1
+  - `task`
+    - Формат: `CustomEmojiLoadTask<T>`
+    - Вид: обязательный
+    - Описание: Параметр `task` в формате `CustomEmojiLoadTask<T>`.
+- Возвращает: `Promise<T>`
+  - Описание: Промис с результатом операции в формате `T`.
+
+#### `export const waitForNextPaint = (): Promise<void> =>`
+
+- Вид: функция
+- Кратко: Функция `waitForNextPaint`.
+- Параметры: нет
+- Возвращает: `Promise<void>`
+  - Описание: Промис, который завершается после успешного выполнения операции `wait for next paint`.
+
+## `frontend/src/shared/CustomEmojiNode.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function CustomEmojiNode({ emoji, size, className, atomic = false, priority = false, visibilityRoot, preloadMargin, }: Props) {`
+
+- Вид: функция
+- Кратко: React-компонент `CustomEmojiNode`.
+- Параметры: 1
+  - `{ emoji, size, className, atomic = false, priority = false, visibilityRoot, preloadMargin, }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `CustomEmojiNode`.
+
+## `frontend/src/shared/customEmojiParser.ts`
+
+- Экспортируемые объявления: 3
+
+### Объявления
+
+#### `export const buildCustomEmojiToken = (id: string): string =>`
+
+- Вид: функция
+- Кратко: Функция `buildCustomEmojiToken`.
+- Параметры: 1
+  - `id`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `id` в формате `string`.
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export const parseCustomEmojiText = (content: string): CustomEmojiTextPart[] => {`
+
+- Вид: функция
+- Кратко: Функция `parseCustomEmojiText`.
+- Параметры: 1
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `CustomEmojiTextPart[]`
+  - Описание: Результат функции в формате `CustomEmojiTextPart[]`.
+
+#### `export const isCustomEmojiOnlyText = (content: string): boolean => {`
+
+- Вид: функция
+- Кратко: Функция `isCustomEmojiOnlyText`.
+- Параметры: 1
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+## `frontend/src/shared/CustomEmojiRenderer.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ emoji, size, className, priority = false, visibilityRoot, preloadMargin, }: Props) { const imageVisibleRef = useRef(false); const [pendingShellNode, setPendingShellNode] = useState<HTMLSpanElement | null>(null); const [imageShellNode, setImageShellNode] =`
+
+- Вид: функция
+- Кратко: React-компонент `CustomEmojiRenderer`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `CustomEmojiRenderer`.
+
+## `frontend/src/shared/customEmojiRichText.ts`
+
+- Экспортируемые объявления: 21
+
+### Объявления
+
+#### `export const CUSTOM_EMOJI_CLIPBOARD_MIME = "application/x-devil-custom-emoji-text";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `CUSTOM_EMOJI_CLIPBOARD_MIME`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const CUSTOM_EMOJI_TOKEN_ATTRIBUTE = "data-custom-emoji-token";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `CUSTOM_EMOJI_TOKEN_ATTRIBUTE`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const CUSTOM_EMOJI_ID_ATTRIBUTE = "data-custom-emoji-id";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `CUSTOM_EMOJI_ID_ATTRIBUTE`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const CUSTOM_EMOJI_LABEL_ATTRIBUTE = "data-custom-emoji-label";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `CUSTOM_EMOJI_LABEL_ATTRIBUTE`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const CUSTOM_EMOJI_EDITOR_SENTINEL_ATTRIBUTE = "data-custom-emoji-editor-sentinel";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `CUSTOM_EMOJI_EDITOR_SENTINEL_ATTRIBUTE`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const CUSTOM_EMOJI_PLAIN_TEXT_PLACEHOLDER = "\uFFFC";`
+
+- Вид: константа
+- Кратко: Хранит константное значение `CUSTOM_EMOJI_PLAIN_TEXT_PLACEHOLDER`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const getCustomEmojiDraftLength = (value: string): number => {`
+
+- Вид: функция
+- Кратко: Функция `getCustomEmojiDraftLength`.
+- Параметры: 1
+  - `value`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `value` в формате `string`.
+- Возвращает: `number`
+  - Описание: Числовое значение результата.
+
+#### `export const serializeCustomEmojiNode = (node: Node): string => {`
+
+- Вид: функция
+- Кратко: Функция `serializeCustomEmojiNode`.
+- Параметры: 1
+  - `node`
+    - Формат: `Node`
+    - Вид: обязательный
+    - Описание: Параметр `node` в формате `Node`.
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export const serializeCustomEmojiRoot = (root: Node): string =>`
+
+- Вид: функция
+- Кратко: Функция `serializeCustomEmojiRoot`.
+- Параметры: 1
+  - `root`
+    - Формат: `Node`
+    - Вид: обязательный
+    - Описание: Параметр `root` в формате `Node`.
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export const serializeCustomEmojiSelection = ( root: HTMLElement, ): string | null => {`
+
+- Вид: функция
+- Кратко: Функция `serializeCustomEmojiSelection`.
+- Параметры: 1
+  - `root`
+    - Формат: `HTMLElement`
+    - Вид: обязательный
+    - Описание: Параметр `root` в формате `HTMLElement`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+#### `export const getSelectedCustomEmojiNodeIndexes = ( root: HTMLElement, ): Set<number> => {`
+
+- Вид: функция
+- Кратко: Функция `getSelectedCustomEmojiNodeIndexes`.
+- Параметры: 1
+  - `root`
+    - Формат: `HTMLElement`
+    - Вид: обязательный
+    - Описание: Параметр `root` в формате `HTMLElement`.
+- Возвращает: `Set<number>`
+  - Описание: Результат функции в формате `Set<number>`.
+
+#### `export const getCustomEmojiDraftSelection = ( root: HTMLElement, ): CustomEmojiDraftSelection | null => {`
+
+- Вид: функция
+- Кратко: Функция `getCustomEmojiDraftSelection`.
+- Параметры: 1
+  - `root`
+    - Формат: `HTMLElement`
+    - Вид: обязательный
+    - Описание: Параметр `root` в формате `HTMLElement`.
+- Возвращает: `CustomEmojiDraftSelection | null`
+  - Описание: Результат функции в формате `CustomEmojiDraftSelection | null`.
+
+#### `export const setCustomEmojiDraftSelection = ( root: HTMLElement, selection: CustomEmojiDraftSelection, ): void => {`
+
+- Вид: функция
+- Кратко: Функция `setCustomEmojiDraftSelection`.
+- Параметры: 2
+  - `root`
+    - Формат: `HTMLElement`
+    - Вид: обязательный
+    - Описание: Параметр `root` в формате `HTMLElement`.
+  - `selection`
+    - Формат: `CustomEmojiDraftSelection`
+    - Вид: обязательный
+    - Описание: Параметр `selection` в формате `CustomEmojiDraftSelection`.
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
+#### `export const replaceCustomEmojiDraftSelection = ( value: string, selection: CustomEmojiDraftSelection, insertion: string, ): {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `replaceCustomEmojiDraftSelection`.
+- Параметры: 3
+  - `value`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `value` в формате `string`.
+  - `selection`
+    - Формат: `CustomEmojiDraftSelection`
+    - Вид: обязательный
+    - Описание: Параметр `selection` в формате `CustomEmojiDraftSelection`.
+  - `insertion`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `insertion` в формате `string`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const deleteCustomEmojiDraftSelection = ( value: string, selection: CustomEmojiDraftSelection, direction: CustomEmojiDeleteDirection, granularity: CustomEmojiDeleteGranularity = "character", ): {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `deleteCustomEmojiDraftSelection`.
+- Параметры: 4
+  - `value`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `value` в формате `string`.
+  - `selection`
+    - Формат: `CustomEmojiDraftSelection`
+    - Вид: обязательный
+    - Описание: Параметр `selection` в формате `CustomEmojiDraftSelection`.
+  - `direction`
+    - Формат: `CustomEmojiDeleteDirection`
+    - Вид: обязательный
+    - Описание: Параметр `direction` в формате `CustomEmojiDeleteDirection`.
+  - `granularity`
+    - Формат: `CustomEmojiDeleteGranularity`
+    - Вид: обязательный
+    - Значение по умолчанию: `"character"`
+    - Описание: Параметр `granularity` в формате `CustomEmojiDeleteGranularity`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const buildCustomEmojiClipboardHtml = (content: string): string =>`
+
+- Вид: функция
+- Кратко: Функция `buildCustomEmojiClipboardHtml`.
+- Параметры: 1
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export const buildCustomEmojiClipboardPlainText = (content: string): string =>`
+
+- Вид: функция
+- Кратко: Функция `buildCustomEmojiClipboardPlainText`.
+- Параметры: 1
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `string`
+  - Описание: Строковое значение результата.
+
+#### `export const writeCustomEmojiClipboardData = ( clipboardData: Pick<DataTransfer, "setData">, content: string, ): void => {`
+
+- Вид: функция
+- Кратко: Функция `writeCustomEmojiClipboardData`.
+- Параметры: 2
+  - `clipboardData`
+    - Формат: `Pick<DataTransfer, "setData">`
+    - Вид: обязательный
+    - Описание: Параметр `clipboardData` в формате `Pick<DataTransfer, "setData">`.
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
+#### `export const parseCustomEmojiClipboardHtml = (html: string): string | null => {`
+
+- Вид: функция
+- Кратко: Функция `parseCustomEmojiClipboardHtml`.
+- Параметры: 1
+  - `html`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `html` в формате `string`.
+- Возвращает: `string | null`
+  - Описание: Результат функции в формате `string | null`.
+
+#### `export const getSingleCustomEmojiOnly = (content: string): CustomEmoji | null => {`
+
+- Вид: функция
+- Кратко: Функция `getSingleCustomEmojiOnly`.
+- Параметры: 1
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `CustomEmoji | null`
+  - Описание: Результат функции в формате `CustomEmoji | null`.
+
+#### `export const writeCustomEmojiClipboardContent = async ( content: string, ): Promise<void> => {`
+
+- Вид: функция
+- Кратко: Функция `writeCustomEmojiClipboardContent`.
+- Параметры: 1
+  - `content`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `content` в формате `string`.
+- Возвращает: `Promise<void>`
+  - Описание: Промис, который завершается после успешного выполнения операции `write custom emoji clipboard content`.
+
+## `frontend/src/shared/customEmojiStorage.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const getRecentCustomEmojiPack = (): CustomEmojiPack | null => {`
+
+- Вид: функция
+- Кратко: Функция `getRecentCustomEmojiPack`.
+- Параметры: нет
+- Возвращает: `CustomEmojiPack | null`
+  - Описание: Результат функции в формате `CustomEmojiPack | null`.
+
+#### `export const recordRecentCustomEmoji = (emoji: CustomEmoji): void => {`
+
+- Вид: функция
+- Кратко: Функция `recordRecentCustomEmoji`.
+- Параметры: 1
+  - `emoji`
+    - Формат: `CustomEmoji`
+    - Вид: обязательный
+    - Описание: Параметр `emoji` в формате `CustomEmoji`.
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
 ## `frontend/src/shared/directInbox/context.ts`
 
 - Экспортируемые объявления: 2
@@ -4424,6 +6008,36 @@
 - Возвращает: не указан
   - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
 
+## `frontend/src/shared/lib/attachmentDisplay.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const formatAttachmentFileSize = (bytes: number): string => {`
+
+- Вид: функция
+- Кратко: Форматирует размер вложения в компактный человекочитаемый вид.
+- Параметры: 1
+  - `bytes`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Размер файла в байтах.
+- Возвращает: `string`
+  - Описание: Строка с размером файла и единицей измерения.
+
+#### `export const formatAttachmentSentAt = (iso: string): string => {`
+
+- Вид: функция
+- Кратко: Форматирует дату отправки вложения для компактной карточки файла.
+- Параметры: 1
+  - `iso`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Дата отправки в ISO-формате.
+- Возвращает: `string`
+  - Описание: Локализованная короткая дата и время отправки.
+
 ## `frontend/src/shared/lib/attachmentMedia.ts`
 
 - Экспортируемые объявления: 5
@@ -4527,9 +6141,33 @@
 
 ## `frontend/src/shared/lib/avatarCrop.ts`
 
-- Экспортируемые объявления: 2
+- Экспортируемые объявления: 4
 
 ### Объявления
+
+#### `export const FULL_AVATAR_CROP: AvatarCrop = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `FULL_AVATAR_CROP`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const buildAvatarCropFromArea = ( areaPixels: AvatarCropArea | null, mediaSize: AvatarCropMediaSize | null, ): AvatarCrop => {`
+
+- Вид: функция
+- Кратко: Функция `buildAvatarCropFromArea`.
+- Параметры: 2
+  - `areaPixels`
+    - Формат: `AvatarCropArea | null`
+    - Вид: обязательный
+    - Описание: Выбранная область в пикселях исходного изображения.
+  - `mediaSize`
+    - Формат: `AvatarCropMediaSize | null`
+    - Вид: обязательный
+    - Описание: Размеры изображения из cropper-а.
+- Возвращает: `AvatarCrop`
+  - Описание: Нормализованный crop с квадратной областью в пикселях исходника.
 
 #### `export const normalizeAvatarCrop = ( value?: AvatarCrop | null, ): AvatarCrop | null => {`
 
@@ -4554,6 +6192,28 @@
     - Описание: Параметры обрезки изображения.
 - Возвращает: `CSSProperties`
   - Описание: Сформированная структура данных.
+
+## `frontend/src/shared/lib/avatarImageCrop.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const cropAvatarImageFile = async ( file: File, crop: AvatarCrop, ): Promise<File> => {`
+
+- Вид: функция
+- Кратко: Создает новый файл аватарки из выбранного пользователем crop-а.
+- Параметры: 2
+  - `file`
+    - Формат: `File`
+    - Вид: обязательный
+    - Описание: Исходный загруженный файл.
+  - `crop`
+    - Формат: `AvatarCrop`
+    - Вид: обязательный
+    - Описание: Нормализованная область, выбранная в редакторе.
+- Возвращает: `Promise<File>`
+  - Описание: Новый квадратный файл, который уже содержит выбранный кадр.
 
 ## `frontend/src/shared/lib/chatTarget.ts`
 
@@ -4681,7 +6341,7 @@
 
 ## `frontend/src/shared/lib/device/constants.ts`
 
-- Экспортируемые объявления: 1
+- Экспортируемые объявления: 2
 
 ### Объявления
 
@@ -4690,6 +6350,18 @@
 - Вид: константа
 - Кратко: Хранит константное значение `MOBILE_VIEWPORT_MAX_PX`.
 - Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const MOBILE_VIEWPORT_MEDIA_QUERY = `(max-width: ${MOBILE_VIEWPORT_MAX_PX}px)`;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `MOBILE_VIEWPORT_MEDIA_QUERY`.
+- Параметры: 1
+  - `max-width`
+    - Формат: `${MOBILE_VIEWPORT_MAX_PX}px`
+    - Вид: обязательный
+    - Описание: Параметр `max-width` в формате `${MOBILE_VIEWPORT_MAX_PX}px`.
 - Возвращает: не указан
   - Описание: Возвращает результат выполнения функции.
 
@@ -4720,8 +6392,8 @@
 #### `export function DeviceProvider({ children }: { children: ReactNode }) {`
 
 - Вид: функция
-- Кратко: Публикует в контекст актуальный снимок устройства и viewport.
-- Детали: Провайдер слушает media query, resize и orientation changes, а затем обновляет `DeviceContext` только тогда, когда snapshot реально изменился.
+- Кратко: Публикует в контекст актуальный снимок устройства.
+- Детали: Провайдер слушает media query changes, а затем обновляет `DeviceContext` только тогда, когда меняется поведение устройства, а не каждый пиксель viewport. Сырые размеры viewport остаются в CSS vars.
 - Параметры: 1
   - `{ children }`
     - Формат: `{ children: ReactNode }`
@@ -4736,7 +6408,7 @@
 
 ## `frontend/src/shared/lib/device/readDeviceSnapshot.ts`
 
-- Экспортируемые объявления: 3
+- Экспортируемые объявления: 4
 
 ### Объявления
 
@@ -4752,6 +6424,22 @@
 
 - Вид: функция
 - Кратко: Функция `areDeviceSnapshotsEqual`.
+- Параметры: 2
+  - `left`
+    - Формат: `DeviceSnapshot`
+    - Вид: обязательный
+    - Описание: Параметр `left` в формате `DeviceSnapshot`.
+  - `right`
+    - Формат: `DeviceSnapshot`
+    - Вид: обязательный
+    - Описание: Параметр `right` в формате `DeviceSnapshot`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+#### `export const areDeviceTraitsEqual = ( left: DeviceSnapshot, right: DeviceSnapshot, ): boolean =>`
+
+- Вид: функция
+- Кратко: Функция `areDeviceTraitsEqual`.
 - Параметры: 2
   - `left`
     - Формат: `DeviceSnapshot`
@@ -4796,7 +6484,7 @@
 
 ## `frontend/src/shared/lib/directNavigation.ts`
 
-- Экспортируемые объявления: 5
+- Экспортируемые объявления: 6
 
 ### Объявления
 
@@ -4838,11 +6526,19 @@
 - Возвращает: `void`
   - Описание: Ничего не возвращает; эффект достигается побочным действием.
 
+#### `export const forgetLastDirectRef = (): void => {`
+
+- Вид: функция
+- Кратко: Функция `forgetLastDirectRef`.
+- Параметры: нет
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
 #### `export const resolveRememberedDirectPath = ({ pathname, fallbackPath = DIRECT_HOME_FALLBACK_PATH, directPeerRefs = [], }: ResolveRememberedDirectPathOptions = {}): string => {`
 
 - Вид: функция
 - Кратко: Вычисляет маршрут, в который нужно вести пользователя из shortcut-а личных чатов.
-- Детали: Приоритет такой: активный подходящий direct route, сохраненный в localStorage peer ref, первый доступный peer ref из списка и только потом fallback path.
+- Детали: Приоритет такой: активный подходящий direct route, сохраненный в localStorage peer ref, первый доступный peer ref из списка и только потом fallback path. Значение из localStorage считается валидным только если оно есть в текущем direct inbox.
 - Параметры: 1
   - `{ pathname, fallbackPath = DIRECT_HOME_FALLBACK_PATH, directPeerRefs = [], }`
     - Формат: `ResolveRememberedDirectPathOptions`
@@ -4851,6 +6547,40 @@
     - Описание: Объект параметров в формате `ResolveRememberedDirectPathOptions`.
 - Возвращает: `string`
   - Описание: Строковое значение результата.
+
+## `frontend/src/shared/lib/fileActions.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const triggerFileDownload = (url: string, fileName: string): void => {`
+
+- Вид: функция
+- Кратко: Функция `triggerFileDownload`.
+- Параметры: 2
+  - `url`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `url` в формате `string`.
+  - `fileName`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `fileName` в формате `string`.
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
+#### `export const copyImageUrlToClipboard = async (url: string): Promise<void> => {`
+
+- Вид: функция
+- Кратко: Функция `copyImageUrlToClipboard`.
+- Параметры: 1
+  - `url`
+    - Формат: `string`
+    - Вид: обязательный
+    - Описание: Параметр `url` в формате `string`.
+- Возвращает: `Promise<void>`
+  - Описание: Промис, который завершается после успешного выполнения операции `copy image url to clipboard`.
 
 ## `frontend/src/shared/lib/format.ts`
 
@@ -5075,6 +6805,70 @@
 - Возвращает: `string | null`
   - Описание: Результат функции в формате `string | null`.
 
+## `frontend/src/shared/lib/viewport/useViewportCssVars.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const useViewportCssVars = (): void => {`
+
+- Вид: функция
+- Кратко: Хук `useViewportCssVars`.
+- Параметры: нет
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
+## `frontend/src/shared/lib/viewport/viewportCssVars.ts`
+
+- Экспортируемые объявления: 3
+
+### Объявления
+
+#### `export const readViewportCssMetrics = ( targetWindow: ViewportCssMetricsSource, ): ViewportCssMetrics => {`
+
+- Вид: функция
+- Кратко: Функция `readViewportCssMetrics`.
+- Параметры: 1
+  - `targetWindow`
+    - Формат: `ViewportCssMetricsSource`
+    - Вид: обязательный
+    - Описание: Параметр `targetWindow` в формате `ViewportCssMetricsSource`.
+- Возвращает: `ViewportCssMetrics`
+  - Описание: Результат функции в формате `ViewportCssMetrics`.
+
+#### `export const areViewportCssMetricsEqual = ( left: ViewportCssMetrics, right: ViewportCssMetrics, ): boolean =>`
+
+- Вид: функция
+- Кратко: Функция `areViewportCssMetricsEqual`.
+- Параметры: 2
+  - `left`
+    - Формат: `ViewportCssMetrics`
+    - Вид: обязательный
+    - Описание: Параметр `left` в формате `ViewportCssMetrics`.
+  - `right`
+    - Формат: `ViewportCssMetrics`
+    - Вид: обязательный
+    - Описание: Параметр `right` в формате `ViewportCssMetrics`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+#### `export const applyViewportCssMetrics = ( root: HTMLElement, metrics: ViewportCssMetrics, ): void => {`
+
+- Вид: функция
+- Кратко: Функция `applyViewportCssMetrics`.
+- Параметры: 2
+  - `root`
+    - Формат: `HTMLElement`
+    - Вид: обязательный
+    - Описание: Параметр `root` в формате `HTMLElement`.
+  - `metrics`
+    - Формат: `ViewportCssMetrics`
+    - Вид: обязательный
+    - Описание: Параметр `metrics` в формате `ViewportCssMetrics`.
+- Возвращает: `void`
+  - Описание: Ничего не возвращает; эффект достигается побочным действием.
+
 ## `frontend/src/shared/lib/ws.ts`
 
 - Экспортируемые объявления: 3
@@ -5120,6 +6914,76 @@
     - Описание: Параметр `token` в формате `string | null | undefined`.
 - Возвращает: не указан
   - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/shared/notifications/index.ts`
+
+- Экспортируемые объявления: 0
+
+## `frontend/src/shared/notifications/NotificationContext.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const NotificationContext = createContext<NotificationsApi | null>(null);`
+
+- Вид: константа
+- Кратко: Хранит константное значение `NotificationContext`.
+- Параметры: 1
+  - `null`
+    - Формат: не указан
+    - Вид: обязательный
+    - Описание: Параметр `null`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/shared/notifications/NotificationProvider.tsx`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export function NotificationViewport({ notifications, onDismiss, }: { notifications: NotificationRecord[]; onDismiss: (id: string) => void; }) {`
+
+- Вид: функция
+- Кратко: React-компонент `NotificationViewport`.
+- Параметры: 1
+  - `{ notifications, onDismiss, }`
+    - Формат: `{ notifications: NotificationRecord[]; onDismiss: (id: string) => void; }`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `{ notifications: NotificationRecord[]; onDismiss: (id: string) => void; }`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `NotificationViewport`.
+
+#### `export function NotificationProvider({ children }: NotificationProviderProps) {`
+
+- Вид: функция
+- Кратко: Провайдер `NotificationProvider`.
+- Параметры: 1
+  - `{ children }`
+    - Формат: `NotificationProviderProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `NotificationProviderProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `NotificationProvider`.
+
+## `frontend/src/shared/notifications/NotificationTypes.ts`
+
+- Экспортируемые объявления: 0
+
+## `frontend/src/shared/notifications/useNotifications.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const useNotifications = (): NotificationsApi => {`
+
+- Вид: функция
+- Кратко: Хук `useNotifications`.
+- Параметры: нет
+- Возвращает: `NotificationsApi`
+  - Описание: Результат функции в формате `NotificationsApi`.
 
 ## `frontend/src/shared/presence/context.ts`
 
@@ -5183,18 +7047,117 @@
 - Возвращает: не указан
   - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
 
+## `frontend/src/shared/roomReadState/context.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const RoomReadStateContext = createContext<RoomReadStateContextValue>(FALLBACK_ROOM_READ_STATE_CONTEXT);`
+
+- Вид: константа
+- Кратко: Хранит константное значение `RoomReadStateContext`.
+- Параметры: 1
+  - `FALLBACK_ROOM_READ_STATE_CONTEXT`
+    - Формат: не указан
+    - Вид: обязательный
+    - Описание: Параметр `FALLBACK_ROOM_READ_STATE_CONTEXT`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+## `frontend/src/shared/roomReadState/index.ts`
+
+- Экспортируемые объявления: 0
+
+## `frontend/src/shared/roomReadState/RoomReadStateProvider.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function RoomReadStateProvider({ children }: { children: ReactNode }) {`
+
+- Вид: функция
+- Кратко: Провайдер `RoomReadStateProvider`.
+- Параметры: 1
+  - `{ children }`
+    - Формат: `{ children: ReactNode }`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `{ children: ReactNode }`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `RoomReadStateProvider`.
+
+## `frontend/src/shared/roomReadState/useRoomReadState.ts`
+
+- Экспортируемые объявления: 2
+
+### Объявления
+
+#### `export const useRoomReadController = () => {`
+
+- Вид: функция
+- Кратко: Хук `useRoomReadController`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
+
+#### `export const useRoomReadState = ( roomId: string | number | null | undefined, ) => {`
+
+- Вид: функция
+- Кратко: Хук `useRoomReadState`.
+- Параметры: 1
+  - `roomId`
+    - Формат: `string | number | null | undefined`
+    - Вид: обязательный
+    - Описание: Параметр `roomId` в формате `string | number | null | undefined`.
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
+
+## `frontend/src/shared/security/useSecuritySettings.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const useSecuritySettings = (enabled = true) => {`
+
+- Вид: функция
+- Кратко: Хук `useSecuritySettings`.
+- Параметры: 1
+  - `enabled`
+    - Формат: не указан
+    - Вид: обязательный
+    - Значение по умолчанию: `true`
+    - Описание: Параметр `enabled`.
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
+
+## `frontend/src/shared/TgsLottie.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const TgsLottie = memo(function TgsLottie({ src, label, size, className, priority = false, visibilityRoot, preloadMargin, }: TgsLottieProps) { const animationContainerRef = useRef<HTMLSpanElement>(null); const animationRef = useRef<LottieAnimation | null>(null); const queuedSrcRef = useRef<string | null>(null); const visibleRef = useRef(false);`
+
+- Вид: функция
+- Кратко: React-компонент `TgsLottie`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `TgsLottie`.
+
 ## `frontend/src/shared/ui/AudioAttachmentPlayer.tsx`
 
 - Экспортируемые объявления: 1
 
 ### Объявления
 
-#### `export function AudioAttachmentPlayer({ src, title, subtitle, downloadName, compact = false, className, }: Props) {`
+#### `export function AudioAttachmentPlayer({ src, title, subtitle, fileSizeLabel, fileTypeLabel, sentAtLabel, // sentAtIso, downloadName, compact = false, className, }: Props) {`
 
 - Вид: функция
-- Кратко: React-компонент `AudioAttachmentPlayer`.
+- Кратко: Рендерит компактный аудиоплеер вложения с метаданными файла и управлением громкостью.
 - Параметры: 1
-  - `{ src, title, subtitle, downloadName, compact = false, className, }`
+  - `{ src, title, subtitle, fileSizeLabel, fileTypeLabel, sentAtLabel, // sentAtIso, downloadName, compact = false, className, }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
@@ -5225,12 +7188,12 @@
 
 ### Объявления
 
-#### `export function AvatarCropModal({ open, image, onCancel, onApply, }: AvatarCropModalProps) {`
+#### `export function AvatarCropModal({ open, image, initialCrop = null, applying = false, onCancel, onApply, }: AvatarCropModalProps) {`
 
 - Вид: функция
-- Кратко: React-компонент `AvatarCropModal`.
+- Кратко: Рендерит модальное окно выбора круглой области аватарки.
 - Параметры: 1
-  - `{ open, image, onCancel, onApply, }`
+  - `{ open, image, initialCrop = null, applying = false, onCancel, onApply, }`
     - Формат: `AvatarCropModalProps`
     - Вид: обязательный
     - Описание: Объект параметров в формате `AvatarCropModalProps`.
@@ -5345,6 +7308,24 @@
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `EmptyState`.
 
+## `frontend/src/shared/ui/FileAttachmentCard.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function FileAttachmentCard({ fileName, fileTypeLabel, fileSizeLabel, sentAtLabel, // sentAtIso, href, downloadName, compact = false, className, }: Props) {`
+
+- Вид: функция
+- Кратко: Рендерит компактную карточку файла с постоянной видимостью типа, размера и даты отправки.
+- Параметры: 1
+  - `{ fileName, fileTypeLabel, fileSizeLabel, sentAtLabel, // sentAtIso, href, downloadName, compact = false, className, }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `FileAttachmentCard`.
+
 ## `frontend/src/shared/ui/ImageLightbox.tsx`
 
 - Экспортируемые объявления: 1
@@ -5378,13 +7359,13 @@
 
 ### Объявления
 
-#### `export function LightboxVideoPlayer({ src, poster, fileName, }: LightboxVideoPlayerProps) {`
+#### `export function LightboxVideoPlayer({ src, poster, fileName, onRequestClose, }: LightboxVideoPlayerProps) {`
 
 - Вид: функция
 - Кратко: React-компонент `LightboxVideoPlayer`.
 - Детали: The component deliberately stays close to the browser's default player: there are no custom playback layers, no third-party runtime and no detached player session. Closing the viewer always tears the media element down.
 - Параметры: 1
-  - `{ src, poster, fileName, }`
+  - `{ src, poster, fileName, onRequestClose, }`
     - Формат: `LightboxVideoPlayerProps`
     - Вид: обязательный
     - Описание: Объект параметров в формате `LightboxVideoPlayerProps`.
@@ -5409,6 +7390,24 @@
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `Modal`.
 
+## `frontend/src/shared/ui/PageState.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function PageState({ tone = "neutral", icon, eyebrow, title, description, children, className, }: PageStateProps) {`
+
+- Вид: функция
+- Кратко: React-компонент `PageState`.
+- Параметры: 1
+  - `{ tone = "neutral", icon, eyebrow, title, description, children, className, }`
+    - Формат: `PageStateProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `PageStateProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `PageState`.
+
 ## `frontend/src/shared/ui/Panel.tsx`
 
 - Экспортируемые объявления: 1
@@ -5426,6 +7425,42 @@
     - Описание: Объект параметров в формате `PanelProps`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `Panel`.
+
+## `frontend/src/shared/ui/PublicChatIcon.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function PublicChatIcon({ className }: PublicChatIconProps) {`
+
+- Вид: функция
+- Кратко: React-компонент `PublicChatIcon`.
+- Параметры: 1
+  - `{ className }`
+    - Формат: `PublicChatIconProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `PublicChatIconProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `PublicChatIcon`.
+
+## `frontend/src/shared/ui/Skeleton.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function Skeleton({ variant = "block", width, height, radius, className, style, }: SkeletonProps) {`
+
+- Вид: функция
+- Кратко: Рендерит анимированный placeholder для данных, которые догружаются отдельно от постоянного каркаса интерфейса.
+- Параметры: 1
+  - `{ variant = "block", width, height, radius, className, style, }`
+    - Формат: `SkeletonProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `SkeletonProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `Skeleton`.
 
 ## `frontend/src/shared/ui/Spinner.tsx`
 
@@ -5445,24 +7480,6 @@
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `Spinner`.
 
-## `frontend/src/shared/ui/Toast.tsx`
-
-- Экспортируемые объявления: 1
-
-### Объявления
-
-#### `export function Toast({ variant, role = "status", className, autoDismissMs = 5000, onDismiss, children, }: ToastProps) {`
-
-- Вид: функция
-- Кратко: React-компонент `Toast`.
-- Параметры: 1
-  - `{ variant, role = "status", className, autoDismissMs = 5000, onDismiss, children, }`
-    - Формат: `ToastProps`
-    - Вид: обязательный
-    - Описание: Объект параметров в формате `ToastProps`.
-- Возвращает: не указан
-  - Описание: React-элемент, который отрисовывает компонент `Toast`.
-
 ## `frontend/src/shared/ui/useGuardedModalState.ts`
 
 - Экспортируемые объявления: 1
@@ -5478,22 +7495,347 @@
 - Возвращает: `GuardedModalState<T>`
   - Описание: Guard с синхронным lock-before-render и безопасным освобождением.
 
+## `frontend/src/shared/ui/useModalHistoryGuard.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function useModalHistoryGuard(onClose: () => void): () => void {`
+
+- Вид: функция
+- Кратко: Хук `useModalHistoryGuard`.
+- Параметры: 1
+  - `onClose`
+    - Формат: `()`
+    - Вид: обязательный
+    - Значение по умолчанию: `> void`
+    - Описание: Колбэк события `close`.
+- Возвращает: `()`
+  - Описание: Результат функции в формате `()`.
+
+## `frontend/src/shared/ui/zoomableImageGeometry.ts`
+
+- Экспортируемые объявления: 22
+
+### Объявления
+
+#### `export const MIN_SCALE = 1;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `MIN_SCALE`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const MAX_SCALE = 32;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `MAX_SCALE`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const MOBILE_MAX_SCALE_OVERSHOOT_RATIO = 0.18;`
+
+- Вид: константа
+- Кратко: Хранит константное значение `MOBILE_MAX_SCALE_OVERSHOOT_RATIO`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const MAX_SCALE_WITH_MOBILE_SPRING = MAX_SCALE * (1 + MOBILE_MAX_SCALE_OVERSHOOT_RATIO);`
+
+- Вид: константа
+- Кратко: Хранит константное значение `MAX_SCALE_WITH_MOBILE_SPRING`.
+- Параметры: 1
+  - `1 + MOBILE_MAX_SCALE_OVERSHOOT_RATIO`
+    - Формат: не указан
+    - Вид: обязательный
+    - Описание: Параметр `1 + MOBILE_MAX_SCALE_OVERSHOOT_RATIO`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const DEFAULT_TRANSFORM: TransformState = {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `DEFAULT_TRANSFORM`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const clamp = (value: number, min: number, max: number): number =>`
+
+- Вид: функция
+- Кратко: Функция `clamp`.
+- Параметры: 3
+  - `value`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Параметр `value` в формате `number`.
+  - `min`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Параметр `min` в формате `number`.
+  - `max`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Параметр `max` в формате `number`.
+- Возвращает: `number`
+  - Описание: Числовое значение результата.
+
+#### `export const getDistance = (first: Point, second: Point): number =>`
+
+- Вид: функция
+- Кратко: Функция `getDistance`.
+- Параметры: 2
+  - `first`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `first` в формате `Point`.
+  - `second`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `second` в формате `Point`.
+- Возвращает: `number`
+  - Описание: Числовое значение результата.
+
+#### `export const getCenter = (first: Point, second: Point): Point => ({ x: (first.x + second.x) / 2, y: (first.y + second.y) / 2, });`
+
+- Вид: функция
+- Кратко: Функция `getCenter`.
+- Параметры: 2
+  - `first`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `first` в формате `Point`.
+  - `second`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `second` в формате `Point`.
+- Возвращает: `Point`
+  - Описание: Результат функции в формате `Point`.
+
+#### `export const getTransformBounds = ( geometry: TransformGeometry, scale: number, ): Point => {`
+
+- Вид: функция
+- Кратко: Функция `getTransformBounds`.
+- Параметры: 2
+  - `geometry`
+    - Формат: `TransformGeometry`
+    - Вид: обязательный
+    - Описание: Параметр `geometry` в формате `TransformGeometry`.
+  - `scale`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Параметр `scale` в формате `number`.
+- Возвращает: `Point`
+  - Описание: Результат функции в формате `Point`.
+
+#### `export const areTransformsClose = ( first: TransformState, second: TransformState, ): boolean =>`
+
+- Вид: функция
+- Кратко: Сравнивает два transform с допуском для дробных значений после анимации.
+- Параметры: 2
+  - `first`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Первое состояние transform.
+  - `second`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Второе состояние transform.
+- Возвращает: `boolean`
+  - Описание: `true`, если визуальная разница между состояниями несущественна.
+
+#### `export const constrainTransform = ( transform: TransformState, geometry: TransformGeometry | null, options: ConstrainTransformOptions = {}, ): TransformState => {`
+
+- Вид: функция
+- Кратко: Ограничивает transform допустимой областью просмотра.
+- Параметры: 3
+  - `transform`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Текущее визуальное смещение и масштаб.
+  - `geometry`
+    - Формат: `TransformGeometry | null`
+    - Вид: обязательный
+    - Описание: Размер viewport и уже вписанного медиа.
+  - `options`
+    - Формат: `ConstrainTransformOptions`
+    - Вид: обязательный
+    - Значение по умолчанию: `{}`
+    - Описание: Дополнительные границы, например mobile spring overscale.
+- Возвращает: `TransformState`
+  - Описание: Transform, который можно безопасно применить к медиа.
+
+#### `export const resolveMobileSpringScale = (scale: number): number => {`
+
+- Вид: функция
+- Кратко: Функция `resolveMobileSpringScale`.
+- Параметры: 1
+  - `scale`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Сырой масштаб pinch-жеста.
+- Возвращает: `number`
+  - Описание: Визуальный масштаб с затухающим overscale.
+
+#### `export const settleTransform = ( transform: TransformState, geometry: TransformGeometry | null, ): TransformState => {`
+
+- Вид: функция
+- Кратко: Функция `settleTransform`.
+- Параметры: 2
+  - `transform`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Текущий transform, возможно с mobile overscale.
+  - `geometry`
+    - Формат: `TransformGeometry | null`
+    - Вид: обязательный
+    - Описание: Размеры области просмотра и медиа.
+- Возвращает: `TransformState`
+  - Описание: Transform с обычными production-границами.
+
+#### `export const buildZoomAtPointTransform = ( current: TransformState, nextScale: number, point: Point, ): TransformState => {`
+
+- Вид: функция
+- Кратко: Функция `buildZoomAtPointTransform`.
+- Параметры: 3
+  - `current`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Параметр `current` в формате `TransformState`.
+  - `nextScale`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Параметр `nextScale` в формате `number`.
+  - `point`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `point` в формате `Point`.
+- Возвращает: `TransformState`
+  - Описание: Результат функции в формате `TransformState`.
+
+#### `export const buildPanTransform = ( startTransform: TransformState, startPoint: Point, currentPoint: Point, ): TransformState => ({ scale: startTransform.scale, x: startTransform.x + currentPoint.x - startPoint.x, y: startTransform.y + currentPoint.y - startPoint.y, });`
+
+- Вид: функция
+- Кратко: Функция `buildPanTransform`.
+- Параметры: 3
+  - `startTransform`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Параметр `startTransform` в формате `TransformState`.
+  - `startPoint`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `startPoint` в формате `Point`.
+  - `currentPoint`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `currentPoint` в формате `Point`.
+- Возвращает: `TransformState`
+  - Описание: Результат функции в формате `TransformState`.
+
+#### `export const buildPinchTransform = ({ startCenter, currentCenter, startDistance, currentDistance, startTransform, }: { startCenter: Point; currentCenter: Point; startDistance: number; currentDistance: number; startTransform: TransformState; }): TransformState => {`
+
+- Вид: функция
+- Кратко: Функция `buildPinchTransform`.
+- Параметры: 1
+  - `{ startCenter, currentCenter, startDistance, currentDistance, startTransform, }`
+    - Формат: `{ startCenter: Point; currentCenter: Point; startDistance: number; currentDistance: number; startTransform: TransformState; }`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `{ startCenter: Point; currentCenter: Point; startDistance: number; currentDistance: number; startTransform: TransformState; }`.
+- Возвращает: `TransformState`
+  - Описание: Результат функции в формате `TransformState`.
+
+#### `export const buildMobilePinchTransform = ({ startCenter, currentCenter, startDistance, currentDistance, startTransform, }: { startCenter: Point; currentCenter: Point; startDistance: number; currentDistance: number; startTransform: TransformState; }): TransformState => {`
+
+- Вид: функция
+- Кратко: Функция `buildMobilePinchTransform`.
+- Параметры: 1
+  - `{ startCenter, currentCenter, startDistance, currentDistance, startTransform, }`
+    - Формат: `{ startCenter: Point; currentCenter: Point; startDistance: number; currentDistance: number; startTransform: TransformState; }`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `{ startCenter: Point; currentCenter: Point; startDistance: number; currentDistance: number; startTransform: TransformState; }`.
+- Возвращает: `TransformState`
+  - Описание: Результат функции в формате `TransformState`.
+
+#### `export const isZoomedTransform = (transform: TransformState): boolean =>`
+
+- Вид: функция
+- Кратко: Функция `isZoomedTransform`.
+- Параметры: 1
+  - `transform`
+    - Формат: `TransformState`
+    - Вид: обязательный
+    - Описание: Параметр `transform` в формате `TransformState`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+#### `export const getSwipeDismissThreshold = (viewportHeight: number): number =>`
+
+- Вид: функция
+- Кратко: Функция `getSwipeDismissThreshold`.
+- Параметры: 1
+  - `viewportHeight`
+    - Формат: `number`
+    - Вид: обязательный
+    - Описание: Параметр `viewportHeight` в формате `number`.
+- Возвращает: `number`
+  - Описание: Числовое значение результата.
+
+#### `export const hasVerticalSwipeIntent = (offset: Point): boolean =>`
+
+- Вид: функция
+- Кратко: Функция `hasVerticalSwipeIntent`.
+- Параметры: 1
+  - `offset`
+    - Формат: `Point`
+    - Вид: обязательный
+    - Описание: Параметр `offset` в формате `Point`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+#### `export const buildSwipeDismissMetrics = ({ startPoint, currentPoint, previousPoint, elapsedMs, viewportHeight, }: { startPoint: Point; currentPoint: Point; previousPoint: Point; elapsedMs: number; viewportHeight: number; }): SwipeDismissMetrics => {`
+
+- Вид: функция
+- Кратко: Функция `buildSwipeDismissMetrics`.
+- Параметры: 1
+  - `{ startPoint, currentPoint, previousPoint, elapsedMs, viewportHeight, }`
+    - Формат: `{ startPoint: Point; currentPoint: Point; previousPoint: Point; elapsedMs: number; viewportHeight: number; }`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `{ startPoint: Point; currentPoint: Point; previousPoint: Point; elapsedMs: number; viewportHeight: number; }`.
+- Возвращает: `SwipeDismissMetrics`
+  - Описание: Результат функции в формате `SwipeDismissMetrics`.
+
+#### `export const shouldDismissBySwipe = ({ offset, velocity, viewportHeight, }: { offset: Point; velocity: Point; viewportHeight: number; }): boolean => {`
+
+- Вид: функция
+- Кратко: Функция `shouldDismissBySwipe`.
+- Параметры: 1
+  - `{ offset, velocity, viewportHeight, }`
+    - Формат: `{ offset: Point; velocity: Point; viewportHeight: number; }`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `{ offset: Point; velocity: Point; viewportHeight: number; }`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
 ## `frontend/src/shared/ui/ZoomableImageStage.tsx`
 
 - Экспортируемые объявления: 1
 
 ### Объявления
 
-#### `export function ZoomableImageStage({ src, alt, onRequestClose, }: ZoomableImageStageProps) {`
+#### `export function ZoomableImageStage(props: ZoomableImageStageProps) {`
 
 - Вид: функция
 - Кратко: React-компонент `ZoomableImageStage`.
-- Детали: The stage keeps fit-to-screen as the base state. Every zoom step is applied around the visual center of the viewer, while pan stays unrestricted after the image has already been scaled.
 - Параметры: 1
-  - `{ src, alt, onRequestClose, }`
+  - `props`
     - Формат: `ZoomableImageStageProps`
     - Вид: обязательный
-    - Описание: Объект параметров в формате `ZoomableImageStageProps`.
+    - Описание: Объект props в формате `ZoomableImageStageProps`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `ZoomableImageStage`.
 
@@ -5568,6 +7910,29 @@
 - Кратко: Хук `useUnreadOverrides`.
 - Детали: `useSyncExternalStore` нужен, чтобы React видел консистентный снимок даже при одновременных рендерах и внешних обновлениях store.
 - Параметры: нет
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
+
+## `frontend/src/shared/useVisibilityGate.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const useVisibilityGate = <T extends Element>( targetNode: T | null, { priority = false, root, rootMargin = "0px", }: Options = {}, ): {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `useVisibilityGate`.
+- Параметры: 2
+  - `targetNode`
+    - Формат: `T | null`
+    - Вид: обязательный
+    - Описание: Параметр `targetNode` в формате `T | null`.
+  - `{ priority = false, root, rootMargin = "0px", }`
+    - Формат: `Options`
+    - Вид: обязательный
+    - Значение по умолчанию: `{}`
+    - Описание: Объект параметров в формате `Options`.
 - Возвращает: не указан
   - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
 
@@ -5704,6 +8069,52 @@
 
 - Экспортируемые объявления: 0
 
+## `frontend/src/test/deviceEnvironment.ts`
+
+- Экспортируемые объявления: 4
+
+### Объявления
+
+#### `export const installDeviceEnvironment = ( environment: Partial<DeviceEnvironment>, ) => {`
+
+- Вид: функция
+- Кратко: Функция `installDeviceEnvironment`.
+- Параметры: 1
+  - `environment`
+    - Формат: `Partial<DeviceEnvironment>`
+    - Вид: обязательный
+    - Описание: Параметр `environment` в формате `Partial<DeviceEnvironment>`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const updateDeviceEnvironment = ( environment: Partial<DeviceEnvironment>, ) => {`
+
+- Вид: функция
+- Кратко: Функция `updateDeviceEnvironment`.
+- Параметры: 1
+  - `environment`
+    - Формат: `Partial<DeviceEnvironment>`
+    - Вид: обязательный
+    - Описание: Параметр `environment` в формате `Partial<DeviceEnvironment>`.
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const dispatchDeviceMediaChanges = () => {`
+
+- Вид: функция
+- Кратко: Функция `dispatchDeviceMediaChanges`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
+#### `export const resetDeviceEnvironment = () => {`
+
+- Вид: функция
+- Кратко: Функция `resetDeviceEnvironment`.
+- Параметры: нет
+- Возвращает: не указан
+  - Описание: Возвращает результат выполнения функции.
+
 ## `frontend/src/test/setup.ts`
 
 - Экспортируемые объявления: 1
@@ -5742,18 +8153,36 @@
 
 ### Объявления
 
-#### `export function AuthForm({ mode, title, submitLabel, onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, error = null, passwordRules = [], className, }: AuthFormProps) {`
+#### `export function AuthForm({ mode, title, submitLabel, onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, passwordRules = [], className, }: AuthFormProps) {`
 
 - Вид: функция
 - Кратко: React-компонент `AuthForm`.
 - Детали: Google-вход здесь намеренно не использует popup. Кнопка запускает server-side redirect flow: браузер уходит на backend endpoint, backend сам завершает Google OAuth и затем возвращает пользователя обратно уже с готовой серверной сессией.
 - Параметры: 1
-  - `{ mode, title, submitLabel, onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, error = null, passwordRules = [], className, }`
+  - `{ mode, title, submitLabel, onSubmit, onGoogleAuth, googleAuthDisabledReason = null, onNavigate, passwordRules = [], className, }`
     - Формат: `AuthFormProps`
     - Вид: обязательный
     - Описание: Объект параметров в формате `AuthFormProps`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `AuthForm`.
+
+## `frontend/src/widgets/auth/LoginTwoFactorModal.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function LoginTwoFactorModal({ open, onClose, onConfirm }: Props) {`
+
+- Вид: функция
+- Кратко: React-компонент `LoginTwoFactorModal`.
+- Параметры: 1
+  - `{ open, onClose, onConfirm }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `LoginTwoFactorModal`.
 
 ## `frontend/src/widgets/chat/ChatSearch.tsx`
 
@@ -5773,6 +8202,24 @@
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `ChatSearch`.
 
+## `frontend/src/widgets/chat/CustomEmojiPicker.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function CustomEmojiPicker({ onSelect, onClose, placement = "composer", }: CustomEmojiPickerProps) {`
+
+- Вид: функция
+- Кратко: React-компонент `CustomEmojiPicker`.
+- Параметры: 1
+  - `{ onSelect, onClose, placement = "composer", }`
+    - Формат: `CustomEmojiPickerProps`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `CustomEmojiPickerProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `CustomEmojiPicker`.
+
 ## `frontend/src/widgets/chat/DirectInfoPanel.tsx`
 
 - Экспортируемые объявления: 1
@@ -5790,6 +8237,24 @@
     - Описание: Объект параметров в формате `Props`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `DirectInfoPanel`.
+
+## `frontend/src/widgets/chat/LazyCustomEmojiPicker.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function LazyCustomEmojiPicker(props: CustomEmojiPickerProps) {`
+
+- Вид: функция
+- Кратко: React-компонент `LazyCustomEmojiPicker`.
+- Параметры: 1
+  - `props`
+    - Формат: `CustomEmojiPickerProps`
+    - Вид: обязательный
+    - Описание: Объект props в формате `CustomEmojiPickerProps`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `LazyCustomEmojiPicker`.
 
 ## `frontend/src/widgets/chat/lib/attachmentLayout.ts`
 
@@ -5841,7 +8306,7 @@
 
 - Вид: функция
 - Кратко: Функция `buildMediaTileLayout`.
-- Детали: Layout сохраняет порядок изображений и использует grouped media collage: portrait и landscape кадры получают разные прямоугольники вместо равных колонок.
+- Детали: Раскладка сохраняет порядок изображений и точнее обычного CSS grid: portrait и landscape кадры получают разные прямоугольники вместо равных колонок.
 - Параметры: 1
   - `items`
     - Формат: `ImageAttachmentRenderItem[]`
@@ -5849,6 +8314,42 @@
     - Описание: Параметр `items` в формате `ImageAttachmentRenderItem[]`.
 - Возвращает: `MediaTileLayout`
   - Описание: Результат функции в формате `MediaTileLayout`.
+
+## `frontend/src/widgets/chat/lib/useVirtualEmojiGrid.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const useVirtualEmojiGrid = ({ gap = 8, itemCount, minCellSize = 52, overscanRows = 1, scrollRoot, }: VirtualEmojiGridOptions): {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `useVirtualEmojiGrid`.
+- Параметры: 1
+  - `{ gap = 8, itemCount, minCellSize = 52, overscanRows = 1, scrollRoot, }`
+    - Формат: `VirtualEmojiGridOptions`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `VirtualEmojiGridOptions`.
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
+
+## `frontend/src/widgets/chat/lib/useVirtualHorizontalList.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export const useVirtualHorizontalList = ({ gap = 0, itemCount, itemWidth, overscanItems = 3, scrollRoot, }: VirtualHorizontalListOptions): {`
+
+- Вид: константа
+- Кратко: Хранит константное значение `useVirtualHorizontalList`.
+- Параметры: 1
+  - `{ gap = 0, itemCount, itemWidth, overscanItems = 3, scrollRoot, }`
+    - Формат: `VirtualHorizontalListOptions`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `VirtualHorizontalListOptions`.
+- Возвращает: не указан
+  - Описание: Состояние, вычисленные значения и колбэки, возвращаемые хуком.
 
 ## `frontend/src/widgets/chat/MessageBubble.tsx`
 
@@ -5886,6 +8387,64 @@
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `MessageInput`.
 
+## `frontend/src/widgets/chat/messageInputEvents.ts`
+
+- Экспортируемые объявления: 4
+
+### Объявления
+
+#### `export const supportsBeforeInputEvents = (): boolean => {`
+
+- Вид: функция
+- Кратко: Функция `supportsBeforeInputEvents`.
+- Параметры: нет
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
+#### `export const getBeforeInputDraftOperation = ( event: InputEvent, ): MessageInputDraftOperation | null => {`
+
+- Вид: функция
+- Кратко: Функция `getBeforeInputDraftOperation`.
+- Параметры: 1
+  - `event`
+    - Формат: `InputEvent`
+    - Вид: обязательный
+    - Описание: Параметр `event` в формате `InputEvent`.
+- Возвращает: `MessageInputDraftOperation | null`
+  - Описание: Результат функции в формате `MessageInputDraftOperation | null`.
+
+#### `export const getKeyboardDraftOperation = ( event: ReactKeyboardEvent<HTMLElement>, beforeInputSupported: boolean, ): MessageInputDraftOperation | null => {`
+
+- Вид: функция
+- Кратко: Функция `getKeyboardDraftOperation`.
+- Параметры: 2
+  - `event`
+    - Формат: `ReactKeyboardEvent<HTMLElement>`
+    - Вид: обязательный
+    - Описание: Параметр `event` в формате `ReactKeyboardEvent<HTMLElement>`.
+  - `beforeInputSupported`
+    - Формат: `boolean`
+    - Вид: обязательный
+    - Описание: Параметр `beforeInputSupported` в формате `boolean`.
+- Возвращает: `MessageInputDraftOperation | null`
+  - Описание: Результат функции в формате `MessageInputDraftOperation | null`.
+
+#### `export const areSameDraftOperations = ( first: MessageInputDraftOperation, second: MessageInputDraftOperation, ): boolean => {`
+
+- Вид: функция
+- Кратко: Функция `areSameDraftOperations`.
+- Параметры: 2
+  - `first`
+    - Формат: `MessageInputDraftOperation`
+    - Вид: обязательный
+    - Описание: Параметр `first` в формате `MessageInputDraftOperation`.
+  - `second`
+    - Формат: `MessageInputDraftOperation`
+    - Вид: обязательный
+    - Описание: Параметр `second` в формате `MessageInputDraftOperation`.
+- Возвращает: `boolean`
+  - Описание: Булево значение, отражающее результат проверки.
+
 ## `frontend/src/widgets/chat/ReadersMenu.tsx`
 
 - Экспортируемые объявления: 1
@@ -5922,6 +8481,24 @@
     - Описание: Объект параметров в формате `Props`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `TypingIndicator`.
+
+## `frontend/src/widgets/chat/useFocusPreservingSendButton.ts`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function useFocusPreservingSendButton({ canSend, disabled, editorRef, onSend, }: UseFocusPreservingSendButtonOptions): SendButtonBindings {`
+
+- Вид: функция
+- Кратко: Хук `useFocusPreservingSendButton`.
+- Параметры: 1
+  - `{ canSend, disabled, editorRef, onSend, }`
+    - Формат: `UseFocusPreservingSendButtonOptions`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `UseFocusPreservingSendButtonOptions`.
+- Возвращает: `SendButtonBindings`
+  - Описание: Результат функции в формате `SendButtonBindings`.
 
 ## `frontend/src/widgets/chat/UserProfilePanel.tsx`
 
@@ -6128,18 +8705,54 @@
 
 ### Объявления
 
-#### `export function Sidebar({ user, onNavigate, onLogout, onCloseMobileDrawer, showMobileDrawerControls = false, }: Props) {`
+#### `export function Sidebar({ user, onNavigate, onCloseMobileDrawer }: Props) {`
 
 - Вид: функция
 - Кратко: React-компонент `Sidebar`.
 - Детали: Компонент также отвечает за desktop-resize, mobile drawer UX, открытие настроек, быстрый переход к друзьям и восстановление последнего личного чата.
 - Параметры: 1
-  - `{ user, onNavigate, onLogout, onCloseMobileDrawer, showMobileDrawerControls = false, }`
+  - `{ user, onNavigate, onCloseMobileDrawer }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `Sidebar`.
+
+## `frontend/src/widgets/settings/PasswordChangeModal.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function PasswordChangeModal({ open, onClose, onSubmit }: Props) {`
+
+- Вид: функция
+- Кратко: React-компонент `PasswordChangeModal`.
+- Параметры: 1
+  - `{ open, onClose, onSubmit }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `PasswordChangeModal`.
+
+## `frontend/src/widgets/settings/SecuritySettingsSection.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function SecuritySettingsSection({ enabled }: Props) {`
+
+- Вид: функция
+- Кратко: React-компонент `SecuritySettingsSection`.
+- Параметры: 1
+  - `{ enabled }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `SecuritySettingsSection`.
 
 ## `frontend/src/widgets/settings/SettingsContent.tsx`
 
@@ -6147,18 +8760,53 @@
 
 ### Объявления
 
-#### `export function SettingsContent({ user, onNavigate, onLogout, compact = false, showTitle = true, }: Props) {`
+#### `export function SettingsContent({ user, onProfileSave, compact = false, showTitle = true, }: Props) {`
 
 - Вид: функция
-- Кратко: Показывает основной контент страницы настроек аккаунта.
-- Детали: Компонент объединяет блок профиля, переключатель browser push-уведомлений, памятку по горячим клавишам и действие выхода из аккаунта. В компактном режиме используется как встраиваемая панель без лишнего визуального шума.
+- Кратко: React-компонент `SettingsContent`.
 - Параметры: 1
-  - `{ user, onNavigate, onLogout, compact = false, showTitle = true, }`
+  - `{ user, onProfileSave, compact = false, showTitle = true, }`
     - Формат: `Props`
     - Вид: обязательный
     - Описание: Объект параметров в формате `Props`.
 - Возвращает: не указан
   - Описание: React-элемент, который отрисовывает компонент `SettingsContent`.
+
+## `frontend/src/widgets/settings/TotpCodeInput.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function TotpCodeInput({ value, onChange, disabled = false }: Props) {`
+
+- Вид: функция
+- Кратко: React-компонент `TotpCodeInput`.
+- Параметры: 1
+  - `{ value, onChange, disabled = false }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `TotpCodeInput`.
+
+## `frontend/src/widgets/settings/TwoFactorSetupModal.tsx`
+
+- Экспортируемые объявления: 1
+
+### Объявления
+
+#### `export function TwoFactorSetupModal({ open, mode, setup, loading = false, onClose, onConfirm, }: Props) {`
+
+- Вид: функция
+- Кратко: React-компонент `TwoFactorSetupModal`.
+- Параметры: 1
+  - `{ open, mode, setup, loading = false, onClose, onConfirm, }`
+    - Формат: `Props`
+    - Вид: обязательный
+    - Описание: Объект параметров в формате `Props`.
+- Возвращает: не указан
+  - Описание: React-элемент, который отрисовывает компонент `TwoFactorSetupModal`.
 
 ## `frontend/src/widgets/sidebar/ConversationList.tsx`
 

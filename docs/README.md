@@ -4,8 +4,8 @@
 
 ## Содержимое
 
-- [Справочник Backend](generated/backend-reference.md) (140 модулей)
-- [Справочник Frontend](generated/frontend-reference.md) (253 модулей)
+- [Справочник Backend](generated/backend-reference.md) (4264 модулей)
+- [Справочник Frontend](generated/frontend-reference.md) (339 модулей)
 
 ## Что Входит
 
