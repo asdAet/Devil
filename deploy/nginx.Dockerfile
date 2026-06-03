@@ -3,7 +3,9 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 ARG VITE_ENABLE_PWA="0"
+ARG VITE_ASSET_BASE_URL="/"
 ENV VITE_ENABLE_PWA=${VITE_ENABLE_PWA}
+ENV VITE_ASSET_BASE_URL=${VITE_ASSET_BASE_URL}
 
 COPY frontend/package*.json ./frontend/
 RUN npm ci --prefix frontend
