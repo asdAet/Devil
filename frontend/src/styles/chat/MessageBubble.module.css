@@ -1,12 +1,16 @@
 .message {
   --message-avatar-size: 45px;
   --message-gap: 8px;
+  box-sizing: border-box;
   display: flex;
   gap: var(--message-gap);
   padding: 1px 48px 1px 12px;
   align-items: flex-start;
   position: relative;
-  transition: background var(--tg-transition-fast, 150ms ease);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  transition: background var(--transition-fast, 150ms ease);
   animation: msgAppear 150ms ease;
 }
 
@@ -26,7 +30,7 @@
 }
 
 .highlighted {
-  background: var(--tg-msg-replay-bg);
+  background: var(--chat-message-reply-bg, var(--color-message-reply-bg));
 }
 
 .messageOwn {
@@ -87,7 +91,7 @@
   max-width: 100%;
   align-self: flex-start;
   border-radius: 6px 6px 6px 6px;
-  background: var(--tg-msg-in-bg);
+  background: var(--chat-message-in-bg);
   position: relative;
   box-shadow: 0 1px 2px var(--color-shadow-medium);
 }
@@ -95,7 +99,7 @@
 .messageOwn .bubble {
   align-self: flex-end;
   border-radius: 6px 6px 6px 6px;
-  background: var(--color-message-own-bg);
+  background: var(--chat-message-own-bg, var(--color-message-own-bg));
 }
 
 .customEmojiOnlyBubble {
@@ -144,8 +148,8 @@
   text-shadow: 0 1px 2px var(--color-shadow-medium);
   transform: translateY(2px);
   transition:
-    opacity var(--tg-transition-fast, 150ms ease),
-    transform var(--tg-transition-fast, 150ms ease);
+    opacity var(--transition-fast, 150ms ease),
+    transform var(--transition-fast, 150ms ease);
 }
 
 .customEmojiOnlyBubble:focus-within .footerInfo,
@@ -162,11 +166,11 @@
   padding: 4px 8px;
   margin-bottom: 4px;
   width: 100%;
-  border-left: 2px solid var(--tg-primary);
+  border-left: 2px solid var(--chat-accent-color, var(--color-info));
   border-radius: 0 4px 4px 0;
   background: var(--color-surface-hover);
   font-size: 12px;
-  transition: background var(--tg-transition-fast, 150ms ease);
+  transition: background var(--transition-fast, 150ms ease);
 }
 
 .replyQuoteClickable {
@@ -183,7 +187,7 @@
 
 .replyUser {
   font-weight: 600;
-  color: var(--tg-primary);
+  color: var(--chat-accent-color, var(--color-info));
   white-space: nowrap;
 }
 
@@ -192,7 +196,7 @@
 }
 
 .replyText {
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -226,7 +230,7 @@
 
 .content {
   margin: 0;
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 14px;
@@ -310,7 +314,7 @@
   gap: 6px;
   margin-top: 6px;
   align-items: flex-start;
-  max-width: min(78vw, 420px);
+  max-width: 100%;
 }
 
 .messageOwn .attachments {
@@ -331,15 +335,15 @@
 }
 
 .mediaTile:focus-visible {
-  outline: 2px solid var(--tg-primary);
+  outline: 2px solid var(--chat-accent-color, var(--color-info));
   outline-offset: -2px;
   z-index: 1;
 }
 
 .mediaCollage {
   position: relative;
-  width: clamp(220px, 58vw, 420px);
-  max-width: min(78vw, 420px);
+  width: min(100%, clamp(220px, 58vw, 420px));
+  max-width: 100%;
   border-radius: 10px;
   overflow: hidden;
   background: var(--color-surface-hover);
@@ -371,7 +375,7 @@
   gap: 6px;
   width: min(100%, var(--chat-attachment-width));
   max-width: 100%;
-  background-color: var(--color-message-in-bg);
+  background-color: var(--chat-message-ifileAttachments-bg);
   border-radius: 8px;
 }
 
@@ -389,7 +393,7 @@
   object-fit: cover;
   object-position: center;
   display: block;
-  transition: transform var(--tg-transition-fast, 150ms);
+  transition: transform var(--transition-fast, 150ms);
 }
 
 .mediaTile:hover .attachImage {
@@ -422,8 +426,8 @@
   font-size: 13px;
   cursor: pointer;
   transition:
-    background var(--tg-transition-fast, 150ms),
-    border-color var(--tg-transition-fast, 150ms),
+    background var(--transition-fast, 150ms),
+    border-color var(--transition-fast, 150ms),
     transform 150ms ease;
 }
 
@@ -459,11 +463,11 @@
 .reactionCount {
   font-size: 12px;
   font-weight: 600;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .reactionMine .reactionCount {
-  color: var(--tg-primary);
+  color: var(--chat-accent-color, var(--color-info));
 }
 
 /* ---- emoji picker popup ---- */

@@ -7,7 +7,7 @@
   flex-direction: column;
   flex-shrink: 0;
   min-height: var(--app-shell-bottom-row-size);
-  background: var(--tg-bg-primary);
+  background: var(--chat-composer-bg, var(--color-surface-hover));
   padding-bottom: max(0px, var(--safe-bottom, 0px));
 }
 
@@ -32,7 +32,7 @@
 
 .uploadBarLabel {
   font-size: 12px;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .uploadBarTrack {
@@ -46,7 +46,7 @@
 
 .uploadBarFill {
   height: 100%;
-  background: var(--tg-primary);
+  background: var(--chat-accent-color, var(--color-info));
   transition: width 200ms ease;
 }
 
@@ -104,7 +104,7 @@
   width: 2px;
   height: 24px;
   border-radius: 1px;
-  background: var(--tg-primary);
+  background: var(--chat-accent-color, var(--color-info));
   flex-shrink: 0;
 }
 
@@ -115,12 +115,12 @@
 
 .replyBarUser {
   font-weight: 600;
-  color: var(--tg-primary);
+  color: var(--chat-accent-color, var(--color-info));
   font-size: 12px;
 }
 
 .replyBarText {
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,10 +136,10 @@
   border: none;
   border-radius: 50%;
   background: none;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--tg-transition-fast, 150ms);
+  transition: background var(--transition-fast, 150ms);
 }
 
 .replyBarClose:hover {
@@ -163,14 +163,14 @@
 }
 
 .previewTitle {
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .previewClearBtn {
   border: none;
   background: none;
-  color: var(--tg-primary);
+  color: var(--chat-accent-color, var(--color-info));
   font-size: 12px;
   cursor: pointer;
 }
@@ -216,7 +216,7 @@
 
 .previewFileName {
   font-size: 12px;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -229,7 +229,7 @@
   border: none;
   border-radius: 50%;
   background: var(--color-surface-hover);
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -245,7 +245,7 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  border-top: 1px solid var(--tg-border);
+  border-top: 1px solid var(--color-border);
   padding: 8px 12px;
 }
 
@@ -258,14 +258,14 @@
   border: none;
   border-radius: 50%;
   background: none;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color var(--tg-transition-fast, 150ms);
+  transition: color var(--transition-fast, 150ms);
 }
 
 .attachBtn:hover {
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
 }
 
 .emojiToggleBtn {
@@ -277,18 +277,17 @@
   border: none;
   border-radius: 50%;
   background: none;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   cursor: pointer;
   flex-shrink: 0;
   transition:
-    color var(--tg-transition-fast, 150ms),
-    background var(--tg-transition-fast, 150ms);
+    color var(--transition-fast, 150ms),
+    background var(--transition-fast, 150ms);
 }
 
 .emojiToggleBtn:hover,
 .emojiToggleBtnActive {
-  color: var(--tg-text-primary);
-  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
 
 .emojiToggleBtn:disabled {
@@ -313,8 +312,8 @@
     var(--message-editor-padding-inline);
   border-radius: 22px;
   border: 0;
-  background: var(--tg-bg-input);
-  color: var(--tg-text-primary);
+  background: var(--chat-input-bg, var(--color-input-bg));
+  color: var(--color-text-primary);
   font-family: inherit;
   font-size: 14px;
   line-height: 1.4;
@@ -323,7 +322,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   cursor: text;
-  transition: box-shadow var(--tg-transition-fast, 150ms);
+  transition: box-shadow var(--transition-fast, 150ms);
 }
 
 .editor:focus {
@@ -332,7 +331,7 @@
 
 .editor::selection {
   background: var(--color-info-soft);
-  color: var(--tg-text-primary);
+  color: var(--color-text-primary);
 }
 
 .editorPlaceholder {
@@ -342,7 +341,7 @@
   right: var(--message-editor-padding-inline);
   left: var(--message-editor-padding-inline);
   overflow: hidden;
-  color: var(--tg-text-secondary);
+  color: var(--color-text-muted);
   font-family: inherit;
   font-size: 14px;
   line-height: 1.4;
@@ -388,13 +387,12 @@
   height: var(--touch-target-min, 44px);
   border: none;
   border-radius: 50%;
-  background: var(--tg-primary);
   color: var(--color-text-primary);
   cursor: pointer;
   flex-shrink: 0;
   transition:
-    opacity var(--tg-transition-fast, 150ms),
-    transform var(--tg-transition-fast, 150ms);
+    opacity var(--transition-fast, 150ms),
+    transform var(--transition-fast, 150ms);
 }
 
 .sendBtn:disabled {
@@ -403,7 +401,7 @@
 }
 
 .sendBtn:not(:disabled):hover {
-  transform: scale(1.08);
+  transform: scale(1.1);
 }
 
 .sendBtn:not(:disabled):active {

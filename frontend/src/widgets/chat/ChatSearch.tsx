@@ -91,6 +91,7 @@ export function ChatSearch({ roomId, onResultClick }: Props) {
       <div className={styles.searchRow}>
         <input
           className={styles.searchInput}
+          name="messageSearch"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Поиск сообщений..."
@@ -99,9 +100,7 @@ export function ChatSearch({ roomId, onResultClick }: Props) {
       </div>
 
       <div className={styles.results}>
-        {loading && (
-          <ChatSearchResultsSkeleton />
-        )}
+        {loading && <ChatSearchResultsSkeleton />}
 
         {!loading && searched && results.length === 0 && (
           <div className={styles.centered}>Ничего не найдено</div>

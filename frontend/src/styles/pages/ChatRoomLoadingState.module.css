@@ -1,14 +1,17 @@
 .chat {
-  --tg-bg-chat: linear-gradient(180deg, var(--color-app-bg) 0%, var(--color-app-bg) 100%);
-  --tg-bg-primary: var(--color-surface-hover);
-  --tg-border: var(--color-border);
+  --chat-loading-page-bg: linear-gradient(
+    180deg,
+    var(--color-app-bg) 0%,
+    var(--color-app-bg) 100%
+  );
+  --chat-loading-header-bg: var(--color-surface-hover);
 
   display: flex;
   flex-direction: column;
   min-height: 0;
   height: 100%;
   position: relative;
-  background: var(--tg-bg-chat);
+  background: var(--chat-loading-page-bg);
 }
 
 .chatHeader {
@@ -18,8 +21,8 @@
   flex-shrink: 0;
   height: var(--app-shell-top-row-size);
   padding: 8px var(--app-gutter, 16px);
-  border-bottom: 1px solid var(--tg-border);
-  background: var(--tg-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--chat-loading-header-bg);
   backdrop-filter: blur(16px);
 }
 
@@ -134,8 +137,8 @@
   gap: 8px;
   padding: 8px max(12px, var(--safe-right, 0px))
     calc(8px + var(--safe-bottom, 0px)) max(12px, var(--safe-left, 0px));
-  border-top: 1px solid var(--tg-border);
-  background: var(--tg-bg-primary);
+  border-top: 1px solid var(--color-border);
+  background: var(--chat-loading-header-bg);
 }
 
 .composerSkeletonCompact {
@@ -164,7 +167,9 @@
   }
 
   .composerSkeleton {
-    min-height: calc(var(--safe-bottom, 0px) + var(--app-shell-bottom-row-size));
+    min-height: calc(
+      var(--safe-bottom, 0px) + var(--app-shell-bottom-row-size)
+    );
     gap: 6px;
     padding: 6px max(8px, var(--safe-right, 0px))
       calc(6px + var(--safe-bottom, 0px)) max(8px, var(--safe-left, 0px));
