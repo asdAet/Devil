@@ -28,7 +28,7 @@
 .dialogTitle {
   font-size: 16px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   margin-bottom: 16px;
 }
 
@@ -40,7 +40,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   margin-bottom: 4px;
 }
 
@@ -50,41 +50,14 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   font-size: 14px;
   outline: none;
   box-sizing: border-box;
 }
 
 .dialogInput:focus {
-  border-color: var(--color-accent);
-}
-
-.dialogTextarea {
-  width: 100%;
-  padding: 8px 12px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  color: var(--color-text);
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
-  min-height: 60px;
-  resize: vertical;
-}
-
-.dialogTextarea:focus {
-  border-color: var(--color-accent);
-}
-
-.dialogCheckRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-text);
-  margin-bottom: 12px;
+  border-color: var(--color-primary);
 }
 
 .dialogError {
@@ -103,7 +76,7 @@
 .dialogCancelBtn {
   background: none;
   border: 1px solid var(--color-border);
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 13px;
@@ -111,7 +84,7 @@
 }
 
 .dialogSubmitBtn {
-  background: var(--color-accent);
+  background: var(--color-primary);
   border: none;
   color: var(--color-page-bg);
   padding: 8px 16px;
@@ -140,8 +113,7 @@
     padding: 16px;
   }
 
-  .dialogInput,
-  .dialogTextarea {
+  .dialogInput {
     font-size: 16px;
   }
 

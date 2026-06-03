@@ -16,7 +16,6 @@ type Props = {
  */
 export function CreateGroupDialog({ onCreated, onClose }: Props) {
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const isPublic = false;
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -30,7 +29,6 @@ export function CreateGroupDialog({ onCreated, onClose }: Props) {
     try {
       const group = await groupController.createGroup({
         name: trimmedName,
-        description: description.trim() || undefined,
         isPublic,
       });
       onCreated(group.roomTarget);
@@ -43,7 +41,7 @@ export function CreateGroupDialog({ onCreated, onClose }: Props) {
     } finally {
       setSending(false);
     }
-  }, [description, isPublic, name, onCreated]);
+  }, [isPublic, name, onCreated]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -75,7 +73,7 @@ export function CreateGroupDialog({ onCreated, onClose }: Props) {
           />
         </div>
 
-        <div className={styles.dialogField}>
+        {/* <div className={styles.dialogField}>
           <label className={styles.dialogLabel}>Описание</label>
           <textarea
             className={styles.dialogTextarea}
@@ -84,7 +82,7 @@ export function CreateGroupDialog({ onCreated, onClose }: Props) {
             placeholder="О чем эта группа? (необязательно)"
             disabled={sending}
           />
-        </div>
+        </div> */}
 
         {error && <div className={styles.dialogError}>{error}</div>}
 
