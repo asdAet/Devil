@@ -474,6 +474,7 @@ export function FriendsPage({ user, onNavigate }: Props) {
               </span>
               <input
                 type="text"
+                name="friendsSearch"
                 className={styles.searchInput}
                 placeholder={activeMeta.searchPlaceholder}
                 value={searchQuery}

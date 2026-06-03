@@ -22,8 +22,16 @@
   overflow: hidden;
   color: var(--friends-text);
   background:
-    radial-gradient(circle at top right, var(--color-info-soft), transparent 28%),
-    radial-gradient(circle at bottom left, var(--color-success-soft), transparent 24%),
+    radial-gradient(
+      circle at top right,
+      var(--color-info-soft),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom left,
+      var(--color-success-soft),
+      transparent 24%
+    ),
     linear-gradient(180deg, var(--color-app-bg) 0%, var(--color-app-bg) 100%);
 }
 
@@ -31,10 +39,12 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 20px;
   border-bottom: 1px solid var(--friends-border);
   background: var(--color-surface-hover);
   backdrop-filter: blur(16px);
+
+  height: calc(var(--safe-top, 0px) + var(--app-shell-top-row-size));
+  padding: calc(var(--safe-top, 0px) + 6px) 8px 6px;
 }
 
 .toolbarLead {
@@ -52,7 +62,11 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text-primary);
-  background: linear-gradient(135deg, var(--color-surface-elevated), var(--color-surface-active));
+  background: linear-gradient(
+    135deg,
+    var(--color-surface-elevated),
+    var(--color-surface-active)
+  );
   box-shadow: inset 0 1px 0 var(--color-border);
 }
 
@@ -99,7 +113,9 @@
   color: var(--friends-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
 .tab:hover {
@@ -139,7 +155,9 @@
   cursor: pointer;
   font-weight: 700;
   box-shadow: inset 0 1px 0 var(--color-border);
-  transition: background 150ms ease, transform 150ms ease;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
 }
 
 .addBtn:hover {
@@ -177,7 +195,11 @@
   border: 1px solid var(--friends-border);
   border-radius: 18px;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--color-surface-hover), var(--color-surface-hover));
+  background: linear-gradient(
+    180deg,
+    var(--color-surface-hover),
+    var(--color-surface-hover)
+  );
   box-shadow: var(--friends-shadow);
 }
 
@@ -215,7 +237,9 @@
   font-size: 14px;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .searchInput::placeholder {
@@ -313,7 +337,9 @@
   border: 1px solid transparent;
   border-radius: 16px;
   background: var(--color-surface-hover);
-  transition: background 150ms ease, border-color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
 .blockedRow:hover {
@@ -350,7 +376,9 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  transition: background 150ms ease, border-color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
 .blockedAction:hover {
