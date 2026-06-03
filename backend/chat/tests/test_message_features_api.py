@@ -1149,6 +1149,33 @@ class ChatMessageFeatureApiTests(TestCase):
             ).exists()
         )
 
+    def test_message_reactions_reject_invalid_custom_emoji_token(self):
+        message = Message.objects.create(
+            username=self.owner.username,
+            user=self.owner,
+            room=self.direct_room,
+            message_content="invalid custom reaction",
+        )
+        self.client.force_login(self.peer)
+
+        response = self.client.post(
+            f"/api/chat/{self.direct_room.pk}/messages/{message.pk}/reactions/",
+            data=json.dumps({"emoji": "[[ce:Animated/1.tgs]]"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            Reaction.objects.filter(message=message, user=self.peer).exists()
+        )
+
+        remove_response = self.client.delete(
+            f"/api/chat/{self.direct_room.pk}/messages/{message.pk}/reactions/"
+            f"{quote('[[ce:Animated%2F1.svg]]', safe='')}/"
+        )
+
+        self.assertEqual(remove_response.status_code, 400)
+
     def test_message_reactions_are_idempotent_for_the_same_emoji(self):
         message = Message.objects.create(
             username=self.owner.username,

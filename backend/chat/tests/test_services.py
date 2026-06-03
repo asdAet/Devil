@@ -234,6 +234,12 @@ class ChatServicesTests(TestCase):
         with self.assertRaises(MessageValidationError):
             services.add_reaction(self.peer, self.room, msg.pk, "")
 
+        with self.assertRaises(MessageValidationError):
+            services.add_reaction(self.peer, self.room, msg.pk, "hello")
+
+        with self.assertRaises(MessageValidationError):
+            services.add_reaction(self.peer, self.room, msg.pk, "[[ce:Animated/1.tgs]]")
+
         with patch("chat.services.has_permission", return_value=False):
             with self.assertRaises(MessageForbiddenError):
                 services.add_reaction(self.peer, self.room, msg.pk, "👍")
@@ -253,6 +259,9 @@ class ChatServicesTests(TestCase):
         services.remove_reaction(self.peer, self.room, msg.pk, "👍")
         services.remove_reaction(self.peer, self.room, msg.pk, "👍")
         self.assertFalse(Reaction.objects.filter(message=msg, user=self.peer, emoji="👍").exists())
+
+        with self.assertRaises(MessageValidationError):
+            services.remove_reaction(self.peer, self.room, msg.pk, "hello")
 
     def test_mark_read_requires_existing_message_and_is_monotonic(self):
         first = self._message(user=self.peer, content="one")

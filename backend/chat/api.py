@@ -1000,8 +1000,11 @@ def message_reaction_remove(request, room_id: int, message_id, emoji):
         _ensure_room_read_access(request, room)
     except Http404:
         return Response({"error": "Не найдено"}, status=http_status.HTTP_404_NOT_FOUND)
+    try:
+        removed = remove_reaction(request.user, room, message_id, emoji)
+    except MessageValidationError as exc:
+        return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
 
-    removed = remove_reaction(request.user, room, message_id, emoji)
     if removed:
         _broadcast_to_room(room, {
             "type": "chat_reaction_remove",

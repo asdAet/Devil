@@ -1,14 +1,25 @@
 # pyright: reportIncompatibleVariableOverride=false, reportCallIssue=false
 from typing import Optional
-
-from django.conf import settings
-from django.db import models
-from django.utils import timezone
 import uuid
 
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils import timezone
+
+from messages.domain import REACTION_EMOJI_MAX_LENGTH, ReactionEmoji, ReactionEmojiError
 from rooms.models import Room
 
-REACTION_EMOJI_MAX_LENGTH = 255
+
+def validate_reaction_emoji(value: str) -> None:
+    """Django adapter for the reaction emoji domain contract."""
+    try:
+        ReactionEmoji(value)
+    except ReactionEmojiError as exc:
+        raise ValidationError(
+            "Must be either a valid Unicode emoji or custom emoji token [[ce:...]]",
+            code="invalid_emoji",
+        ) from exc
 
 
 class Message(models.Model):
@@ -87,7 +98,10 @@ class Reaction(models.Model):
         on_delete=models.CASCADE,
         related_name="reactions",
     )
-    emoji = models.CharField(max_length=REACTION_EMOJI_MAX_LENGTH)
+    emoji = models.CharField(
+        max_length=REACTION_EMOJI_MAX_LENGTH,
+        validators=[validate_reaction_emoji],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     message_id: int
     user_id: int

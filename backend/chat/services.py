@@ -12,13 +12,13 @@ from django.core.files.storage import Storage
 from django.db import OperationalError, ProgrammingError, transaction
 from django.utils import timezone
 
+from messages.domain import ReactionEmoji, ReactionEmojiError
 from messages.models import (
     Message,
     MessageAttachment,
     MessageReadReceipt,
     MessageReadState,
     Reaction,
-    REACTION_EMOJI_MAX_LENGTH,
 )
 from roles.access import has_permission
 from roles.permissions import Perm
@@ -334,9 +334,10 @@ def add_reaction(user, room: Room, message_id: int, emoji: str) -> Reaction:
     Returns:
         Объект типа Reaction, сформированный в ходе выполнения.
     """
-    emoji = emoji.strip()
-    if not emoji or len(emoji) > REACTION_EMOJI_MAX_LENGTH:
-        raise MessageValidationError("Некорректный эмодзи")
+    try:
+        emoji = str(ReactionEmoji(emoji.strip()))
+    except ReactionEmojiError as exc:
+        raise MessageValidationError("Некорректный эмодзи") from exc
 
     if not has_permission(room, user, Perm.ADD_REACTIONS):
         raise MessageForbiddenError("Отсутствует разрешение ADD_REACTIONS")
@@ -361,6 +362,11 @@ def remove_reaction(user, room: Room, message_id: int, emoji: str) -> bool:
         message_id: Идентификатор message, используемый для выборки данных.
         emoji: Эмодзи-реакция, которую нужно добавить или удалить.
     """
+    try:
+        emoji = str(ReactionEmoji(emoji.strip()))
+    except ReactionEmojiError as exc:
+        raise MessageValidationError("Некорректный эмодзи") from exc
+
     deleted_count, _details = Reaction.objects.filter(
         message_id=message_id, message__room=room, user=user, emoji=emoji,
     ).delete()
