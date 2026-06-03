@@ -38,14 +38,6 @@ const normalizeAssetBase = (value: string | undefined) => {
   return raw.endsWith("/") ? raw : `${raw}/`;
 };
 
-const toKebabChunkName = (value: string) =>
-  value
-    .replace(/\.[^.]+$/, "")
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
-
 const getManualChunk = (id: string) => {
   const normalizedId = id.replaceAll("\\", "/");
 
@@ -60,8 +52,7 @@ const getManualChunk = (id: string) => {
   }
   if (
     normalizedId.includes("/node_modules/lottie-web/") ||
-    normalizedId.includes("/node_modules/fflate/") ||
-    normalizedId.includes("/node_modules/react-easy-crop/")
+    normalizedId.includes("/node_modules/fflate/")
   ) {
     return "vendor-media";
   }
@@ -70,11 +61,6 @@ const getManualChunk = (id: string) => {
     normalizedId.includes("/node_modules/zod/")
   ) {
     return "vendor-api";
-  }
-
-  const pageMatch = normalizedId.match(/\/src\/pages\/([^/]+Page)\.tsx$/);
-  if (pageMatch?.[1]) {
-    return `page-${toKebabChunkName(pageMatch[1])}`;
   }
 
   return undefined;
