@@ -31,7 +31,7 @@ export type AttachmentBuckets = {
 };
 
 /**
- * Геометрия одной плитки в telegram-подобной медиа-коллаже.
+ * Геометрия одной плитки в мессенджер-подобной медиа-коллаже.
  */
 export type MediaTileLayoutItem = {
   attachment: Attachment;
@@ -203,7 +203,7 @@ export const splitAttachmentRenderItems = (
 };
 
 /**
- * Классифицирует ratios по telegram-подобным типам: wide, narrow, square.
+ * Классифицирует ratios по мессенджер-подобным типам: wide, narrow, square.
  */
 const countProportions = (ratios: number[]): string =>
   ratios.map((ratio) => (ratio > 1.2 ? "w" : ratio < 0.8 ? "n" : "q")).join("");
@@ -605,7 +605,7 @@ const buildComplexLayout = (
 };
 
 /**
- * Вычисляет геометрию коллажа по модели, близкой к Telegram Desktop grouped layout.
+ * Вычисляет геометрию коллажа по grouped-media модели.
  */
 const layoutMediaGroup = (
   items: ImageAttachmentRenderItem[],
@@ -654,7 +654,7 @@ const layoutMediaGroup = (
 /**
  * Строит итоговую геометрию для grouped media в сообщении.
  *
- * Layout сохраняет порядок изображений и ближе к Telegram, чем обычный CSS grid:
+ * Раскладка сохраняет порядок изображений и точнее обычного CSS grid:
  * portrait и landscape кадры получают разные прямоугольники вместо равных колонок.
  */
 export const buildMediaTileLayout = (

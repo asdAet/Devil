@@ -65,8 +65,8 @@ const mockPickerEmoji: CustomEmoji = {
   token: "[[ce:Animated%2F1.tgs]]",
 };
 
-vi.mock("./TelegramEmojiPicker", () => ({
-  TelegramEmojiPicker: ({
+vi.mock("./CustomEmojiPicker", () => ({
+  CustomEmojiPicker: ({
     onSelect,
   }: {
     onSelect: (emoji: CustomEmoji) => void;

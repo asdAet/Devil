@@ -25,10 +25,12 @@ import {
 } from "./ChatRoomLoadingState";
 import type { ChatRoomPageViewProps } from "./ChatRoomPageView.types";
 import { isOptimisticMessage } from "./optimisticMessages";
+import { groupTimelineByDay } from "./timelineRender";
 import {
   isOwnMessage,
   normalizeActorRef,
   resolveMessageActorRef,
+  type TimelineItem,
 } from "./utils";
 
 /**
@@ -144,6 +146,11 @@ export function ChatRoomPageView({
   const { isDropTargetActive, fileDropBindings } = fileDrop;
   const loadingHeaderActionSlots = isPublicRoom ? 1 : 2;
 
+  const timelineBlocks = useMemo(
+    () => groupTimelineByDay(timeline),
+    [timeline],
+  );
+
   useEffect(() => {
     if (!isOnline) {
       if (!offlineNotificationShownRef.current) {
@@ -245,6 +252,7 @@ export function ChatRoomPageView({
           <input
             ref={headerSearchInputRef}
             type="text"
+            name="chatHeaderSearch"
             className={styles.headerSearchInput}
             value={headerSearchQuery}
             onChange={(event) => setHeaderSearchQuery(event.target.value)}
@@ -310,6 +318,91 @@ export function ChatRoomPageView({
       setHeaderSearchQuery,
     ],
   );
+
+  const renderTimelineEntry = (
+    item: Exclude<TimelineItem, { type: "day" }>,
+    index: number,
+  ) => {
+    if (item.type === "unread") {
+      return (
+        <div
+          className={styles.unreadDivider}
+          role="separator"
+          key="unread-divider"
+          data-unread-divider
+          data-unread-anchor-id={unreadDividerAnchorId ?? ""}
+        >
+          <span>Новые сообщения</span>
+        </div>
+      );
+    }
+
+    const previousTimelineItem = timeline[index - 1];
+    const previousMessage =
+      previousTimelineItem?.type === "message"
+        ? previousTimelineItem.message
+        : null;
+    const grouped =
+      previousMessage !== null &&
+      resolveMessageActorRef(previousMessage) ===
+        resolveMessageActorRef(item.message);
+    const ownMessage = isOwnMessage(item.message, currentActorRef);
+    const optimisticMessage = isOptimisticMessage(item.message);
+    const canModerateMessage = Boolean(
+      user && canManageMessagesToRoom && !ownMessage,
+    );
+    const canEditOrDelete =
+      !optimisticMessage && (ownMessage || canModerateMessage);
+    const canReplyOrReact = Boolean(user && !optimisticMessage);
+
+    return (
+      <MessageBubble
+        key={
+          item.message.clientMessageId ??
+          `${item.message.id}-${item.message.createdAt}`
+        }
+        message={item.message}
+        isOwn={ownMessage}
+        showAvatar={!grouped}
+        showHeader={!grouped}
+        grouped={grouped}
+        canModerate={canModerateMessage}
+        canViewReaders={
+          ownMessage && !item.message.isDeleted && !optimisticMessage
+        }
+        isRead={
+          ownMessage &&
+          !optimisticMessage &&
+          item.message.id <= maxReadMessageId
+        }
+        highlighted={item.message.id === highlightedMessageId}
+        onlineUsernames={onlineUsernames}
+        onReply={canReplyOrReact ? handleReply : undefined}
+        onEdit={canEditOrDelete ? handleEdit : undefined}
+        onDelete={canEditOrDelete ? handleDelete : undefined}
+        onReact={canReplyOrReact ? handleReact : undefined}
+        onViewReaders={user ? handleOpenReaders : undefined}
+        onReplyQuoteClick={handleReplyQuoteClick}
+        onAvatarClick={openUserProfile}
+        onOpenMediaAttachment={handleOpenMediaAttachment}
+      />
+    );
+  };
+
+  const renderTimelineRange = (startIndex: number, endIndex: number) => {
+    const entries: ReturnType<typeof renderTimelineEntry>[] = [];
+
+    for (let index = startIndex; index < endIndex; index += 1) {
+      const item = timeline[index];
+      if (!item || item.type === "day") {
+        continue;
+      }
+
+      entries.push(renderTimelineEntry(item, index));
+    }
+
+    return entries;
+  };
 
   if (!user && !isPublicRoom) {
     return (
@@ -575,83 +668,23 @@ export function ChatRoomPageView({
             <>
               {loadingMore && <ChatHistorySkeleton compact />}
 
-              {timeline.map((item, index) =>
-                item.type === "day" ? (
-                  <div
-                    className={styles.daySeparator}
-                    role="separator"
-                    aria-label={item.label}
-                    key={`day-${item.key}`}
-                  >
-                    <span>{item.label}</span>
-                  </div>
-                ) : item.type === "unread" ? (
-                  <div
-                    className={styles.unreadDivider}
-                    role="separator"
-                    key="unread-divider"
-                    data-unread-divider
-                    data-unread-anchor-id={unreadDividerAnchorId ?? ""}
-                  >
-                    <span>Новые сообщения</span>
-                  </div>
+              {timelineBlocks.map((block) =>
+                block.type === "standalone" ? (
+                  renderTimelineEntry(block.item, block.index)
                 ) : (
-                  (() => {
-                    const previousTimelineItem = timeline[index - 1];
-                    const previousMessage =
-                      previousTimelineItem?.type === "message"
-                        ? previousTimelineItem.message
-                        : null;
-                    const grouped =
-                      previousMessage !== null &&
-                      resolveMessageActorRef(previousMessage) ===
-                        resolveMessageActorRef(item.message);
-                    const ownMessage = isOwnMessage(
-                      item.message,
-                      currentActorRef,
-                    );
-                    const optimisticMessage = isOptimisticMessage(item.message);
-                    const canModerateMessage = Boolean(
-                      user && canManageMessagesToRoom && !ownMessage,
-                    );
-                    const canEditOrDelete =
-                      !optimisticMessage && (ownMessage || canModerateMessage);
-                    const canReplyOrReact = Boolean(user && !optimisticMessage);
-                    return (
-                      <MessageBubble
-                        key={
-                          item.message.clientMessageId ??
-                          `${item.message.id}-${item.message.createdAt}`
-                        }
-                        message={item.message}
-                        isOwn={ownMessage}
-                        showAvatar={!grouped}
-                        showHeader={!grouped}
-                        grouped={grouped}
-                        canModerate={canModerateMessage}
-                        canViewReaders={
-                          ownMessage &&
-                          !item.message.isDeleted &&
-                          !optimisticMessage
-                        }
-                        isRead={
-                          ownMessage &&
-                          !optimisticMessage &&
-                          item.message.id <= maxReadMessageId
-                        }
-                        highlighted={item.message.id === highlightedMessageId}
-                        onlineUsernames={onlineUsernames}
-                        onReply={canReplyOrReact ? handleReply : undefined}
-                        onEdit={canEditOrDelete ? handleEdit : undefined}
-                        onDelete={canEditOrDelete ? handleDelete : undefined}
-                        onReact={canReplyOrReact ? handleReact : undefined}
-                        onViewReaders={user ? handleOpenReaders : undefined}
-                        onReplyQuoteClick={handleReplyQuoteClick}
-                        onAvatarClick={openUserProfile}
-                        onOpenMediaAttachment={handleOpenMediaAttachment}
-                      />
-                    );
-                  })()
+                  <div
+                    className={styles.dayGroup}
+                    key={`day-group-${block.day.key}`}
+                  >
+                    <div
+                      className={styles.daySeparator}
+                      role="separator"
+                      aria-label={block.day.label}
+                    >
+                      <span>{block.day.label}</span>
+                    </div>
+                    {renderTimelineRange(block.startIndex, block.endIndex)}
+                  </div>
                 ),
               )}
             </>
@@ -806,7 +839,7 @@ export function ChatRoomPageView({
       >
         <p
           style={{
-            color: "var(--tg-text-secondary, #aaa)",
+            color: "var(--color-text-muted, #aaa)",
             marginBottom: 16,
             fontSize: 14,
           }}

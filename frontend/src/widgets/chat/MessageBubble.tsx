@@ -53,12 +53,12 @@ import {
   ImageLightbox,
 } from "../../shared/ui";
 import styles from "../../styles/chat/MessageBubble.module.css";
+import { LazyCustomEmojiPicker } from "./LazyCustomEmojiPicker";
 import {
   buildAttachmentRenderItems,
   buildMediaTileLayout,
   splitAttachmentRenderItems,
 } from "./lib/attachmentLayout";
-import { TelegramEmojiPicker } from "./TelegramEmojiPicker";
 import { VideoAttachmentPreview } from "./VideoAttachmentPreview";
 
 /**
@@ -1323,7 +1323,7 @@ export function MessageBubble({
         />
       )}
       {emojiPickerOpen && (
-        <TelegramEmojiPicker
+        <LazyCustomEmojiPicker
           placement="overlay"
           onSelect={handleCustomReactionSelect}
           onClose={() => setEmojiPickerOpen(false)}

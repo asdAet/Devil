@@ -208,8 +208,8 @@ vi.mock("../controllers/GroupController", () => ({
   groupController: groupControllerMock,
 }));
 
-vi.mock("../widgets/chat/TelegramEmojiPicker", () => ({
-  TelegramEmojiPicker: ({
+vi.mock("../widgets/chat/CustomEmojiPicker", () => ({
+  CustomEmojiPicker: ({
     onSelect,
   }: {
     onSelect: (emoji: typeof customEmojiMock.emoji) => void;
@@ -825,7 +825,7 @@ describe("ChatRoomPage", () => {
     ]);
   });
 
-  it("inserts selected custom emoji into the rich message input", () => {
+  it("inserts selected custom emoji into the rich message input", async () => {
     render(
       <ChatRoomPage
         roomId="1"
@@ -838,7 +838,9 @@ describe("ChatRoomPage", () => {
     const sendCallsBeforeSelect = wsState.send.mock.calls.length;
 
     fireEvent.click(screen.getByTestId("chat-emoji-button"));
-    fireEvent.click(screen.getByRole("button", { name: "Mock custom emoji" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Mock custom emoji" }),
+    );
 
     const emojiNode = screen
       .getByTestId("chat-message-input")
@@ -914,7 +916,7 @@ describe("ChatRoomPage", () => {
     });
   });
 
-  it("keeps pending reaction operations isolated per concrete emoji", () => {
+  it("keeps pending reaction operations isolated per concrete emoji", async () => {
     const removeDeferred = createDeferred<void>();
 
     chatRoomMock.messages = [
@@ -953,7 +955,9 @@ describe("ChatRoomPage", () => {
     ) as HTMLElement;
     fireEvent.contextMenu(article);
     fireEvent.click(screen.getByText("Реакция"));
-    fireEvent.click(screen.getByRole("button", { name: "Mock custom emoji" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Mock custom emoji" }),
+    );
 
     expect(chatControllerMock.addReaction).toHaveBeenCalledTimes(1);
     expect(chatControllerMock.addReaction).toHaveBeenCalledWith(
@@ -2007,14 +2011,11 @@ describe("ChatRoomPage", () => {
     expect(divider?.dataset.unreadAnchorId).toBe("1");
 
     const firstMessage = chatLog.querySelector('article[data-message-id="1"]');
-    const indexOfDivider = Array.from(chatLog.children).findIndex(
-      (node) => node === divider,
-    );
-    const indexOfFirstMessage = Array.from(chatLog.children).findIndex(
-      (node) => node === firstMessage,
-    );
-    expect(indexOfDivider).toBeGreaterThanOrEqual(0);
-    expect(indexOfDivider).toBeLessThan(indexOfFirstMessage);
+    expect(firstMessage).not.toBeNull();
+    expect(
+      divider!.compareDocumentPosition(firstMessage!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     setScrollMetrics(200);
     setViewport(220, { 1: 120, 2: 180, 3: 410 });

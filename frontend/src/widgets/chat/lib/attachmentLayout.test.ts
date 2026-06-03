@@ -90,7 +90,7 @@ describe("attachmentLayout", () => {
     ).toBeCloseTo(0.62, 5);
   });
 
-  it("builds telegram-like collage geometry inside container bounds", () => {
+  it("builds messenger-style collage geometry inside container bounds", () => {
     const attachments = buildAttachmentRenderItems([
       makeAttachment({
         id: 1,

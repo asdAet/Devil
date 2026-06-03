@@ -5841,7 +5841,7 @@
 
 - Вид: функция
 - Кратко: Функция `buildMediaTileLayout`.
-- Детали: Layout сохраняет порядок изображений и ближе к Telegram, чем обычный CSS grid: portrait и landscape кадры получают разные прямоугольники вместо равных колонок.
+- Детали: Layout сохраняет порядок изображений и использует grouped media collage: portrait и landscape кадры получают разные прямоугольники вместо равных колонок.
 - Параметры: 1
   - `items`
     - Формат: `ImageAttachmentRenderItem[]`
