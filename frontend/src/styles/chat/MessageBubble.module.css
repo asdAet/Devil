@@ -342,7 +342,7 @@
 
 .mediaCollage {
   position: relative;
-  width: min(100%, clamp(220px, 58vw, 420px));
+  width: clamp(220px, 58vw, 420px);
   max-width: 100%;
   border-radius: 10px;
   overflow: hidden;
