@@ -15,7 +15,7 @@ from django.db.models import Q
 from django.utils.html import strip_tags
 from PIL import Image
 
-from .avatar_service import profile_avatar_upload_to
+from .avatar_service import profile_avatar_upload_to, user_password_default_avatar_path
 
 MAX_PROFILE_IMAGE_SIDE = 4096
 MAX_PROFILE_IMAGE_PIXELS = MAX_PROFILE_IMAGE_SIDE * MAX_PROFILE_IMAGE_SIDE
@@ -32,7 +32,7 @@ class Profile(models.Model):
     """Модель Profile описывает структуру и поведение данных в приложении."""
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=150, blank=True, default="")
-    image = models.ImageField(default="avatars/Password_defualt.jpg", upload_to=profile_avatar_upload_to)
+    image = models.ImageField(default=user_password_default_avatar_path, upload_to=profile_avatar_upload_to)
     avatar_url = models.URLField(max_length=2048, blank=True, default="")
     avatar_crop_x = models.FloatField(null=True, blank=True)
     avatar_crop_y = models.FloatField(null=True, blank=True)
@@ -73,7 +73,8 @@ class Profile(models.Model):
         if isinstance(self.name, str):
             self.name = strip_tags(self.name).strip()
 
-        default_name = self._meta.get_field("image").default
+        default_value = self._meta.get_field("image").default
+        default_name = default_value() if callable(default_value) else default_value
         old_image_name = getattr(self, "_old_image_name", None)
         new_image_name = self.image.name if self.image else None
 

@@ -15,6 +15,11 @@ jobs:
       contents: read
     env:
       DJANGO_SECRET_KEY: "ci-test-secret-key-not-for-production"
+      USER_AVATAR_UPLOAD_DIR: "avatars/users"
+      GROUP_AVATAR_UPLOAD_DIR: "avatars/groups"
+      USER_PASSWORD_DEFAULT_AVATAR: "avatars/Password_defualt.svg"
+      USER_OAUTH_DEFAULT_AVATAR: "avatars/OAuth_defualt.svg"
+      GROUP_DEFAULT_AVATAR: "avatars/Group_defualt.svg"
     defaults:
       run:
         working-directory: backend
@@ -83,6 +88,11 @@ jobs:
       contents: read
     env:
       DJANGO_SECRET_KEY: "ci-test-secret-key-not-for-production"
+      USER_AVATAR_UPLOAD_DIR: "avatars/users"
+      GROUP_AVATAR_UPLOAD_DIR: "avatars/groups"
+      USER_PASSWORD_DEFAULT_AVATAR: "avatars/Password_defualt.svg"
+      USER_OAUTH_DEFAULT_AVATAR: "avatars/OAuth_defualt.svg"
+      GROUP_DEFAULT_AVATAR: "avatars/Group_defualt.svg"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

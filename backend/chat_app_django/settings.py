@@ -165,6 +165,14 @@ def env_int(name: str, default: int, minimum: int | None = None) -> int:
     return value
 
 
+def env_required(name: str) -> str:
+    """Возвращает обязательную переменную окружения."""
+    value = os.getenv(name)
+    if value is not None and value.strip():
+        return value.strip()
+    raise ImproperlyConfigured(f"{name} должен быть задан в .env.")
+
+
 DEFAULT_FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
 
 
@@ -419,20 +427,11 @@ STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
-USER_AVATAR_UPLOAD_DIR = os.getenv("USER_AVATAR_UPLOAD_DIR", "avatars/users").strip()
-GROUP_AVATAR_UPLOAD_DIR = os.getenv("GROUP_AVATAR_UPLOAD_DIR", "avatars/groups").strip()
-USER_PASSWORD_DEFAULT_AVATAR = os.getenv(
-    "USER_PASSWORD_DEFAULT_AVATAR",
-    "avatars/Password_defualt.jpg",
-).strip()
-USER_OAUTH_DEFAULT_AVATAR = os.getenv(
-    "USER_OAUTH_DEFAULT_AVATAR",
-    "avatars/OAuth_defualt.jpg",
-).strip()
-GROUP_DEFAULT_AVATAR = os.getenv(
-    "GROUP_DEFAULT_AVATAR",
-    "avatars/Group_defualt.jpg",
-).strip()
+USER_AVATAR_UPLOAD_DIR = env_required("USER_AVATAR_UPLOAD_DIR")
+GROUP_AVATAR_UPLOAD_DIR = env_required("GROUP_AVATAR_UPLOAD_DIR")
+USER_PASSWORD_DEFAULT_AVATAR = env_required("USER_PASSWORD_DEFAULT_AVATAR")
+USER_OAUTH_DEFAULT_AVATAR = env_required("USER_OAUTH_DEFAULT_AVATAR")
+GROUP_DEFAULT_AVATAR = env_required("GROUP_DEFAULT_AVATAR")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CRISPY_TEMPLATE_PACK = "bootstrap4"

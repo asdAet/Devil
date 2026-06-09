@@ -114,6 +114,13 @@ docker compose -f docker-compose.prod.yml -f deploy/observability/compose.yml up
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
 - `DJANGO_CORS_ALLOWED_ORIGINS`
 - `DJANGO_PUBLIC_BASE_URL`
+- `USER_AVATAR_UPLOAD_DIR`
+- `GROUP_AVATAR_UPLOAD_DIR`
+- `USER_PASSWORD_DEFAULT_AVATAR`
+- `USER_OAUTH_DEFAULT_AVATAR`
+- `GROUP_DEFAULT_AVATAR`
+
+Bundled default avatar files live in `backend/assets/avatars/`. The env values above remain public media paths, for example `avatars/Password_defualt.svg`.
 
 Observability описан в [deploy/observability/README.md](deploy/observability/README.md).
 

@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from chat_app_django.media_utils import (
     build_profile_url,
@@ -14,21 +15,7 @@ from chat_app_django.media_utils import (
     normalize_media_path,
 )
 
-_DEFAULT_USER_PASSWORD_AVATAR = "avatars/Password_defualt.jpg"
-_DEFAULT_USER_OAUTH_AVATAR = "avatars/OAuth_defualt.jpg"
-_DEFAULT_GROUP_AVATAR = "avatars/Group_defualt.jpg"
-_DEFAULT_USER_UPLOAD_DIR = "avatars/users"
-_DEFAULT_GROUP_UPLOAD_DIR = "avatars/groups"
-_DEFAULT_AVATAR_ASSET_ROOT = Path(__file__).resolve().parent / "static" / "users" / "default_avatars"
-_DEFAULT_USER_PASSWORD_ASSET = _DEFAULT_AVATAR_ASSET_ROOT / "Password_defualt.jpg"
-_DEFAULT_USER_OAUTH_ASSET = _DEFAULT_AVATAR_ASSET_ROOT / "OAuth_defualt.jpg"
-_DEFAULT_GROUP_ASSET = _DEFAULT_AVATAR_ASSET_ROOT / "Group_defualt.jpg"
-_USER_DEFAULT_IMAGE_ALIASES = (
-    "default.jpg",
-    "avatars/users/password/default.jpg",
-    "avatars/users/oauth/default.jpg",
-)
-
+_BUNDLED_DEFAULT_AVATAR_ROOT = Path(settings.BASE_DIR) / "assets" / "avatars"
 
 def _trimmed(value: Any) -> str:
     """Выполняет вспомогательную обработку для trimmed.
@@ -55,35 +42,12 @@ def _normalized_media_path(value: str | None) -> str:
     return normalized or ""
 
 
-def _setting_media_path(name: str, default: str) -> str:
-    """Выполняет вспомогательную обработку для setting media path.
-    
-    Args:
-        name: Человекочитаемое имя объекта или параметра.
-        default: Значение по умолчанию при отсутствии входных данных.
-    
-    Returns:
-        Строковое значение, сформированное функцией.
-    """
-    configured = _trimmed(getattr(settings, name, default))
+def _configured_media_path(name: str) -> str:
+    configured = _trimmed(getattr(settings, name, ""))
     normalized = _normalized_media_path(configured)
-    if normalized:
-        return normalized
-    return _normalized_media_path(default)
-
-
-def _setting_media_dir(name: str, default: str) -> str:
-    """Выполняет вспомогательную обработку для setting media dir.
-    
-    Args:
-        name: Человекочитаемое имя объекта или параметра.
-        default: Значение по умолчанию при отсутствии входных данных.
-    
-    Returns:
-        Строковое значение, сформированное функцией.
-    """
-    value = _setting_media_path(name, default).strip("/")
-    return value or default.strip("/")
+    if not normalized:
+        raise ImproperlyConfigured(f"{name} должен быть задан в .env.")
+    return normalized
 
 
 def user_password_default_avatar_path() -> str:
@@ -92,7 +56,7 @@ def user_password_default_avatar_path() -> str:
     Returns:
         Строковое значение, сформированное функцией.
     """
-    return _setting_media_path("USER_PASSWORD_DEFAULT_AVATAR", _DEFAULT_USER_PASSWORD_AVATAR)
+    return _configured_media_path("USER_PASSWORD_DEFAULT_AVATAR")
 
 
 def user_oauth_default_avatar_path() -> str:
@@ -101,7 +65,7 @@ def user_oauth_default_avatar_path() -> str:
     Returns:
         Строковое значение, сформированное функцией.
     """
-    return _setting_media_path("USER_OAUTH_DEFAULT_AVATAR", _DEFAULT_USER_OAUTH_AVATAR)
+    return _configured_media_path("USER_OAUTH_DEFAULT_AVATAR")
 
 
 def group_default_avatar_path() -> str:
@@ -110,7 +74,7 @@ def group_default_avatar_path() -> str:
     Returns:
         Строковое значение, сформированное функцией.
     """
-    return _setting_media_path("GROUP_DEFAULT_AVATAR", _DEFAULT_GROUP_AVATAR)
+    return _configured_media_path("GROUP_DEFAULT_AVATAR")
 
 
 def user_avatar_upload_dir() -> str:
@@ -119,7 +83,7 @@ def user_avatar_upload_dir() -> str:
     Returns:
         Строковое значение, сформированное функцией.
     """
-    return _setting_media_dir("USER_AVATAR_UPLOAD_DIR", _DEFAULT_USER_UPLOAD_DIR)
+    return _configured_media_path("USER_AVATAR_UPLOAD_DIR").strip("/")
 
 
 def group_avatar_upload_dir() -> str:
@@ -128,7 +92,7 @@ def group_avatar_upload_dir() -> str:
     Returns:
         Строковое значение, сформированное функцией.
     """
-    return _setting_media_dir("GROUP_AVATAR_UPLOAD_DIR", _DEFAULT_GROUP_UPLOAD_DIR)
+    return _configured_media_path("GROUP_AVATAR_UPLOAD_DIR").strip("/")
 
 
 def _safe_upload_filename(filename: str | None) -> str:
@@ -261,9 +225,7 @@ def _is_same_media_file(path: str, candidate: str) -> bool:
     right = _normalized_media_path(candidate)
     if not left or not right:
         return False
-    if left == right:
-        return True
-    return PurePosixPath(left).name == PurePosixPath(right).name
+    return left == right
 
 
 def _is_default_user_image(path: str) -> bool:
@@ -275,11 +237,7 @@ def _is_default_user_image(path: str) -> bool:
     Returns:
         Логическое значение результата проверки.
     """
-    defaults = (
-        *_USER_DEFAULT_IMAGE_ALIASES,
-        user_password_default_avatar_path(),
-        user_oauth_default_avatar_path(),
-    )
+    defaults = (user_password_default_avatar_path(), user_oauth_default_avatar_path())
     return any(_is_same_media_file(path, candidate) for candidate in defaults)
 
 
@@ -293,12 +251,16 @@ def resolve_bundled_default_avatar_file(path: str | None) -> Path | None:
     if not normalized:
         return None
 
-    candidates = (
-        (user_password_default_avatar_path(), _DEFAULT_USER_PASSWORD_ASSET),
-        (user_oauth_default_avatar_path(), _DEFAULT_USER_OAUTH_ASSET),
-        (group_default_avatar_path(), _DEFAULT_GROUP_ASSET),
+    configured_paths = (
+        user_password_default_avatar_path(),
+        user_oauth_default_avatar_path(),
+        group_default_avatar_path(),
     )
-    for configured_path, bundled_asset in candidates:
+    for configured_path in configured_paths:
+        filename = PurePosixPath(configured_path).name
+        if not filename or filename in {".", ".."}:
+            continue
+        bundled_asset = _BUNDLED_DEFAULT_AVATAR_ROOT / filename
         if _is_same_media_file(normalized, configured_path) and bundled_asset.is_file():
             return bundled_asset
     return None

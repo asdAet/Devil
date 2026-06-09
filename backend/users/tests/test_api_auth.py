@@ -274,7 +274,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(disable_response.status_code, 200)
         self.assertFalse(disable_response.json()["security"]["twoFactorEnabled"])
 
-    @override_settings(USER_PASSWORD_DEFAULT_AVATAR="avatars/missing_pwd_default.jpg")
+    @override_settings(USER_PASSWORD_DEFAULT_AVATAR="avatars/Password_defualt.svg")
     def test_register_default_avatar_is_served_from_bundled_asset_when_media_file_is_missing(self):
         csrf = self._csrf()
         response = self.client.post(
@@ -299,7 +299,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(media_response.status_code, 200)
         self.assertEqual(
             media_response.headers.get("Content-Type", "").split(";")[0],
-            "image/jpeg",
+            "image/svg+xml",
         )
         media_response.close()
 
