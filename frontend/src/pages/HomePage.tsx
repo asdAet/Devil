@@ -3,16 +3,16 @@ import styles from "../styles/pages/HomePage.module.css";
 
 const benefits = [
   {
-    title: "Без регистрации",
-    text: "Публичный чат открыт сразу. Авторизация нужна только чтобы написать самому или открыть личную переписку.",
+    title: "Публичный чат для всех",
+    text: "Открыт всем, в том числе без регистрации.",
   },
   {
-    title: "Быстрые действия с каждым сообщением",
-    text: "Ответить, скопировать, поставить реакцию — всё рядом, без лишних экранов.",
+    title: "Личные и групповые чаты",
+    text: "Приватная переписка и закрытые группы отдельно от публичного чата.",
   },
   {
-    title: "Личные чаты отдельно от групп",
-    text: "Личная переписка не смешивается с групповой. Файлы, доступы и реакции — у каждого чата свои.",
+    title: "Файлы и вложения",
+    text: "Отправляйте документы, фото и медиа в любом чате.",
   },
 ];
 
@@ -89,13 +89,13 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
 
       <section className={styles.hero} aria-labelledby="home-title">
         <div className={styles.heroContent}>
-          <p className={styles.sectionKicker}>Мессенджер в реальном времени</p>
+          <p className={styles.sectionKicker}>Мессенджер для общения и работы</p>
           <h1 id="home-title" className={styles.heroTitle}>
             Devil
           </h1>
           <p className={styles.heroLead}>
-            Публичный чат открыт для всех без регистрации. После входа — личные
-            переписки, группы, файлы и реакции.
+            Публичный чат открыт всем с регистрацией и без. Личные диалоги и
+            закрытые группы для работы и приватного общения.
           </p>
           <div className={styles.heroActions}>
             <Button
@@ -120,10 +120,10 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
 
           <div className={styles.channelPanel}>
             <strong>Devil</strong>
-            <span>Общий чат без входа</span>
-            <span>Группа команды</span>
-            <span>Личные чаты</span>
-            <span>Файлы, фото и реакции</span>
+            <span>Публичный чат</span>
+            <span>Групповой чат</span>
+            <span>Личные диалоги</span>
+            <span>Файлы и вложения</span>
           </div>
 
           <div className={styles.chatPanel}>
@@ -156,11 +156,10 @@ export function HomePage({ onNavigate, onLoginNavigate }: Props) {
         </div>
         <div className={styles.aboutCopy}>
           <p className={styles.sectionKicker}>Как это работает</p>
-          <h2 id="about-title">Открытый для гостей. Закрытый для своих.</h2>
+          <h2 id="about-title">Открытое и закрытое общение в одном месте</h2>
           <p className={styles.aboutText}>
-            Дайте гостю ссылку — зайдёт без регистрации и увидит общий чат.
-            Создайте группу для команды или напишите в личку — всё в одном
-            месте.
+            Публичный чат открыт любому. Личные диалоги и группы для
+            приватного и рабочего общения, доступ только у участников.
           </p>
           <div
             id="benefits"

@@ -91,6 +91,7 @@ export function useChatRoomPageViewModel({
     user && !isBlocked && (!isGroupRoom || canWriteToRoom),
   );
 
+  //TODO: В публичном чате добавить оналйн и преименовать Public Chat
   const roomSubtitle =
     details?.kind === "direct"
       ? isBlocked

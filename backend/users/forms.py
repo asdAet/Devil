@@ -347,7 +347,7 @@ class ProfileUpdateForm(forms.ModelForm):
                 )
 
             crop_update = parsed
-        elif cleaned.get("image"):
+        elif self.files.get(self.add_prefix("image")) is not None:
             crop_update = {
                 "avatar_crop_x": None,
                 "avatar_crop_y": None,
@@ -364,9 +364,9 @@ class ProfileUpdateForm(forms.ModelForm):
         Returns:
             Функция не возвращает значение.
         """
-        image = self.cleaned_data.get("image")
+        image = self.files.get(self.add_prefix("image"))
         if not image:
-            return image
+            return self.cleaned_data.get("image")
 
         if _is_svg_upload(image):
             _validate_svg_avatar(image)

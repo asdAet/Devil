@@ -1,3 +1,5 @@
+import Linkify from "linkify-react";
+import type { Opts as LinkifyOptions } from "linkifyjs";
 import {
   type ClipboardEvent as ReactClipboardEvent,
   type CSSProperties,
@@ -60,6 +62,17 @@ import {
   splitAttachmentRenderItems,
 } from "./lib/attachmentLayout";
 import { VideoAttachmentPreview } from "./VideoAttachmentPreview";
+
+const LINKIFY_OPTIONS: LinkifyOptions = {
+  className: styles.contentLink,
+  defaultProtocol: "https",
+  rel: "noopener noreferrer",
+  target: "_blank",
+  validate: {
+    email: false,
+    url: true,
+  },
+};
 
 /**
  * Описывает входные props компонента `Props`.
@@ -349,7 +362,11 @@ function MessageContent({ content }: { content: string }) {
     >
       {parts.map((part, index) => {
         if (part.type === "text") {
-          return <span key={`text-${index}`}>{part.value}</span>;
+          return (
+            <span key={`text-${index}`}>
+              <Linkify options={LINKIFY_OPTIONS}>{part.value}</Linkify>
+            </span>
+          );
         }
 
         const emojiIndex = emojiIndexByPartIndex.get(index) ?? -1;

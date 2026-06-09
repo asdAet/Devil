@@ -237,6 +237,18 @@
   line-height: 1.45;
 }
 
+.contentLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+  text-underline-offset: 0.14em;
+}
+
+.contentLink:hover,
+.contentLink:focus-visible {
+  text-decoration-color: currentColor;
+}
+
 .customEmojiInline {
   display: inline-flex;
   align-items: center;
