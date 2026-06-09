@@ -120,7 +120,7 @@ docker compose -f docker-compose.prod.yml -f deploy/observability/compose.yml up
 - `USER_OAUTH_DEFAULT_AVATAR`
 - `GROUP_DEFAULT_AVATAR`
 
-Bundled default avatar files live in `backend/assets/avatars/`. The env values above remain public media paths, for example `avatars/Password_defualt.svg`.
+Bundled default avatar files live in `backend/assets/avatars/`. The env values above remain public media paths, for example `avatars/Password_defualt.svg`. Default paths are resolved at request time and are not stored in profile or group avatar fields, so changing `.env` applies to every entity without a custom upload.
 
 Observability описан в [deploy/observability/README.md](deploy/observability/README.md).
 

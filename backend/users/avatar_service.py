@@ -228,19 +228,6 @@ def _is_same_media_file(path: str, candidate: str) -> bool:
     return left == right
 
 
-def _is_default_user_image(path: str) -> bool:
-    """Проверяет условие default user image и возвращает логический результат.
-    
-    Args:
-        path: Путь к ресурсу в storage или media-каталоге.
-    
-    Returns:
-        Логическое значение результата проверки.
-    """
-    defaults = (user_password_default_avatar_path(), user_oauth_default_avatar_path())
-    return any(_is_same_media_file(path, candidate) for candidate in defaults)
-
-
 def resolve_bundled_default_avatar_file(path: str | None) -> Path | None:
     """Возвращает встроенный default avatar asset для известных логических avatar paths.
 
@@ -289,7 +276,7 @@ def resolve_user_avatar_source(user: Any) -> str | None:
     image_name = _trimmed(getattr(image, "name", "") if image is not None else "")
     avatar_url = _trimmed(getattr(profile, "avatar_url", ""))
 
-    if image_name and not _is_default_user_image(image_name):
+    if image_name:
         return image_name
 
     if avatar_url:
