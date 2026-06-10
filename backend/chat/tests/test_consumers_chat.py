@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TransactionTestCase, override_settings
@@ -24,7 +24,6 @@ from chat.routing import websocket_urlpatterns as chat_ws
 from direct_inbox.routing import websocket_urlpatterns as di_ws
 from users.identity import user_public_ref, user_public_username
 
-User = get_user_model()
 application = URLRouter(chat_ws + di_ws)
 
 
@@ -33,9 +32,9 @@ class ChatConsumerTests(TransactionTestCase):
     def setUp(self):
         """Проверяет сценарий `setUp`."""
         cache.clear()
-        self.owner = User.objects.create_user(username='owner', password='pass12345')
-        self.member = User.objects.create_user(username='member', password='pass12345')
-        self.other = User.objects.create_user(username='other', password='pass12345')
+        self.owner = User.objects.create_user(login='owner', password='pass12345')
+        self.member = User.objects.create_user(login='member', password='pass12345')
+        self.other = User.objects.create_user(login='other', password='pass12345')
 
         self.private_room = Room.objects.create(
             name='private',
@@ -302,7 +301,7 @@ class ChatConsumerTests(TransactionTestCase):
                     "userId": self.member.pk,
                     "publicRef": user_public_ref(self.member),
                     "username": user_public_username(self.member),
-                    "displayName": self.member.username,
+                    "displayName": self.member.login,
                     "lastReadMessageId": 1,
                     "lastReadAt": None,
                     "roomId": self.private_room.pk,
@@ -582,5 +581,3 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertTrue(
             Message.objects.filter(room=self.private_room, message_content='second').exists()
         )
-
-

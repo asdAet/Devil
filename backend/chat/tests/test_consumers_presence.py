@@ -7,14 +7,13 @@ from types import SimpleNamespace
 from asgiref.sync import async_to_sync
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.test import TransactionTestCase
 
 from presence.routing import websocket_urlpatterns as presence_urlpatterns
 from users.identity import user_public_username
 
-User = get_user_model()
 application = URLRouter(presence_urlpatterns)
 
 
@@ -22,7 +21,7 @@ class PresenceConsumerTests(TransactionTestCase):
     """Проверяет поведение presence websocket для гостей и авторизованных."""
 
     def setUp(self):
-        self.user = User.objects.create_user(username='presence_user', password='pass12345')
+        self.user = User.objects.create_user(login='presence_user', password='pass12345')
 
     async def _connect(self, user=None, ip='198.51.100.10', port=55000, session_key: str | None = None):
         communicator = WebsocketCommunicator(

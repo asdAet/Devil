@@ -2,7 +2,7 @@
 
 import json
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import Client, TestCase
 
 from roles.models import PermissionOverride, Role
@@ -10,17 +10,16 @@ from roles.permissions import Perm
 from rooms.models import Room
 from rooms.services import ensure_membership
 
-User = get_user_model()
 
 
 class RoomRolesApiTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.owner = User.objects.create_user(username="roles_owner", password="pass12345")
-        self.member = User.objects.create_user(username="roles_member", password="pass12345")
-        self.other = User.objects.create_user(username="roles_other", password="pass12345")
+        self.owner = User.objects.create_user(login="roles_owner", password="pass12345")
+        self.member = User.objects.create_user(login="roles_member", password="pass12345")
+        self.other = User.objects.create_user(login="roles_other", password="pass12345")
         self.superuser = User.objects.create_superuser(
-            username="roles_superuser",
+            login="roles_superuser",
             email="roles_superuser@example.com",
             password="pass12345",
         )

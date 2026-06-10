@@ -32,7 +32,7 @@ from rooms.models import Room
 from rooms.services import ensure_membership
 from testsupport.files import require_stored_file_name
 from testsupport.users import typed_user_model
-from users.identity import ensure_user_identity_core, set_room_public_handle, set_user_public_handle
+from users.identity import set_room_public_handle, set_user_public_handle
 
 User = typed_user_model()
 
@@ -53,15 +53,12 @@ def _attachment_thumbnail_name(attachment: MessageAttachment) -> str:
 class ChatMessageFeatureApiTests(TestCase):
     def setUp(self):
         self.client: Any = Client()
-        self.owner = User.objects.create_user(username="owner_feat", password="pass12345")
-        self.peer = User.objects.create_user(username="peer_feat", password="pass12345")
-        self.outsider = User.objects.create_user(username="outsider_feat", password="pass12345")
-        set_user_public_handle(self.owner, self.owner.username)
-        set_user_public_handle(self.peer, self.peer.username)
-        set_user_public_handle(self.outsider, self.outsider.username)
-        ensure_user_identity_core(self.owner)
-        ensure_user_identity_core(self.peer)
-        ensure_user_identity_core(self.outsider)
+        self.owner = User.objects.create_user(login="owner_feat", password="pass12345")
+        self.peer = User.objects.create_user(login="peer_feat", password="pass12345")
+        self.outsider = User.objects.create_user(login="outsider_feat", password="pass12345")
+        set_user_public_handle(self.owner, self.owner.login)
+        set_user_public_handle(self.peer, self.peer.login)
+        set_user_public_handle(self.outsider, self.outsider.login)
 
         self.direct_room = Room.objects.create(
             name="dm features",
@@ -203,7 +200,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_reactions_allowed_in_direct_room(self):
         message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="reaction target",
@@ -235,8 +232,8 @@ class ChatMessageFeatureApiTests(TestCase):
         ensure_membership(visible_group, self.owner, role_name="Owner")
         set_room_public_handle(visible_group, "scope_visible_group")
 
-        scope_friend = User.objects.create_user(username="scope_friend", password="pass12345")
-        set_user_public_handle(scope_friend, scope_friend.username)
+        scope_friend = User.objects.create_user(login="scope_friend", password="pass12345")
+        set_user_public_handle(scope_friend, scope_friend.login)
         ensure_membership(visible_group, scope_friend, role_name="Member")
 
         hidden_group = Room.objects.create(
@@ -248,18 +245,18 @@ class ChatMessageFeatureApiTests(TestCase):
         set_room_public_handle(hidden_group, "scope_hidden_group")
         ensure_membership(hidden_group, self.outsider, role_name="Owner")
 
-        hidden_scope_user = User.objects.create_user(username="scope_hidden", password="pass12345")
-        set_user_public_handle(hidden_scope_user, hidden_scope_user.username)
+        hidden_scope_user = User.objects.create_user(login="scope_hidden", password="pass12345")
+        set_user_public_handle(hidden_scope_user, hidden_scope_user.login)
         ensure_membership(hidden_group, hidden_scope_user, role_name="Member")
 
         visible_msg = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="scope visible message",
         )
         hidden_msg = Message.objects.create(
-            username=self.outsider.username,
+            username=self.outsider.login,
             user=self.outsider,
             room=hidden_group,
             message_content="scope hidden message",
@@ -275,8 +272,8 @@ class ChatMessageFeatureApiTests(TestCase):
         self.assertIn("messages", payload)
 
         found_usernames = {item["username"] for item in payload["users"]}
-        self.assertIn(scope_friend.username, found_usernames)
-        self.assertNotIn(hidden_scope_user.username, found_usernames)
+        self.assertIn(scope_friend.login, found_usernames)
+        self.assertNotIn(hidden_scope_user.login, found_usernames)
 
         found_group_ids = {item["roomId"] for item in payload["groups"]}
         self.assertIn(visible_group.pk, found_group_ids)
@@ -298,27 +295,25 @@ class ChatMessageFeatureApiTests(TestCase):
         ensure_membership(hidden_group, self.outsider, role_name="Owner")
 
         hidden_user = User.objects.create_user(
-            username="super_scope_user",
+            login="super_scope_user",
             password="pass12345",
         )
         set_user_public_handle(hidden_user, "superscopeuser")
-        ensure_user_identity_core(hidden_user)
         ensure_membership(hidden_group, hidden_user, role_name="Member")
 
         hidden_message = Message.objects.create(
-            username=hidden_user.username,
+            username=hidden_user.login,
             user=hidden_user,
             room=hidden_group,
             message_content="superscope hidden message",
         )
 
         superuser = User.objects.create_superuser(
-            username="search_superuser_feat",
+            login="search_superuser_feat",
             email="search_superuser_feat@example.com",
             password="pass12345",
         )
         set_user_public_handle(superuser, "search_superuser_feat")
-        ensure_user_identity_core(superuser)
 
         self.client.force_login(superuser)
         response = self.client.get("/api/chat/search/global/?q=@superscope")
@@ -345,7 +340,7 @@ class ChatMessageFeatureApiTests(TestCase):
         ensure_membership(visible_group, self.owner, role_name="Owner")
 
         visible_msg = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="plain_scope message",
@@ -455,7 +450,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_attachment_upload_accepts_reply_to_and_get_lists_items(self):
         reply_target = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="reply target",
@@ -720,12 +715,11 @@ class ChatMessageFeatureApiTests(TestCase):
     @override_settings(CHAT_ATTACHMENT_MAX_PER_MESSAGE=1)
     def test_attachment_upload_allows_too_many_files_for_superuser(self):
         superuser = User.objects.create_superuser(
-            username="attach_count_superuser",
+            login="attach_count_superuser",
             email="attach_count_superuser@example.com",
             password="pass12345",
         )
         set_user_public_handle(superuser, "attach_count_superuser")
-        ensure_user_identity_core(superuser)
 
         self.client.force_login(superuser)
         upload_ids = [
@@ -781,12 +775,11 @@ class ChatMessageFeatureApiTests(TestCase):
     @override_settings(CHAT_ATTACHMENT_MAX_SIZE_MB=1)
     def test_attachment_upload_allows_oversized_file_for_superuser(self):
         superuser = User.objects.create_superuser(
-            username="attach_size_superuser",
+            login="attach_size_superuser",
             email="attach_size_superuser@example.com",
             password="pass12345",
         )
         set_user_public_handle(superuser, "attach_size_superuser")
-        ensure_user_identity_core(superuser)
 
         self.client.force_login(superuser)
         large_payload = b"x" * (2 * 1024 * 1024)
@@ -880,13 +873,13 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_mark_read_is_monotonic_and_persisted_in_room_details(self):
         first_message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="first unread",
         )
         second_message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="second unread",
@@ -916,7 +909,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_mark_read_accepts_form_payload_for_keepalive_flush(self):
         message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="form-data mark read",
@@ -933,7 +926,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_detail_patch_validates_content_type_and_empty_value(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="initial",
@@ -956,7 +949,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_detail_patch_and_delete_cover_success_and_not_found(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="initial",
@@ -986,7 +979,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_detail_delete_returns_forbidden_for_non_author(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="cant delete by peer",
@@ -1006,18 +999,17 @@ class ChatMessageFeatureApiTests(TestCase):
         )
         ensure_membership(private_room, self.outsider)
         message = Message.objects.create(
-            username=self.outsider.username,
+            username=self.outsider.login,
             user=self.outsider,
             room=private_room,
             message_content="hidden message",
         )
         superuser = User.objects.create_superuser(
-            username="chat_superuser_feat",
+            login="chat_superuser_feat",
             email="chat_superuser_feat@example.com",
             password="pass12345",
         )
         set_user_public_handle(superuser, "chat_superuser_feat")
-        ensure_user_identity_core(superuser)
         self.client.force_login(superuser)
 
         patch_response = self.client.patch(
@@ -1040,7 +1032,7 @@ class ChatMessageFeatureApiTests(TestCase):
             CHAT_ATTACHMENT_DELETE_FILES_ON_MESSAGE_DELETE=True,
         ):
             message = Message.objects.create(
-                username=self.owner.username,
+                username=self.owner.login,
                 user=self.owner,
                 room=self.direct_room,
                 message_content="with attachments",
@@ -1075,7 +1067,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_reactions_handles_forbidden_and_remove_flow(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="reactions",
@@ -1110,7 +1102,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_reactions_accept_custom_emoji_token(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="custom reaction",
@@ -1151,7 +1143,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_reactions_reject_invalid_custom_emoji_token(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="invalid custom reaction",
@@ -1178,7 +1170,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_reactions_are_idempotent_for_the_same_emoji(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="reaction idempotency",
@@ -1217,7 +1209,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_reactions_allow_multiple_distinct_emojis_for_same_user(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="multiple reactions",
@@ -1251,19 +1243,19 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_search_messages_handles_validation_and_pagination(self):
         first = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="needle first",
         )
         second = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="needle second",
         )
         Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="other",
@@ -1292,7 +1284,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_mark_read_validation_public_room_and_ws_unread_state(self):
         message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="for unread",
@@ -1330,7 +1322,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
         public_room = api._public_room()
         public_message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=public_room,
             message_content="public unread",
@@ -1353,7 +1345,7 @@ class ChatMessageFeatureApiTests(TestCase):
         self.assertNotIn(str(public_room.pk), unread_public_after_first_visit["counts"])
 
         later_public_message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=public_room,
             message_content="public unread later",
@@ -1392,7 +1384,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_readers_endpoint_returns_direct_read_at_for_author(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="direct own message",
@@ -1427,7 +1419,7 @@ class ChatMessageFeatureApiTests(TestCase):
         ensure_membership(group_room, self.peer, role_name="Member")
         ensure_membership(group_room, self.outsider, role_name="Member")
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=group_room,
             message_content="group own message",
@@ -1479,7 +1471,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_mark_read_endpoint_survives_missing_receipt_table(self):
         message = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.direct_room,
             message_content="survive missing receipts",
@@ -1501,7 +1493,7 @@ class ChatMessageFeatureApiTests(TestCase):
 
     def test_message_readers_endpoint_survives_missing_receipt_table(self):
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.direct_room,
             message_content="reader fallback",
@@ -1521,4 +1513,3 @@ class ChatMessageFeatureApiTests(TestCase):
         self.assertEqual(response.json()["messageId"], message.pk)
         self.assertEqual(response.json()["readAt"], None)
         self.assertEqual(response.json()["readers"], [])
-

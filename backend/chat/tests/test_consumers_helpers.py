@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from asgiref.sync import async_to_sync
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -29,7 +29,6 @@ from rooms.models import Room
 from users.identity import set_user_public_handle, user_public_ref
 from users.models import SecurityRateLimitBucket
 
-User = get_user_model()
 
 
 class WsConnectRateLimitTests(TestCase):
@@ -91,9 +90,9 @@ class ChatConsumerInternalTests(TestCase):
     def setUp(self):
         """Проверяет сценарий `setUp`."""
         cache.clear()
-        self.user = User.objects.create_user(username='chat_internal_user', password='pass12345')
+        self.user = User.objects.create_user(login='chat_internal_user', password='pass12345')
         self.superuser = User.objects.create_superuser(
-            username='chat_internal_superuser',
+            login='chat_internal_superuser',
             email='chat_internal_superuser@example.com',
             password='pass12345',
         )
@@ -289,8 +288,8 @@ class PresenceConsumerInternalTests(TestCase):
     def setUp(self):
         """Проверяет сценарий `setUp`."""
         cache.clear()
-        self.user = User.objects.create_user(username='presence_internal_user', password='pass12345')
-        set_user_public_handle(self.user, self.user.username)
+        self.user = User.objects.create_user(login='presence_internal_user', password='pass12345')
+        set_user_public_handle(self.user, self.user.login)
 
     def _consumer(self, user=None):
         """Проверяет сценарий `_consumer`."""
@@ -433,10 +432,10 @@ class PresenceConsumerInternalTests(TestCase):
 
         online = async_to_sync(consumer._get_online)()
         self.assertEqual(len(online), 1)
-        self.assertEqual(online[0]['username'], self.user.username)
+        self.assertEqual(online[0]['username'], self.user.login)
 
         async_to_sync(consumer._remove_user)(self.user, graceful=False)
-        self.assertEqual(async_to_sync(consumer._get_online)()[0]['username'], self.user.username)
+        self.assertEqual(async_to_sync(consumer._get_online)()[0]['username'], self.user.login)
 
         async_to_sync(consumer._remove_user)(self.user, graceful=True)
         self.assertEqual(async_to_sync(consumer._get_online)(), [])
@@ -559,8 +558,8 @@ class ChatConsumerDirectInboxTargetsTests(TestCase):
     def setUp(self):
         """Проверяет сценарий `setUp`."""
         cache.clear()
-        self.owner = User.objects.create_user(username='target_owner', password='pass12345')
-        self.member = User.objects.create_user(username='target_member', password='pass12345')
+        self.owner = User.objects.create_user(login='target_owner', password='pass12345')
+        self.member = User.objects.create_user(login='target_member', password='pass12345')
 
     def _consumer(self):
         """Проверяет сценарий `_consumer`."""
@@ -612,7 +611,7 @@ class DirectInboxConsumerInternalTests(TestCase):
     def setUp(self):
         """Проверяет сценарий `setUp`."""
         cache.clear()
-        self.user = User.objects.create_user(username='direct_inbox_internal', password='pass12345')
+        self.user = User.objects.create_user(login='direct_inbox_internal', password='pass12345')
 
     def _consumer(self):
         """Проверяет сценарий `_consumer`."""
@@ -725,4 +724,3 @@ class DirectInboxConsumerInternalTests(TestCase):
 
         consumer.close.assert_awaited_once_with(code=4429)
         consumer.accept.assert_not_awaited()
-

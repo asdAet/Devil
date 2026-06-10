@@ -9,7 +9,7 @@ from typing import Any, cast
 from asgiref.sync import async_to_sync
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TransactionTestCase
@@ -21,7 +21,6 @@ from presence.routing import websocket_urlpatterns as presence_ws
 from rooms.models import Room
 from rooms.services import ensure_membership
 
-User = get_user_model()
 application = URLRouter(cast(list[Any], chat_ws + direct_inbox_ws + presence_ws))
 
 
@@ -42,8 +41,8 @@ def _sample_value(metric, sample_name: str, labels: dict[str, str]) -> float:
 class WebSocketObservabilityMetricsTests(TransactionTestCase):
     def setUp(self):
         cache.clear()
-        self.owner = User.objects.create_user(username="metrics_owner", password="pass12345")
-        self.member = User.objects.create_user(username="metrics_member", password="pass12345")
+        self.owner = User.objects.create_user(login="metrics_owner", password="pass12345")
+        self.member = User.objects.create_user(login="metrics_member", password="pass12345")
         self.private_room = Room.objects.create(
             name="metrics-private",
             kind=Room.Kind.PRIVATE,

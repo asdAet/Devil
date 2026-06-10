@@ -3,7 +3,7 @@
 """Содержит тесты модуля `test_access` подсистемы `chat`."""
 
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
 from django.test import TestCase
@@ -12,16 +12,15 @@ from roles.access import can_read, can_write, ensure_can_read_or_404, ensure_can
 from rooms.services import ensure_membership
 from rooms.models import Room
 
-User = get_user_model()
 
 
 class ChatAccessTests(TestCase):
     """Группирует тестовые сценарии класса `ChatAccessTests`."""
     def setUp(self):
         """Проверяет сценарий `setUp`."""
-        self.owner = User.objects.create_user(username='owner', password='pass12345')
-        self.member = User.objects.create_user(username='member', password='pass12345')
-        self.other = User.objects.create_user(username='other', password='pass12345')
+        self.owner = User.objects.create_user(login='owner', password='pass12345')
+        self.member = User.objects.create_user(login='member', password='pass12345')
+        self.other = User.objects.create_user(login='other', password='pass12345')
 
         self.private_room = Room.objects.create(
             name='private',

@@ -7,7 +7,7 @@ import json
 from asgiref.sync import async_to_sync
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TransactionTestCase, override_settings
@@ -18,7 +18,6 @@ from rooms.models import Room
 from chat.routing import websocket_urlpatterns as chat_ws
 from direct_inbox.routing import websocket_urlpatterns as di_ws
 
-User = get_user_model()
 application = URLRouter(chat_ws + di_ws)
 
 
@@ -27,9 +26,9 @@ class DirectInboxConsumerTests(TransactionTestCase):
     def setUp(self):
         """Проверяет сценарий `setUp`."""
         cache.clear()
-        self.owner = User.objects.create_user(username='owner_di', password='pass12345')
-        self.member = User.objects.create_user(username='member_di', password='pass12345')
-        self.other = User.objects.create_user(username='other_di', password='pass12345')
+        self.owner = User.objects.create_user(login='owner_di', password='pass12345')
+        self.member = User.objects.create_user(login='member_di', password='pass12345')
+        self.other = User.objects.create_user(login='other_di', password='pass12345')
 
         self.direct_room = Room.objects.create(
             name='dm',
@@ -201,4 +200,3 @@ class DirectInboxConsumerTests(TransactionTestCase):
             await inbox.disconnect()
 
         async_to_sync(run)()
-

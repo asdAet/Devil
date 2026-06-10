@@ -44,9 +44,9 @@ def _attachment_thumbnail_name(attachment: MessageAttachment) -> str:
 
 class ChatServicesTests(TestCase):
     def setUp(self):
-        self.owner = User.objects.create_user(username="svc_owner", password="pass12345")
-        self.peer = User.objects.create_user(username="svc_peer", password="pass12345")
-        self.other = User.objects.create_user(username="svc_other", password="pass12345")
+        self.owner = User.objects.create_user(login="svc_owner", password="pass12345")
+        self.peer = User.objects.create_user(login="svc_peer", password="pass12345")
+        self.other = User.objects.create_user(login="svc_other", password="pass12345")
         self.room = Room.objects.create(
             name="Service room",
             kind=Room.Kind.PRIVATE,
@@ -59,7 +59,7 @@ class ChatServicesTests(TestCase):
     def _message(self, *, user=None, content="hello"):
         user = user or self.owner
         return Message.objects.create(
-            username=user.username,
+            username=user.login,
             user=user,
             room=self.room,
             message_content=content,
@@ -387,7 +387,7 @@ class ChatServicesTests(TestCase):
         ensure_membership(direct_room, self.owner)
         ensure_membership(direct_room, self.peer)
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=direct_room,
             message_content="direct owned",
@@ -421,7 +421,7 @@ class ChatServicesTests(TestCase):
         ensure_membership(direct_room, self.owner)
         ensure_membership(direct_room, self.peer)
         message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=direct_room,
             message_content="direct fallback",
@@ -446,13 +446,13 @@ class ChatServicesTests(TestCase):
         ensure_membership(second_room, self.peer, role_name="Member")
 
         m1 = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=self.room,
             message_content="unread in first",
         )
         m2 = Message.objects.create(
-            username=self.peer.username,
+            username=self.peer.login,
             user=self.peer,
             room=second_room,
             message_content="read in second",
@@ -466,7 +466,7 @@ class ChatServicesTests(TestCase):
         # ensure read-state branch for deleted and own messages does not inflate unread
         Message.objects.filter(pk=m1.pk).update(is_deleted=True)
         own_message = Message.objects.create(
-            username=self.owner.username,
+            username=self.owner.login,
             user=self.owner,
             room=self.room,
             message_content="own message",

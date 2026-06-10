@@ -1,20 +1,19 @@
 """Tests for chat models."""
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 from messages.models import Message
 from roles.models import Role
 from rooms.models import Room
 
-User = get_user_model()
 
 
 class ChatModelsTests(TestCase):
     """Model-level behavior and signal tests."""
 
     def test_message_str_uses_related_user_when_available(self):
-        user = User.objects.create_user(username="msg_user", password="pass12345")
+        user = User.objects.create_user(login="msg_user", password="pass12345")
         room = Room.objects.create(name="Public", kind=Room.Kind.PUBLIC)
         message = Message.objects.create(
             username="sender_name",
