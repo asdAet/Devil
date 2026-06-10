@@ -8,7 +8,7 @@ from django.test import Client, TestCase
 
 from auditlog.models import AuditEvent
 from users.application import auth_service
-from users.identity import ensure_user_identity_core, set_user_public_handle
+from users.identity import set_user_public_handle
 
 
 class UserActionsAuditCoverageTests(TestCase):
@@ -149,8 +149,6 @@ class UserActionsAuditCoverageTests(TestCase):
             username="auditdirectpeer",
             email="audit_direct_peer@example.com",
         )
-        ensure_user_identity_core(actor)
-        ensure_user_identity_core(peer)
         set_user_public_handle(peer, "auditdirectpeer")
 
         self.client.force_login(actor)

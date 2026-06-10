@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.db import OperationalError
 from django.test import RequestFactory, TestCase
@@ -13,7 +13,6 @@ from django.urls import ResolverMatch
 
 from auditlog.application import write_service
 
-User = get_user_model()
 
 
 class AuditWriteServiceExtraTests(TestCase):
@@ -42,7 +41,7 @@ class AuditWriteServiceExtraTests(TestCase):
         self.assertEqual(ws_scope["audit_request_id"], "ws-1")
 
     def test_extract_actor_and_safe_metadata_branches(self):
-        user = User.objects.create_user(username="audit_user", password="pass12345")
+        user = User.objects.create_user(login="audit_user", password="pass12345")
         extracted = write_service._extract_actor(
             actor_user=user,
             actor_user_id="9",

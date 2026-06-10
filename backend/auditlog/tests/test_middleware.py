@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -6,12 +6,11 @@ from unittest.mock import patch
 from auditlog.interfaces.middleware import AuditHttpMiddleware
 from auditlog.models import AuditEvent
 
-User = get_user_model()
 
 
 class AuditMiddlewareTests(TestCase):
     def test_request_is_saved_to_audit_events(self):
-        user = User.objects.create_user(username="audit_http_user", password="pass12345")
+        user = User.objects.create_user(login="audit_http_user", password="pass12345")
         self.client.force_login(user)
 
         response = self.client.get("/api/auth/session/")
@@ -50,4 +49,3 @@ class AuditMiddlewareTests(TestCase):
         self.assertEqual(args[0], request)
         self.assertIsNone(kwargs["response"])
         self.assertIsInstance(kwargs["exception"], RuntimeError)
-

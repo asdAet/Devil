@@ -1,30 +1,29 @@
 import json
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from auditlog.models import AuditEvent
 
-User = get_user_model()
 
 
 class AuditAdminExportTests(TestCase):
     def setUp(self):
         self.admin_user = User.objects.create_user(
-            username="audit_admin",
+            login="audit_admin",
             password="pass12345",
             is_staff=True,
             is_superuser=True,
         )
         self.member = User.objects.create_user(
-            username="audit_member_regular",
+            login="audit_member_regular",
             password="pass12345",
             is_staff=False,
         )
-        self.actor = User.objects.create_user(username="audit_actor", password="pass12345")
+        self.actor = User.objects.create_user(login="audit_actor", password="pass12345")
         self.export_url = reverse("admin:auditlog_auditevent_export")
 
         self.success_event = AuditEvent.objects.create(
@@ -32,7 +31,7 @@ class AuditAdminExportTests(TestCase):
             protocol="http",
             actor_user=self.actor,
             actor_user_id_snapshot=self.actor.pk,
-            actor_username_snapshot=self.actor.username,
+            actor_username_snapshot=self.actor.login,
             is_authenticated=True,
             method="POST",
             path="/api/auth/login/",
@@ -46,7 +45,7 @@ class AuditAdminExportTests(TestCase):
             protocol="http",
             actor_user=self.actor,
             actor_user_id_snapshot=self.actor.pk,
-            actor_username_snapshot=self.actor.username,
+            actor_username_snapshot=self.actor.login,
             is_authenticated=True,
             method="POST",
             path="/api/chat/private/messages/",

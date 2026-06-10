@@ -1,30 +1,29 @@
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from auditlog.models import AuditEvent
 
-User = get_user_model()
 
 
 class AuditAdminIpSummaryTests(TestCase):
     def setUp(self):
         self.admin_user = User.objects.create_user(
-            username="audit_ip_admin",
+            login="audit_ip_admin",
             password="pass12345",
             is_staff=True,
             is_superuser=True,
         )
         self.member = User.objects.create_user(
-            username="audit_ip_member",
+            login="audit_ip_member",
             password="pass12345",
             is_staff=False,
         )
-        self.actor_one = User.objects.create_user(username="actor_one", password="pass12345")
-        self.actor_two = User.objects.create_user(username="actor_two", password="pass12345")
+        self.actor_one = User.objects.create_user(login="actor_one", password="pass12345")
+        self.actor_two = User.objects.create_user(login="actor_two", password="pass12345")
         self.summary_url = reverse("admin:auditlog_auditevent_ip_summary")
 
         now = timezone.now()
@@ -35,7 +34,7 @@ class AuditAdminIpSummaryTests(TestCase):
             action="auth.login.success",
             actor_user=self.actor_one,
             actor_user_id_snapshot=self.actor_one.pk,
-            actor_username_snapshot=self.actor_one.username,
+            actor_username_snapshot=self.actor_one.login,
             is_authenticated=True,
             ip=self.ip_a,
             success=True,
@@ -44,7 +43,7 @@ class AuditAdminIpSummaryTests(TestCase):
             action="chat.message.send",
             actor_user=self.actor_two,
             actor_user_id_snapshot=self.actor_two.pk,
-            actor_username_snapshot=self.actor_two.username,
+            actor_username_snapshot=self.actor_two.login,
             is_authenticated=True,
             ip=self.ip_a,
             success=True,
@@ -59,7 +58,7 @@ class AuditAdminIpSummaryTests(TestCase):
             action="auth.login.success",
             actor_user=self.actor_one,
             actor_user_id_snapshot=self.actor_one.pk,
-            actor_username_snapshot=self.actor_one.username,
+            actor_username_snapshot=self.actor_one.login,
             is_authenticated=True,
             ip=self.ip_b,
             success=True,
@@ -95,8 +94,8 @@ class AuditAdminIpSummaryTests(TestCase):
         self.assertEqual(row_a["account_count"], 2)
         self.assertEqual(row_a["anonymous_events"], 1)
         usernames = {str(account["username"]) for account in row_a["accounts"]}
-        self.assertIn(self.actor_one.username, usernames)
-        self.assertIn(self.actor_two.username, usernames)
+        self.assertIn(self.actor_one.login, usernames)
+        self.assertIn(self.actor_two.login, usernames)
 
     def test_staff_can_sort_and_filter_ip_summary(self):
         self.client.force_login(self.admin_user)
@@ -105,7 +104,7 @@ class AuditAdminIpSummaryTests(TestCase):
             {
                 "sort": "ip",
                 "direction": "asc",
-                "actor": self.actor_two.username,
+                "actor": self.actor_two.login,
             },
         )
         self.assertEqual(response.status_code, 200)
