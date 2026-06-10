@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from django import forms
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 from users.forms import (
@@ -16,9 +16,7 @@ from users.forms import (
     _validate_username_symbols,
 )
 from users.identity import ensure_profile, set_user_public_handle
-from users.models import EmailIdentity
 
-User = get_user_model()
 
 
 class UsersFormsExtraTests(TestCase):
@@ -28,14 +26,9 @@ class UsersFormsExtraTests(TestCase):
         _validate_username_symbols("valid_name1")
 
     def test_email_register_form_detects_duplicate_email(self):
-        user = User.objects.create_user(username="dup_mail_user", email="dup@example.com")
+        user = User.objects.create_user(login="dup_mail_user", email="dup@example.com")
         user.set_unusable_password()
         user.save(update_fields=["password"])
-        EmailIdentity.objects.create(
-            user=user,
-            email_normalized="dup@example.com",
-            email_verified=False,
-        )
 
         form = EmailRegisterForm(
             data={"email": " DUP@example.com ", "password1": "pass12345", "password2": "pass12345"}
@@ -76,10 +69,10 @@ class UsersFormsExtraTests(TestCase):
             self.assertIn("password1", error_form.errors)
 
     def test_profile_identity_update_form_validates_and_saves(self):
-        user = User.objects.create_user(username="identity_user", password="pass12345")
+        user = User.objects.create_user(login="identity_user", password="pass12345")
         profile = ensure_profile(user)
 
-        duplicate_user = User.objects.create_user(username="duplicate_user", password="pass12345")
+        duplicate_user = User.objects.create_user(login="duplicate_user", password="pass12345")
         set_user_public_handle(duplicate_user, "takenname")
 
         duplicate = ProfileIdentityUpdateForm(
@@ -99,7 +92,7 @@ class UsersFormsExtraTests(TestCase):
         self.assertEqual(updated.name, "Name")
 
     def test_profile_identity_update_form_handles_none_and_blank_username(self):
-        user = User.objects.create_user(username="identity_none", password="pass12345")
+        user = User.objects.create_user(login="identity_none", password="pass12345")
         form_none = ProfileIdentityUpdateForm(data={"name": "Only Name"}, user=user)
         self.assertTrue(form_none.is_valid(), form_none.errors)
         self.assertIsNone(form_none.cleaned_data["username"])
@@ -109,14 +102,14 @@ class UsersFormsExtraTests(TestCase):
         self.assertIsNone(form_blank.cleaned_data["username"])
 
     def test_user_update_form_allows_empty_values(self):
-        user = User.objects.create_user(username="upd_user", password="pass12345")
-        form = UserUpdateForm(data={"username": "upd_user", "email": ""}, instance=user)
+        user = User.objects.create_user(login="upd_user", password="pass12345")
+        form = UserUpdateForm(data={"login": "upd_user", "email": ""}, instance=user)
         self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data["username"], "upd_user")
-        self.assertEqual(form.cleaned_data["email"], "")
+        self.assertEqual(form.cleaned_data["login"], "upd_user")
+        self.assertIsNone(form.cleaned_data["email"])
 
     def test_profile_update_form_save_commit_false_and_clean_image_without_file(self):
-        user = User.objects.create_user(username="profile_upd_extra", password="pass12345")
+        user = User.objects.create_user(login="profile_upd_extra", password="pass12345")
         profile = ensure_profile(user)
         form = ProfileUpdateForm(data={"bio": "ok"}, instance=profile)
         self.assertTrue(form.is_valid(), form.errors)

@@ -62,7 +62,7 @@ class MediaAccessServiceTests(TestCase):
 
     def _attachment_for_room(self, room: Room, *, author) -> MessageAttachment:
         message = Message.objects.create(
-            username=author.username,
+            username=author.login,
             user=author,
             room=room,
             message_content="service attachment message",

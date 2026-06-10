@@ -1,31 +1,20 @@
-﻿"""Coverage tests for custom auth backend."""
+"""Coverage tests for custom login/email auth backend."""
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password
+from users.models import User
 from django.test import RequestFactory, TestCase
 
-from users.auth_backends import EmailIdentityBackend
-from users.models import EmailIdentity, LoginIdentity
-
-User = get_user_model()
+from users.auth_backends import LoginOrEmailBackend
 
 
-class EmailIdentityBackendTests(TestCase):
+
+class LoginOrEmailBackendTests(TestCase):
     def setUp(self):
-        self.backend = EmailIdentityBackend()
+        self.backend = LoginOrEmailBackend()
         self.request = RequestFactory().post("/api/auth/login/")
-        self.user = User.objects.create_user(username="backend_user", email="backend@example.com")
-        self.user.set_unusable_password()
-        self.user.save(update_fields=["password"])
-        LoginIdentity.objects.create(
-            user=self.user,
-            login_normalized="backend_login",
-            password_hash=make_password("pass12345"),
-        )
-        EmailIdentity.objects.create(
-            user=self.user,
-            email_normalized="backend@example.com",
-            email_verified=True,
+        self.user = User.objects.create_user(
+            login="backend_user",
+            email="backend@example.com",
+            password="pass12345",
         )
 
     def test_authenticate_returns_user_for_valid_credentials(self):
@@ -38,7 +27,7 @@ class EmailIdentityBackendTests(TestCase):
 
         by_login = self.backend.authenticate(
             request=self.request,
-            username=" backend_login ",
+            username=" backend_user ",
             password="pass12345",
         )
         self.assertEqual(by_login, self.user)

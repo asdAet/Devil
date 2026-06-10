@@ -9,22 +9,21 @@ from pathlib import Path
 
 from PIL import Image
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from users.models import MAX_PROFILE_IMAGE_SIDE
 
-User = get_user_model()
 
 
 class ProfileModelTests(TestCase):
     def test_str_representation_contains_username(self):
-        user = User.objects.create_user(username="model_user", password="pass12345")
+        user = User.objects.create_user(login="model_user", password="pass12345")
         self.assertIn("model_user", str(user.profile))
 
     def test_save_strips_html_from_bio(self):
-        user = User.objects.create_user(username="bio_model_user", password="pass12345")
+        user = User.objects.create_user(login="bio_model_user", password="pass12345")
         profile = user.profile
         profile.bio = "<b>Hello</b> <script>alert(1)</script>"
         profile.save()
@@ -77,7 +76,7 @@ class ProfileImageProcessingTests(TestCase):
         return SimpleUploadedFile("avatar.svg", payload, content_type="image/svg+xml")
 
     def test_profile_save_handles_rgba_source_without_crash(self):
-        user = User.objects.create_user(username="imguser", password="pass12345")
+        user = User.objects.create_user(login="imguser", password="pass12345")
         profile = user.profile
         profile.image = self._make_rgba_upload_with_jpg_name()
 
@@ -90,7 +89,7 @@ class ProfileImageProcessingTests(TestCase):
             self.assertEqual(saved.mode, "RGBA")
 
     def test_replacing_avatar_deletes_previous_file(self):
-        user = User.objects.create_user(username="replace_user", password="pass12345")
+        user = User.objects.create_user(login="replace_user", password="pass12345")
         profile = user.profile
 
         first = SimpleUploadedFile("first.png", self._png_bytes((255, 0, 0)), content_type="image/png")
@@ -107,7 +106,7 @@ class ProfileImageProcessingTests(TestCase):
         self.assertNotEqual(first_name, second_name)
 
     def test_large_avatar_is_resized_to_safe_limit(self):
-        user = User.objects.create_user(username="resize_user", password="pass12345")
+        user = User.objects.create_user(login="resize_user", password="pass12345")
         profile = user.profile
         profile.image = self._png_upload((MAX_PROFILE_IMAGE_SIDE + 500, 800))
         profile.save()
@@ -118,7 +117,7 @@ class ProfileImageProcessingTests(TestCase):
             self.assertLessEqual(saved.height, MAX_PROFILE_IMAGE_SIDE)
 
     def test_svg_avatar_is_saved_without_raster_processing(self):
-        user = User.objects.create_user(username="svg_model_user", password="pass12345")
+        user = User.objects.create_user(login="svg_model_user", password="pass12345")
         profile = user.profile
         profile.image = self._svg_upload()
         profile.save()
@@ -128,5 +127,7 @@ class ProfileImageProcessingTests(TestCase):
         profile.save(update_fields=["bio"])
         profile.refresh_from_db()
 
-        self.assertEqual(profile.image.name, first_saved_name)
-        self.assertTrue(profile.image.name.endswith(".svg"))
+        image_name = profile.image.name
+        self.assertEqual(image_name, first_saved_name)
+        assert image_name is not None
+        self.assertTrue(image_name.endswith(".svg"))

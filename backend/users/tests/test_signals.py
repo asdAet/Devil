@@ -4,29 +4,28 @@
 
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.db import IntegrityError
 from django.test import TestCase
 
 from messages.models import Message
 from rooms.models import Room
-from users.identity import user_public_id
+from users.identity import set_user_public_handle, user_public_id
 from users.models import Profile
 from users.signals import ensure_profile
 
-User = get_user_model()
 
 
 class UserSignalsTests(TestCase):
     """Группирует тестовые сценарии класса `UserSignalsTests`."""
     def test_profile_created_for_new_user(self):
         """Проверяет сценарий `test_profile_created_for_new_user`."""
-        user = User.objects.create_user(username='signal_user', password='pass12345')
+        user = User.objects.create_user(login='signal_user', password='pass12345')
         self.assertTrue(Profile.objects.filter(user=user).exists())
 
     def test_profile_not_duplicated_on_user_update(self):
         """Проверяет сценарий `test_profile_not_duplicated_on_user_update`."""
-        user = User.objects.create_user(username='signal_user2', password='pass12345')
+        user = User.objects.create_user(login='signal_user2', password='pass12345')
         self.assertEqual(Profile.objects.filter(user=user).count(), 1)
 
         user.email = 'updated@example.com'
@@ -36,18 +35,18 @@ class UserSignalsTests(TestCase):
 
     def test_profile_recreated_if_removed_then_user_saved(self):
         """Проверяет сценарий `test_profile_recreated_if_removed_then_user_saved`."""
-        user = User.objects.create_user(username='signal_user3', password='pass12345')
+        user = User.objects.create_user(login='signal_user3', password='pass12345')
         Profile.objects.filter(user=user).delete()
         self.assertFalse(Profile.objects.filter(user=user).exists())
 
-        user.first_name = 'Updated'
-        user.save(update_fields=['first_name'])
+        user.email = 'updated-signal@example.com'
+        user.save(update_fields=['email'])
 
         self.assertTrue(Profile.objects.filter(user=user).exists())
 
     def test_signal_skips_raw_fixture_saves(self):
         """Проверяет сценарий `test_signal_skips_raw_fixture_saves`."""
-        user = User.objects.create_user(username='signal_raw', password='pass12345')
+        user = User.objects.create_user(login='signal_raw', password='pass12345')
 
         with patch('users.signals.Profile.objects.get_or_create') as get_or_create:
             ensure_profile(User, user, raw=True)
@@ -56,7 +55,7 @@ class UserSignalsTests(TestCase):
 
     def test_signal_handles_integrity_error_race(self):
         """Проверяет сценарий `test_signal_handles_integrity_error_race`."""
-        user = User.objects.create_user(username='signal_race', password='pass12345')
+        user = User.objects.create_user(login='signal_race', password='pass12345')
 
         with patch('users.signals.Profile.objects.get_or_create', side_effect=IntegrityError), patch(
             'users.signals.Profile.objects.filter'
@@ -66,20 +65,19 @@ class UserSignalsTests(TestCase):
         filter_qs.assert_called_once_with(user=user)
         filter_qs.return_value.first.assert_called_once()
 
-    def test_username_rename_updates_messages_and_writes_audit_event(self):
-        """Проверяет сценарий `test_username_rename_updates_messages_and_writes_audit_event`."""
-        user = User.objects.create_user(username='old_name', password='pass12345')
+    def test_public_handle_change_updates_messages_and_writes_audit_event(self):
+        """Публичный handle обновляет снимки автора сообщений."""
+        user = User.objects.create_user(login='old_name', password='pass12345')
         room = Room.objects.create(name='Private', kind=Room.Kind.PRIVATE, created_by=user)
         Message.objects.create(
-            username='old_name',
+            username=user_public_id(user),
             user=user,
             room=room,
             message_content='hello',
         )
 
         with self.assertLogs('security.audit', level='INFO') as captured:
-            user.username = 'new_name'
-            user.save(update_fields=['username'])
+            set_user_public_handle(user, 'new_name')
 
-        self.assertTrue(Message.objects.filter(user=user, username=user_public_id(user)).exists())
-        self.assertTrue(any('user.username.changed' in line for line in captured.output))
+        self.assertTrue(Message.objects.filter(user=user, username='new_name').exists())
+        self.assertTrue(any('public_handle.user.updated' in line for line in captured.output))

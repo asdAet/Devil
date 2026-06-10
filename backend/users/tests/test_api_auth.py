@@ -15,7 +15,7 @@ from chat import utils
 from users.application import auth_service
 from users.avatar_service import user_password_default_avatar_path
 from users.application.errors import IdentityServiceError
-from users.models import EmailIdentity, LoginIdentity
+from users.models import User
 
 
 class AuthApiTests(TestCase):
@@ -80,8 +80,9 @@ class AuthApiTests(TestCase):
             utils.is_valid_media_signature(default_avatar_path, int(query["exp"][0]), query["sig"][0])
         )
 
-        self.assertTrue(LoginIdentity.objects.filter(login_normalized="newlogin").exists())
-        self.assertTrue(EmailIdentity.objects.filter(email_normalized="new@example.com").exists())
+        created = User.objects.get(login="newlogin")
+        self.assertEqual(created.email, "new@example.com")
+        self.assertTrue(created.has_usable_password())
 
     def test_register_duplicate_email_returns_conflict(self):
         self._create_login_user(login="firstlogin", password="pass12345", email="taken@example.com")
@@ -409,11 +410,8 @@ class AuthApiTests(TestCase):
         self.assertTrue(payload.get("wsAuthToken"))
 
     def test_login_success_for_django_superuser_without_identity_rows(self):
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
         User.objects.create_superuser(
-            username="admin",
+            login="admin",
             email="admin@example.com",
             password="adminpass123",
         )
@@ -658,4 +656,3 @@ class AuthApiTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/register?oauthError=", response.headers["Location"])
-

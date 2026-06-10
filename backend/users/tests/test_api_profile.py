@@ -98,11 +98,10 @@ class ProfileApiTests(TestCase):
         self.assertFalse(payload.get("isSuperuser"))
 
     def test_get_profile_authenticated_superuser_includes_flag(self):
-        from django.contrib.auth import get_user_model
+        from users.models import User
 
-        User = get_user_model()
         admin = User.objects.create_superuser(
-            username="profile_admin",
+            login="profile_admin",
             email="profile_admin@example.com",
             password="pass12345",
         )
@@ -325,7 +324,7 @@ class AttachmentMediaAccessTests(TestCase):
 
     def _attachment_for_room(self, room: Room, *, author) -> MessageAttachment:
         message = Message.objects.create(
-            username=author.username,
+            username=author.login,
             user=author,
             room=room,
             message_content="attachment message",
@@ -352,7 +351,7 @@ class AttachmentMediaAccessTests(TestCase):
         thumbnail_payload: bytes = b"thumb",
     ) -> MessageAttachment:
         message = Message.objects.create(
-            username=author.username,
+            username=author.login,
             user=author,
             room=room,
             message_content="custom attachment message",
@@ -376,7 +375,7 @@ class AttachmentMediaAccessTests(TestCase):
 
     def _svg_attachment_for_room(self, room: Room, *, author) -> MessageAttachment:
         message = Message.objects.create(
-            username=author.username,
+            username=author.login,
             user=author,
             room=room,
             message_content="svg attachment message",
@@ -410,7 +409,7 @@ class AttachmentMediaAccessTests(TestCase):
 
     def _attachment_with_png_thumbnail_for_room(self, room: Room, *, author) -> MessageAttachment:
         message = Message.objects.create(
-            username=author.username,
+            username=author.login,
             user=author,
             room=room,
             message_content="png thumbnail attachment message",

@@ -6,15 +6,14 @@ import time
 from unittest.mock import patch
 
 import requests
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase, override_settings
 
 from users.application import auth_service
 from users.application.errors import IdentityConflictError, IdentityServiceError, IdentityUnauthorizedError
-from users.identity import ensure_user_identity_core, user_public_ref
-from users.models import EmailIdentity, LoginIdentity, OAuthIdentity
+from users.identity import user_public_id, user_public_ref
+from users.models import OAuthIdentity
 
-User = get_user_model()
 
 
 class _MockResponse:
@@ -86,25 +85,23 @@ class AuthServiceUnitTests(TestCase):
 
     def test_login_user_supports_superuser_created_via_django_admin_flow(self):
         admin = User.objects.create_superuser(
-            username="admin",
+            login="admin",
             email="admin@example.com",
             password="adminpass123",
         )
-        self.assertFalse(LoginIdentity.objects.filter(user=admin).exists())
 
         self.assertEqual(auth_service.login_user("admin", "adminpass123"), admin)
         self.assertEqual(auth_service.login_user("admin@example.com", "adminpass123"), admin)
 
-    def test_login_user_rejects_non_staff_without_identity_records(self):
-        user_without_identity = User.objects.create_user(
-            username="plain_user",
+    def test_login_user_supports_regular_user_password(self):
+        plain_user = User.objects.create_user(
+            login="plain_user",
             email="plain@example.com",
             password="plainpass123",
         )
-        self.assertFalse(LoginIdentity.objects.filter(user=user_without_identity).exists())
 
-        with self.assertRaises(IdentityUnauthorizedError):
-            auth_service.login_user("plain_user", "plainpass123")
+        self.assertEqual(auth_service.login_user("plain_user", "plainpass123"), plain_user)
+        self.assertEqual(auth_service.login_user("plain@example.com", "plainpass123"), plain_user)
 
     @override_settings(GOOGLE_OAUTH_CLIENT_ID="")
     def test_get_expected_google_audience_requires_setting(self):
@@ -248,7 +245,7 @@ class AuthServiceUnitTests(TestCase):
         self.assertEqual(user, self.user)
 
     @override_settings(GOOGLE_OAUTH_CLIENT_ID="client-id")
-    def test_authenticate_or_signup_with_google_creates_user_and_checks_email_conflict(self):
+    def test_authenticate_or_signup_with_google_creates_user_and_links_existing_email(self):
         payload = {
             "iss": "https://accounts.google.com",
             "aud": "client-id",
@@ -265,19 +262,28 @@ class AuthServiceUnitTests(TestCase):
         ):
             created = auth_service.authenticate_or_signup_with_google(id_token="token", username="newoauth")
 
-        self.assertTrue(LoginIdentity.objects.filter(user=created).exists() is False)
-        self.assertTrue(EmailIdentity.objects.filter(user=created, email_normalized="new_oauth@example.com").exists())
+        self.assertEqual(created.login, "new_oauth@example.com")
+        self.assertEqual(created.email, "new_oauth@example.com")
+        self.assertTrue(created.email_verified)
+        self.assertFalse(created.has_usable_password())
         self.assertTrue(OAuthIdentity.objects.filter(user=created, provider_user_id="sub-new").exists())
         self.assertEqual(user_public_ref(created), "@newoauth")
-        self.assertTrue(ensure_user_identity_core(created).public_id)
+        self.assertRegex(user_public_id(created), r"^[1-9]\d{9}$")
 
-        conflict_payload = {**payload, "sub": "sub-conflict", "email": "svc@example.com"}
+        existing_email_payload = {**payload, "sub": "sub-existing-email", "email": "svc@example.com"}
         with patch(
             "users.application.auth_service.requests.get",
-            return_value=_MockResponse(200, conflict_payload),
+            return_value=_MockResponse(200, existing_email_payload),
         ):
-            with self.assertRaises(IdentityConflictError):
-                auth_service.authenticate_or_signup_with_google(id_token="token")
+            linked = auth_service.authenticate_or_signup_with_google(id_token="token")
+        self.assertEqual(linked, self.user)
+        self.assertTrue(
+            OAuthIdentity.objects.filter(
+                user=self.user,
+                provider=OAuthIdentity.Provider.GOOGLE,
+                provider_user_id="sub-existing-email",
+            ).exists()
+        )
 
     @override_settings(GOOGLE_OAUTH_CLIENT_ID="client-id")
     def test_authenticate_or_signup_with_google_supports_access_token(self):
@@ -306,12 +312,9 @@ class AuthServiceUnitTests(TestCase):
                 username="accessnew",
             )
 
-        self.assertTrue(
-            EmailIdentity.objects.filter(
-                user=created,
-                email_normalized="access_new@example.com",
-            ).exists()
-        )
+        self.assertEqual(created.login, "access_new@example.com")
+        self.assertEqual(created.email, "access_new@example.com")
+        self.assertTrue(created.email_verified)
         self.assertTrue(
             OAuthIdentity.objects.filter(
                 user=created,
@@ -332,17 +335,19 @@ class AuthServiceUnitTests(TestCase):
         display_name = auth_service.set_profile_name(self.user, " <b>Name</b> ")
         self.assertEqual(display_name, "Name")
         self.user.refresh_from_db()
-        self.assertEqual(self.user.first_name, "Name")
+        self.assertEqual(self.user.profile.name, "Name")
 
     def test_update_security_settings_updates_email_and_password(self):
         auth_service.update_security_settings(self.user, email="new@example.com")
-        self.assertTrue(EmailIdentity.objects.filter(user=self.user, email_normalized="new@example.com").exists())
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "new@example.com")
+        self.assertFalse(self.user.email_verified)
 
         auth_service.update_security_settings(self.user, new_password="pass99999")
         self.assertEqual(auth_service.login_user("svc_login", "pass99999"), self.user)
 
     @override_settings(GOOGLE_OAUTH_CLIENT_ID="client-id")
-    def test_oauth_user_without_email_must_add_email_before_setting_password(self):
+    def test_oauth_requires_verified_email(self):
         payload = {
             "iss": "https://accounts.google.com",
             "aud": "client-id",
@@ -355,11 +360,8 @@ class AuthServiceUnitTests(TestCase):
             "users.application.auth_service.requests.get",
             return_value=_MockResponse(200, payload),
         ):
-            oauth_user = auth_service.authenticate_or_signup_with_google(id_token="token")
-
-        with self.assertRaises(IdentityServiceError) as exc:
-            auth_service.update_security_settings(oauth_user, new_password="pass99999")
-        self.assertEqual(exc.exception.code, "email_missing")
+            with self.assertRaises(IdentityUnauthorizedError):
+                auth_service.authenticate_or_signup_with_google(id_token="token")
 
     def test_get_user_by_ref_returns_user_only_for_user_owner(self):
         auth_service.set_public_handle(self.user, "wrappedname")
