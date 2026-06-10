@@ -56,7 +56,7 @@ class InviteLink(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -65,7 +65,7 @@ class InviteLink(models.Model):
     @property
     def is_expired(self) -> bool:
         """Проверяет условие expired и возвращает логический результат.
-        
+
         Returns:
             Логическое значение результата проверки.
         """
@@ -83,9 +83,9 @@ class JoinRequest(models.Model):
 
     class Status(models.TextChoices):
         """Класс Status инкапсулирует связанную бизнес-логику модуля."""
-        PENDING = "pending", "Pending"
-        APPROVED = "approved", "Approved"
-        REJECTED = "rejected", "Rejected"
+        PENDING = "pending"
+        APPROVED = "approved"
+        REJECTED = "rejected"
 
     room = models.ForeignKey(
         Room,
@@ -147,11 +147,11 @@ class JoinRequest(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
-        return f"{self.room_id}:{self.user.username}:{self.status}"
+        return f"{self.room_id}:{self.user_id}:{self.status}"
 
 
 class PinnedMessage(models.Model):
@@ -191,7 +191,7 @@ class PinnedMessage(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """

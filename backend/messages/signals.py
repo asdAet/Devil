@@ -17,7 +17,7 @@ def observe_message_created_signal(sender, instance, created, **kwargs):
         return
 
     room = getattr(instance, "room", None)
-    room_kind = getattr(room, "kind", None)
+    room_kind = str(getattr(room, "kind", "") or "")
     message_content = str(getattr(instance, "message_content", "") or "")
     transaction.on_commit(
         lambda room_kind=room_kind, message_content=message_content: observe_message_created(

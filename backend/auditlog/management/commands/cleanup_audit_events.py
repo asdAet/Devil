@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -35,6 +37,6 @@ class Command(BaseCommand):
         if days < 1:
             raise CommandError("--days должно быть >= 1")
 
-        cutoff = timezone.now() - timezone.timedelta(days=days)
+        cutoff = timezone.now() - timedelta(days=days)
         deleted, _details = AuditEvent.objects.filter(created_at__lt=cutoff).delete()
         self.stdout.write(self.style.SUCCESS(f"Удалено {deleted} событий аудита старше {days} дней"))

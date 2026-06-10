@@ -3,9 +3,11 @@
 
 import json
 from unittest import mock
+from typing import cast
 
 from django.db.utils import DatabaseError
 from django.test import RequestFactory, SimpleTestCase
+from rest_framework.response import Response
 
 from chat_app_django import health
 
@@ -38,7 +40,7 @@ class HealthUnitTests(SimpleTestCase):
         render = getattr(response, "render", None)
         if callable(render):
             render()
-        payload = json.loads(response.content)
+        payload = json.loads(cast(Response, response).content)
         self.assertEqual(payload['status'], 'error')
         self.assertEqual(payload['components']['database'], 'error')
         self.assertEqual(payload['components']['cache'], 'error')

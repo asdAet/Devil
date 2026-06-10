@@ -21,6 +21,7 @@
     }
   ],
   "typeCheckingMode": "standard",
+  "reportIncompatibleVariableOverride": "none",
   "reportMissingImports": "none",
   "reportMissingModuleSource": "none"
 }
