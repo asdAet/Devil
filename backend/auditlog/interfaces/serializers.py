@@ -30,10 +30,10 @@ class AuditEventSerializer(serializers.ModelSerializer):
 
     def get_actor(self, obj):
         """Возвращает actor из текущего контекста или хранилища.
-        
+
         Args:
             obj: Объект доменной модели или ORM-сущность.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -42,12 +42,3 @@ class AuditEventSerializer(serializers.ModelSerializer):
             "usernameSnapshot": obj.actor_username_snapshot,
             "isAuthenticated": obj.is_authenticated,
         }
-
-
-class UsernameHistorySerializer(serializers.Serializer):
-    """Класс UsernameHistorySerializer сериализует и валидирует данные API."""
-    id = serializers.IntegerField()
-    createdAt = serializers.DateTimeField()
-    oldUsername = serializers.CharField(allow_null=True)
-    newUsername = serializers.CharField(allow_null=True)
-    requestId = serializers.CharField(allow_null=True)

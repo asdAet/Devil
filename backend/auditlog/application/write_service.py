@@ -24,10 +24,10 @@ _pending_persist_tasks: set[asyncio.Task] = set()
 
 def _normalize_int(value):
     """Нормализует int к внутреннему формату приложения.
-    
+
     Args:
         value: Входное значение для проверки или преобразования.
-    
+
     Returns:
         Функция не возвращает значение.
     """
@@ -41,11 +41,11 @@ def _normalize_int(value):
 
 def _scope_header(scope, name: bytes) -> str | None:
     """Выполняет вспомогательную обработку для scope header.
-    
+
     Args:
         scope: ASGI-scope с метаданными соединения.
         name: Человекочитаемое имя объекта или параметра.
-    
+
     Returns:
         Объект типа str | None, полученный при выполнении операции.
     """
@@ -60,10 +60,10 @@ def _scope_header(scope, name: bytes) -> str | None:
 
 def _get_or_create_request_id_for_request(request) -> str:
     """Возвращает or create request id for request из текущего контекста или хранилища.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и параметрами вызова.
-    
+
     Returns:
         Строковое значение, сформированное функцией.
     """
@@ -79,10 +79,10 @@ def _get_or_create_request_id_for_request(request) -> str:
 
 def _get_or_create_request_id_for_scope(scope) -> str:
     """Возвращает or create request id for scope из текущего контекста или хранилища.
-    
+
     Args:
         scope: ASGI-scope с метаданными соединения.
-    
+
     Returns:
         Строковое значение, сформированное функцией.
     """
@@ -98,13 +98,13 @@ def _get_or_create_request_id_for_scope(scope) -> str:
 
 def _extract_actor(actor_user=None, actor_user_id=None, actor_username=None, is_authenticated=None):
     """Извлекает actor из источника данных.
-    
+
     Args:
         actor_user: Пользователь, от имени которого пишется аудит-событие.
         actor_user_id: Идентификатор пользователя, от имени которого пишется аудит.
         actor_username: Публичное имя пользователя для аудита и ответа API.
         is_authenticated: Булев флаг условия authenticated.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -119,7 +119,9 @@ def _extract_actor(actor_user=None, actor_user_id=None, actor_username=None, is_
             authenticated = user_authenticated
         if user_authenticated:
             snapshot_id = snapshot_id or getattr(user, "id", None)
-            snapshot_username = snapshot_username or getattr(user, "username", None)
+            from users.identity import user_public_username
+
+            snapshot_username = snapshot_username or user_public_username(user)
 
     if not authenticated:
         user = None
@@ -128,10 +130,10 @@ def _extract_actor(actor_user=None, actor_user_id=None, actor_username=None, is_
 
 def _safe_metadata(metadata) -> dict:
     """Вспомогательная функция `_safe_metadata` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         metadata: Дополнительные поля события, включаемые в аудит-запись.
-    
+
     Returns:
         Словарь типа dict с данными результата.
     """
@@ -148,11 +150,11 @@ def _safe_metadata(metadata) -> dict:
 
 def _default_success(event: str, status_code: int | None) -> bool:
     """Вспомогательная функция `_default_success` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         event: Событие для логирования или трансляции.
         status_code: HTTP-код результата операции.
-    
+
     Returns:
         Логическое значение результата проверки.
     """
@@ -165,7 +167,7 @@ def _default_success(event: str, status_code: int | None) -> bool:
 
 def _persist_event_row(payload: dict) -> None:
     """Сохраняет event row в постоянном хранилище.
-    
+
     Args:
         payload: Подготовленные данные для сохранения или отправки.
     """
@@ -177,7 +179,7 @@ def _persist_event_row(payload: dict) -> None:
 
 def _persist_event(payload: dict) -> asyncio.Task | None:
     """Сохраняет event в постоянном хранилище.
-    
+
     Args:
         payload: Подготовленные данные для сохранения или отправки.
     """
@@ -250,7 +252,7 @@ def write_event(
     **fields,
 ) -> asyncio.Task | None:
     """Записывает event в хранилище или аудит.
-    
+
     Args:
         action: Код или имя действия, которое фиксируется в аудите.
         protocol: Транспортный протокол текущего запроса или события.
@@ -331,7 +333,7 @@ def write_event(
 
 def audit_security_event(event: str, **fields) -> asyncio.Task | None:
     """Фиксирует security event в системе аудита.
-    
+
     Args:
         event: Событие для логирования или трансляции.
         **fields: Дополнительные поля, переданные в функцию.
@@ -353,7 +355,7 @@ def audit_security_event(event: str, **fields) -> asyncio.Task | None:
 
 def audit_http_event(event: str, request, **fields) -> asyncio.Task | None:
     """Фиксирует http event в системе аудита.
-    
+
     Args:
         event: Событие для логирования или трансляции.
         request: HTTP-запрос с контекстом пользователя и входными данными.
@@ -379,7 +381,7 @@ def audit_http_event(event: str, request, **fields) -> asyncio.Task | None:
 
 def audit_ws_event(event: str, scope, **fields) -> asyncio.Task | None:
     """Фиксирует ws event в системе аудита.
-    
+
     Args:
         event: Событие для логирования или трансляции.
         scope: ASGI-контекст соединения с метаданными клиента.
@@ -408,7 +410,7 @@ def audit_http_request(
     exception: Exception | None = None,
 ) -> asyncio.Task | None:
     """Фиксирует http request в системе аудита.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
         response: HTTP-ответ, который анализируется перед возвратом клиенту.

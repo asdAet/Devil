@@ -17,11 +17,11 @@ from users import api as users_api
 
 def _absolute(request, raw_path: str) -> str:
     """Вспомогательная функция `_absolute` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
         raw_path: Параметр raw path, используемый в логике функции.
-    
+
     Returns:
         Строковое значение, сформированное функцией.
     """
@@ -30,12 +30,12 @@ def _absolute(request, raw_path: str) -> str:
 
 def _link(request, name: str, kwargs: dict | None = None) -> str | None:
     """Выполняет вспомогательную обработку для link.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и параметрами вызова.
         name: Человекочитаемое имя объекта или параметра.
         kwargs: Дополнительные именованные аргументы вызова.
-    
+
     Returns:
         Объект типа str | None, полученный при выполнении операции.
     """
@@ -47,11 +47,11 @@ def _link(request, name: str, kwargs: dict | None = None) -> str | None:
 
 def _first_link(request, names: list[str]) -> str | None:
     """Вспомогательная функция `_first_link` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
         names: Параметр names, используемый в логике функции.
-    
+
     Returns:
         Объект типа str | None, сформированный в ходе выполнения.
     """
@@ -66,10 +66,10 @@ def _first_link(request, names: list[str]) -> str | None:
 @permission_classes([AllowAny])
 def api_index(request):
     """Вспомогательная функция `api_index` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -161,7 +161,6 @@ def api_index(request):
         ),
         "chatRoomPermissionsMe": _absolute(request, "/api/chat/{room_id}/permissions/me/"),
         "auditEventDetail": _absolute(request, "/api/admin/audit/events/{event_id}/"),
-        "auditUsernameHistory": _absolute(request, "/api/admin/audit/users/{user_id}/username-history/"),
         "friendsRemove": _absolute(request, "/api/friends/{user_id}/"),
         "friendsAccept": _absolute(request, "/api/friends/requests/{friendship_id}/accept/"),
         "friendsDecline": _absolute(request, "/api/friends/requests/{friendship_id}/decline/"),
@@ -182,10 +181,10 @@ def api_index(request):
 @permission_classes([AllowAny])
 def api_root(request):
     """Вспомогательная функция `api_root` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -251,4 +250,3 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,
     )
-

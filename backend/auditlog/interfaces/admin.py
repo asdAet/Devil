@@ -580,7 +580,8 @@ class AuditEventAdmin(admin.ModelAdmin):
                 if user_id is not None:
                     user_obj = users_by_id.get(user_id)
                     if user_obj is not None:
-                        resolved_username = str(getattr(user_obj, user_model.USERNAME_FIELD, resolved_username))
+                        username_field = str(getattr(user_model, "USERNAME_FIELD", "login"))
+                        resolved_username = str(getattr(user_obj, username_field, resolved_username))
                         try:
                             admin_url = reverse(
                                 f"admin:{user_model._meta.app_label}_{user_model._meta.model_name}_change",
