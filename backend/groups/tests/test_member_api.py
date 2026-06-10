@@ -3,7 +3,7 @@
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 from roles.models import Membership, Role
@@ -12,7 +12,6 @@ from users.identity import user_display_name, user_public_id, user_public_ref
 
 from ._typing import TypedAPIClient
 
-User = get_user_model()
 
 
 class APITestCase(TestCase):
@@ -47,8 +46,8 @@ def _create_group_with_member(client: TypedAPIClient, owner, member) -> int:
 class TestJoinLeave(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.member = User.objects.create_user(username="member", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.member = User.objects.create_user(login="member", password="testpass123")
 
     def test_join_public_group(self):
         self.api_client.force_authenticate(user=self.owner)
@@ -94,11 +93,11 @@ class TestJoinLeave(APITestCase):
 class TestKickBanMute(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.member = User.objects.create_user(username="member", password="testpass123")
-        self.other = User.objects.create_user(username="other", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.member = User.objects.create_user(login="member", password="testpass123")
+        self.other = User.objects.create_user(login="other", password="testpass123")
         self.superuser = User.objects.create_superuser(
-            username="group_superuser_member_moderation",
+            login="group_superuser_member_moderation",
             email="group_superuser_member_moderation@example.com",
             password="testpass123",
         )
@@ -298,7 +297,7 @@ class TestKickBanMute(APITestCase):
         admin_role = Role.objects.get(room=room, name="Admin")
         mod_role = Role.objects.get(room=room, name="Moderator")
 
-        mod = User.objects.create_user(username="mod", password="testpass123")
+        mod = User.objects.create_user(login="mod", password="testpass123")
         self.api_client.force_authenticate(user=self.owner)
         resp = self.api_client.post(f"/api/groups/{self.room_id}/invites/", {}, format="json")
         code = resp.json()["code"]

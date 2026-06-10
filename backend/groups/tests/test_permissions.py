@@ -3,7 +3,7 @@
 import pytest
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 from django.utils import timezone
 
@@ -13,15 +13,14 @@ from roles.permissions import Perm
 from rooms.models import Room
 from users.identity import set_room_public_handle
 
-User = get_user_model()
 
 
 @pytest.mark.django_db
 class TestGroupPermissions(TestCase):
     def setUp(self):
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.member_user = User.objects.create_user(username="member", password="testpass123")
-        self.outsider = User.objects.create_user(username="outsider", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.member_user = User.objects.create_user(login="member", password="testpass123")
+        self.outsider = User.objects.create_user(login="outsider", password="testpass123")
 
         self.room = Room.objects.create(
             name="Test Group",
@@ -85,8 +84,8 @@ class TestGroupPermissions(TestCase):
 @pytest.mark.django_db
 class TestPublicGroupPermissions(TestCase):
     def setUp(self):
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.outsider = User.objects.create_user(username="outsider", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.outsider = User.objects.create_user(login="outsider", password="testpass123")
 
         self.room = Room.objects.create(
             name="Public Group",

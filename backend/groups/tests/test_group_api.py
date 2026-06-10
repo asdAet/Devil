@@ -30,7 +30,7 @@ def _assert_signed_media_url(url: str):
 class TestCreateGroup(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.user = User.objects.create_user(username="owner", password="testpass123")
+        self.user = User.objects.create_user(login="owner", password="testpass123")
         self.api_client.force_authenticate(user=self.user)
 
     def test_create_private_group(self):
@@ -103,8 +103,8 @@ class TestCreateGroup(APITestCase):
 class TestGroupDetail(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.other = User.objects.create_user(username="other", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.other = User.objects.create_user(login="other", password="testpass123")
         self.api_client.force_authenticate(user=self.owner)
 
         resp = self.api_client.post(
@@ -173,7 +173,7 @@ class TestGroupDetail(APITestCase):
 
     def test_superuser_can_update_and_delete_group_without_membership(self):
         superuser = User.objects.create_superuser(
-            username="group_superuser_detail",
+            login="group_superuser_detail",
             email="group_superuser_detail@example.com",
             password="testpass123",
         )
@@ -268,7 +268,7 @@ class TestGroupDetail(APITestCase):
 class TestPublicGroupList(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.user = User.objects.create_user(username="owner", password="testpass123")
+        self.user = User.objects.create_user(login="owner", password="testpass123")
         self.api_client.force_authenticate(user=self.user)
 
         for i in range(3):
@@ -331,8 +331,8 @@ class TestPublicGroupList(APITestCase):
 class TestMyGroupList(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.user = User.objects.create_user(username="member", password="testpass123")
-        self.other = User.objects.create_user(username="other", password="testpass123")
+        self.user = User.objects.create_user(login="member", password="testpass123")
+        self.other = User.objects.create_user(login="other", password="testpass123")
         self.api_client.force_authenticate(user=self.user)
 
         self.api_client.post("/api/groups/", {"name": "Private Mine"}, format="json")
@@ -377,7 +377,7 @@ class TestMyGroupList(APITestCase):
 
     def test_superuser_lists_all_groups_in_my_groups_endpoint(self):
         superuser = User.objects.create_superuser(
-            username="group_superuser_list",
+            login="group_superuser_list",
             email="group_superuser_list@example.com",
             password="testpass123",
         )
@@ -410,8 +410,8 @@ class TestMyGroupList(APITestCase):
 class TestPrivateGroupAccess(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.other = User.objects.create_user(username="other", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.other = User.objects.create_user(login="other", password="testpass123")
         self.api_client.force_authenticate(user=self.owner)
 
         resp = self.api_client.post("/api/groups/", {"name": "Secret Group"}, format="json")

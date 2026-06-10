@@ -1,7 +1,7 @@
 """Tests for pinned messages and ownership transfer API endpoints."""
 
 import pytest
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 from messages.models import Message
@@ -10,7 +10,6 @@ from rooms.models import Room
 
 from ._typing import TypedAPIClient
 
-User = get_user_model()
 
 
 class APITestCase(TestCase):
@@ -26,7 +25,7 @@ def _setup_group_with_message(client: TypedAPIClient, owner) -> tuple[int, int]:
     msg = Message.objects.create(
         room=room,
         user=owner,
-        username=owner.username,
+        username=owner.login,
         message_content="Hello!",
     )
     return room_id, msg.pk
@@ -36,8 +35,8 @@ def _setup_group_with_message(client: TypedAPIClient, owner) -> tuple[int, int]:
 class TestPinnedMessages(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.member = User.objects.create_user(username="member", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.member = User.objects.create_user(login="member", password="testpass123")
         self.room_id, self.msg_id = _setup_group_with_message(self.api_client, self.owner)
 
     def test_pin_message(self):
@@ -95,10 +94,10 @@ class TestPinnedMessages(APITestCase):
 class TestOwnershipTransfer(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.member = User.objects.create_user(username="member", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.member = User.objects.create_user(login="member", password="testpass123")
         self.superuser = User.objects.create_superuser(
-            username="group_superuser_owner_transfer",
+            login="group_superuser_owner_transfer",
             email="group_superuser_owner_transfer@example.com",
             password="testpass123",
         )

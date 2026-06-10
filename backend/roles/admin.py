@@ -6,10 +6,10 @@ from .permissions import Perm
 
 def _permission_flags(mask: int) -> str:
     """Вспомогательная функция `_permission_flags` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         mask: Параметр mask, используемый в логике функции.
-    
+
     Returns:
         Строковое значение, сформированное функцией.
     """
@@ -68,7 +68,7 @@ class RoleAdmin(admin.ModelAdmin):
 class MembershipAdmin(admin.ModelAdmin):
     """Класс MembershipAdmin настраивает поведение сущности в Django Admin."""
     list_display = ("room", "user", "role_names", "is_banned", "nickname", "joined_at")
-    search_fields = ("room__name", "room__public_id", "user__username", "nickname")
+    search_fields = ("room__name", "room__public_id", "user__login", "user__email", "nickname")
     list_filter = ("is_banned", "room__kind")
     raw_id_fields = ("room", "user", "banned_by")
     filter_horizontal = ("roles",)
@@ -100,7 +100,7 @@ class PermissionOverrideAdmin(admin.ModelAdmin):
         "deny",
         "deny_flags",
     )
-    search_fields = ("room__name", "room__public_id", "target_role__name", "target_user__username")
+    search_fields = ("room__name", "room__public_id", "target_role__name", "target_user__login", "target_user__email")
     list_filter = ("room__kind",)
     raw_id_fields = ("room", "target_role", "target_user")
     list_select_related = ("room", "target_role", "target_user")

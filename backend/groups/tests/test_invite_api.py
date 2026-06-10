@@ -1,7 +1,8 @@
 """Tests for invite link API endpoints."""
 
 import pytest
-from django.contrib.auth import get_user_model
+from users.models import User
+from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
@@ -9,7 +10,6 @@ from groups.infrastructure.models import InviteLink
 
 from ._typing import TypedAPIClient
 
-User = get_user_model()
 
 
 class APITestCase(TestCase):
@@ -20,8 +20,8 @@ class APITestCase(TestCase):
 class TestInviteLinks(APITestCase):
     def setUp(self):
         self.api_client = TypedAPIClient()
-        self.owner = User.objects.create_user(username="owner", password="testpass123")
-        self.joiner = User.objects.create_user(username="joiner", password="testpass123")
+        self.owner = User.objects.create_user(login="owner", password="testpass123")
+        self.joiner = User.objects.create_user(login="joiner", password="testpass123")
         self.api_client.force_authenticate(user=self.owner)
 
         resp = self.api_client.post("/api/groups/", {"name": "Invite Group"}, format="json")
@@ -99,7 +99,7 @@ class TestInviteLinks(APITestCase):
 
         # Manually expire the invite
         invite = InviteLink.objects.get(code=code)
-        invite.expires_at = timezone.now() - timezone.timedelta(hours=1)
+        invite.expires_at = timezone.now() - timedelta(hours=1)
         invite.save(update_fields=["expires_at"])
 
         self.api_client.force_authenticate(user=self.joiner)
@@ -118,7 +118,7 @@ class TestInviteLinks(APITestCase):
         resp = self.api_client.post(f"/api/invite/{code}/join/")
         assert resp.status_code == 200
 
-        user3 = User.objects.create_user(username="user3", password="testpass123")
+        user3 = User.objects.create_user(login="user3", password="testpass123")
         self.api_client.force_authenticate(user=user3)
         resp = self.api_client.post(f"/api/invite/{code}/join/")
         assert resp.status_code == 400

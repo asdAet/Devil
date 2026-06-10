@@ -1,13 +1,12 @@
 from types import SimpleNamespace
 from typing import cast
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 from friends.models import Friendship
 from friends.utils import get_from_user_id, get_to_user_id
 
-User = get_user_model()
 
 
 class FriendsUtilsTests(TestCase):
@@ -34,8 +33,8 @@ class FriendsUtilsTests(TestCase):
 
 class FriendshipModelStringTests(TestCase):
     def test_str_uses_fk_ids_when_available(self):
-        from_user = User.objects.create_user(username="f_from", password="pass12345")
-        to_user = User.objects.create_user(username="f_to", password="pass12345")
+        from_user = User.objects.create_user(login="f_from", password="pass12345")
+        to_user = User.objects.create_user(login="f_to", password="pass12345")
         friendship = Friendship(from_user=from_user, to_user=to_user, status=Friendship.Status.PENDING)
         self.assertEqual(str(friendship), f"{from_user.pk}->{to_user.pk}:{Friendship.Status.PENDING}")
 

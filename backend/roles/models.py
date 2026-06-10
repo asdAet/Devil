@@ -79,7 +79,7 @@ class Role(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -90,10 +90,10 @@ class Role(models.Model):
     @classmethod
     def create_defaults_for_room(cls, room: Room) -> dict[str, "Role"]:
         """Создает defaults for room и возвращает созданную сущность.
-        
+
         Args:
             room: Экземпляр комнаты, над которой выполняется действие.
-        
+
         Returns:
             Словарь типа dict[str, 'Role'] с результатами операции.
         """
@@ -197,25 +197,27 @@ class Membership(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
-        return f"{self.room_id}:{self.user.username}"
+        return f"{self.room_id}:{self.user_id}"
 
     @property
     def display_name(self) -> str:
         """Возвращает отображаемое имя участника в рамках комнаты.
 
         Returns:
-            Никнейм участника в комнате, если он задан, иначе базовый username пользователя.
+            Никнейм участника в комнате, если он задан, иначе display name пользователя.
         """
-        return self.nickname or self.user.username
+        from users.identity import user_display_name
+
+        return self.nickname or user_display_name(self.user)
 
     @property
     def is_muted(self) -> bool:
         """Проверяет условие muted и возвращает логический результат.
-        
+
         Returns:
             Логическое значение результата проверки.
         """
@@ -269,7 +271,7 @@ class PermissionOverride(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """

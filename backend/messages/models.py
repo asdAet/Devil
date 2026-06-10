@@ -78,11 +78,16 @@ class Message(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
-        name = self.user.username if self.user else self.username
+        if self.user:
+            from users.identity import user_display_name
+
+            name = user_display_name(self.user)
+        else:
+            name = self.username
         return f"{name}: {self.message_content}"
 
 
@@ -121,7 +126,7 @@ class Reaction(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -159,7 +164,7 @@ class MessageAttachment(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -253,7 +258,7 @@ class MessageReadState(models.Model):
 
     def __str__(self):
         """Возвращает человекочитаемое строковое представление объекта.
-        
+
         Returns:
             Функция не возвращает значение.
         """

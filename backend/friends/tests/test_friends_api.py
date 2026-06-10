@@ -2,13 +2,12 @@
 
 from urllib.parse import parse_qs, urlparse
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import Client, TestCase
 
 from friends.models import Friendship
 from users.identity import set_user_public_handle
 
-User = get_user_model()
 
 
 def _assert_signed_media_url(url: str):
@@ -22,9 +21,9 @@ def _assert_signed_media_url(url: str):
 class FriendsApiTestBase(TestCase):
     def setUp(self):
         self.client = Client()
-        self.alice = User.objects.create_user(username="alice", password="pass12345")
-        self.bob = User.objects.create_user(username="bob", password="pass12345")
-        self.charlie = User.objects.create_user(username="charlie", password="pass12345")
+        self.alice = User.objects.create_user(login="alice", password="pass12345")
+        self.bob = User.objects.create_user(login="bob", password="pass12345")
+        self.charlie = User.objects.create_user(login="charlie", password="pass12345")
         set_user_public_handle(self.alice, "alice")
         set_user_public_handle(self.bob, "bob")
         set_user_public_handle(self.charlie, "charlie")

@@ -18,7 +18,7 @@ class FriendshipAdmin(admin.ModelAdmin):
         "updated_at",
     )
     list_filter = ("status", "created_at", "updated_at")
-    search_fields = ("id", "from_user__username", "to_user__username")
+    search_fields = ("id", "from_user__login", "from_user__email", "to_user__login", "to_user__email")
     raw_id_fields = ("from_user", "to_user")
     list_select_related = ("from_user", "to_user")
     readonly_fields = ("created_at", "updated_at")
@@ -28,10 +28,10 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.display(description="ID отправителя")
     def from_user_id_value(self, obj: Friendship) -> int | None:
         """Формирует значение from user id value для отображения в админ-панели.
-        
+
         Args:
             obj: Параметр obj, используемый в логике функции.
-        
+
         Returns:
             Объект типа int | None, сформированный в ходе выполнения.
         """
@@ -40,10 +40,10 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.display(description="ID получателя")
     def to_user_id_value(self, obj: Friendship) -> int | None:
         """Формирует значение to user id value для отображения в админ-панели.
-        
+
         Args:
             obj: Параметр obj, используемый в логике функции.
-        
+
         Returns:
             Объект типа int | None, сформированный в ходе выполнения.
         """
@@ -51,11 +51,11 @@ class FriendshipAdmin(admin.ModelAdmin):
 
     def _set_status(self, queryset, status: str) -> int:
         """Устанавливает status с учетом текущих правил приложения.
-        
+
         Args:
             queryset: Набор записей, к которому применяются фильтры.
             status: HTTP-статус ответа, который будет возвращен клиенту.
-        
+
         Returns:
             Целочисленное значение результата вычисления.
         """
@@ -71,7 +71,7 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.action(description="Установить статус: в ожидании")
     def mark_pending(self, request, queryset):
         """Помечает pending новым состоянием.
-        
+
         Args:
             request: HTTP-запрос с контекстом пользователя и параметрами вызова.
             queryset: Набор записей, к которому применяются фильтры.
@@ -82,7 +82,7 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.action(description="Установить статус: принята")
     def mark_accepted(self, request, queryset):
         """Помечает accepted новым состоянием.
-        
+
         Args:
             request: HTTP-запрос с контекстом пользователя и параметрами вызова.
             queryset: Набор записей, к которому применяются фильтры.
@@ -93,7 +93,7 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.action(description="Установить статус: отклонена")
     def mark_declined(self, request, queryset):
         """Помечает declined новым состоянием.
-        
+
         Args:
             request: HTTP-запрос с контекстом пользователя и параметрами вызова.
             queryset: Набор записей, к которому применяются фильтры.
@@ -104,7 +104,7 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.action(description="Установить статус: заблокирована")
     def mark_blocked(self, request, queryset):
         """Помечает blocked новым состоянием.
-        
+
         Args:
             request: HTTP-запрос с контекстом пользователя и параметрами вызова.
             queryset: Набор записей, к которому применяются фильтры.
@@ -115,7 +115,7 @@ class FriendshipAdmin(admin.ModelAdmin):
     @admin.action(description="Сделать принятой + создать зеркальные записи")
     def make_mutual_accepted(self, request, queryset):
         """Формирует значение make mutual accepted для отображения в админ-панели.
-        
+
         Args:
             request: HTTP-запрос с контекстом пользователя и входными данными.
             queryset: Набор записей, к которому применяются фильтры.
