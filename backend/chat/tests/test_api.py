@@ -3,8 +3,8 @@
 import json
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
-from django.db import OperationalError
+from users.models import User
+from django.db import IntegrityError, OperationalError
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 
 from chat import api
@@ -13,14 +13,13 @@ from roles.models import Membership
 from rooms.models import Room
 from rooms.services import ensure_membership
 from users.identity import (
-    ensure_user_identity_core,
     room_public_ref,
     set_room_public_handle,
     set_user_public_handle,
+    user_public_id,
     user_public_ref,
 )
 
-User = get_user_model()
 
 
 class _BrokenProfileValue:
@@ -60,9 +59,9 @@ class ChatApiHelpersTests(SimpleTestCase):
 class RoomDetailsApiTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.owner = User.objects.create_user(username="owner", password="pass12345")
-        self.member = User.objects.create_user(username="member", password="pass12345")
-        self.other = User.objects.create_user(username="other", password="pass12345")
+        self.owner = User.objects.create_user(login="owner", password="pass12345")
+        self.member = User.objects.create_user(login="member", password="pass12345")
+        self.other = User.objects.create_user(login="other", password="pass12345")
 
     def _create_private_room(self):
         room = Room.objects.create(
@@ -120,9 +119,9 @@ class RoomDetailsApiTests(TestCase):
 class RoomMessagesApiTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.owner = User.objects.create_user(username="owner", password="pass12345")
-        self.member = User.objects.create_user(username="member", password="pass12345")
-        self.other = User.objects.create_user(username="other", password="pass12345")
+        self.owner = User.objects.create_user(login="owner", password="pass12345")
+        self.member = User.objects.create_user(login="member", password="pass12345")
+        self.other = User.objects.create_user(login="other", password="pass12345")
 
     def _create_private_room(self):
         room = Room.objects.create(
@@ -200,14 +199,14 @@ class RoomMessagesApiTests(TestCase):
 
     def test_private_room_messages_require_membership(self):
         room = self._create_private_room()
-        Message.objects.create(username=self.owner.username, user=self.owner, room=room, message_content="hello")
+        Message.objects.create(username=self.owner.login, user=self.owner, room=room, message_content="hello")
         response = self.client.get(f"/api/chat/{room.pk}/messages/")
         self.assertEqual(response.status_code, 404)
 
     def test_private_room_messages_allow_member(self):
         room = self._create_private_room()
         ensure_membership(room, self.member, role_name="Member")
-        Message.objects.create(username=self.owner.username, user=self.owner, room=room, message_content="hello")
+        Message.objects.create(username=self.owner.login, user=self.owner, room=room, message_content="hello")
         self.client.force_login(self.member)
         response = self.client.get(f"/api/chat/{room.pk}/messages/")
         self.assertEqual(response.status_code, 200)
@@ -215,7 +214,7 @@ class RoomMessagesApiTests(TestCase):
 
     def test_direct_room_messages_deny_outsider(self):
         room = self._create_direct_room()
-        Message.objects.create(username=self.owner.username, user=self.owner, room=room, message_content="hello")
+        Message.objects.create(username=self.owner.login, user=self.owner, room=room, message_content="hello")
         self.client.force_login(self.other)
         response = self.client.get(f"/api/chat/{room.pk}/messages/")
         self.assertEqual(response.status_code, 404)
@@ -229,9 +228,9 @@ class RoomMessagesApiTests(TestCase):
 class ChatResolveApiTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.owner = User.objects.create_user(username="owner", password="pass12345")
-        self.peer = User.objects.create_user(username="peer", password="pass12345")
-        self.other = User.objects.create_user(username="other", password="pass12345")
+        self.owner = User.objects.create_user(login="owner", password="pass12345")
+        self.peer = User.objects.create_user(login="peer", password="pass12345")
+        self.other = User.objects.create_user(login="other", password="pass12345")
         self.group = Room.objects.create(
             name="Crew Room",
             kind=Room.Kind.GROUP,
@@ -240,9 +239,6 @@ class ChatResolveApiTests(TestCase):
         )
         set_user_public_handle(self.peer, "peer")
         set_room_public_handle(self.group, "crew")
-        ensure_user_identity_core(self.owner)
-        ensure_user_identity_core(self.peer)
-        ensure_user_identity_core(self.other)
         ensure_membership(self.group, self.owner, role_name="Owner")
 
     def _post_resolve(self, target: str):
@@ -258,7 +254,7 @@ class ChatResolveApiTests(TestCase):
 
     def test_direct_resolve_rejects_self(self):
         self.client.force_login(self.owner)
-        owner_ref = ensure_user_identity_core(self.owner).public_id
+        owner_ref = user_public_id(self.owner)
         response = self._post_resolve(str(owner_ref))
         self.assertEqual(response.status_code, 400)
 
@@ -287,7 +283,7 @@ class ChatResolveApiTests(TestCase):
 
     def test_direct_resolve_supports_numeric_user_id(self):
         self.client.force_login(self.owner)
-        peer_ref = ensure_user_identity_core(self.peer).public_id
+        peer_ref = user_public_id(self.peer)
         response = self._post_resolve(str(peer_ref))
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -329,11 +325,9 @@ class ChatResolveApiTests(TestCase):
 class ChatApiExtraCoverageTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.owner = User.objects.create_user(username="owner_extra", password="pass12345")
-        self.peer = User.objects.create_user(username="peer_extra", password="pass12345")
+        self.owner = User.objects.create_user(login="owner_extra", password="pass12345")
+        self.peer = User.objects.create_user(login="peer_extra", password="pass12345")
         set_user_public_handle(self.peer, "peer_extra")
-        ensure_user_identity_core(self.owner)
-        ensure_user_identity_core(self.peer)
 
     def _post_resolve(self, target: str):
         return self.client.post(
@@ -353,19 +347,9 @@ class ChatApiExtraCoverageTests(TestCase):
             response = self._post_resolve("@peer_extra")
         self.assertEqual(response.status_code, 503)
 
-    def test_chat_resolve_returns_503_when_role_assignment_fails(self):
+    def test_chat_resolve_returns_503_when_direct_conversation_creation_fails(self):
         self.client.force_login(self.owner)
-        room = Room.objects.create(
-            name="stub",
-            kind=Room.Kind.DIRECT,
-            direct_pair_key=f"{self.owner.pk}:{self.peer.pk}",
-            created_by=self.owner,
-        )
-
-        with patch("chat.api.ensure_direct_room_with_retry", return_value=(room, False)), patch(
-            "chat.api._ensure_direct_memberships_with_retry",
-            side_effect=OperationalError,
-        ):
+        with patch("chat.api.ensure_direct_room_with_retry", side_effect=IntegrityError):
             response = self._post_resolve("@peer_extra")
         self.assertEqual(response.status_code, 503)
 

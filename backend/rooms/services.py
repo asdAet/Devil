@@ -107,29 +107,29 @@ def _create_or_get_direct_room(initiator, target, pair_key: str):
 
 
 def ensure_direct_room_with_retry(initiator, target, pair_key: str):
-    """Create or fetch a direct room with retry on transient database errors."""
-    attempts = max(1, int(getattr(settings, "CHAT_DIRECT_START_RETRIES", 3)))
+    """Create a complete direct conversation with retry on transient database errors."""
+    attempts = max(1, int(getattr(settings, "CHAT_DIRECT_START_RETRIES", 5)))
 
     for attempt in range(attempts):
         try:
             with transaction.atomic():
-                # Direct room identity is defined only by the participant pair.
-                return _create_or_get_direct_room(initiator, target, pair_key)
+                room, created = _create_or_get_direct_room(initiator, target, pair_key)
+                ensure_direct_memberships(room, initiator, target)
+                return room, created
         except IntegrityError:
-            room = Room.objects.filter(direct_pair_key=pair_key).first()
-            if room:
-                return room, False
             if attempt == attempts - 1:
                 raise
         except OperationalError as exc:
-            room = Room.objects.filter(direct_pair_key=pair_key).first()
-            if room:
-                return room, False
-            if "locked" not in str(exc).lower() or attempt == attempts - 1:
+            message = str(exc).lower()
+            is_transient = any(
+                marker in message
+                for marker in ("locked", "deadlock", "serialization failure", "could not serialize")
+            )
+            if not is_transient or attempt == attempts - 1:
                 raise
-            time.sleep(0.05 * (attempt + 1))
+        time.sleep(min(0.05 * (2**attempt), 1.0))
 
-    raise OperationalError("Не удалось создать личную комнату")
+    raise OperationalError("Не удалось создать личный чат")
 
 
 def direct_peer_for_user(room: Room, user):

@@ -1,7 +1,6 @@
 """API endpoints for the chat subsystem."""
 
 import json
-import time
 from uuid import UUID
 
 from asgiref.sync import async_to_sync
@@ -52,7 +51,6 @@ from .unread_push import (
 from rooms.services import (
     direct_pair_key,
     direct_peer_for_user,
-    ensure_direct_memberships,
     ensure_direct_room_with_retry,
     ensure_membership,
     parse_pair_key_users,
@@ -292,8 +290,7 @@ def _resolve_chat_target(request, target_ref: str):
                 resolved,
                 pair_key,
             )
-            _ensure_direct_memberships_with_retry(room, request.user, resolved)
-        except OperationalError:
+        except (IntegrityError, OperationalError):
             return None, None, Response(
                 {"error": "Сервис временно недоступен"},
                 status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -399,48 +396,6 @@ def _parse_nonnegative_int(raw_value: str | None, param_name: str) -> int:
     if parsed < 0:
         raise ValueError(f"Некорректный параметр '{param_name}': должно быть >= 0")
     return parsed
-
-
-def _is_transient_db_lock(exc: OperationalError) -> bool:
-    """Проверяет условие transient db lock и возвращает булев результат.
-    
-    Args:
-        exc: Параметр exc, используемый в логике функции.
-    
-    Returns:
-        Логическое значение результата проверки.
-    """
-    message = str(exc).lower()
-    return "locked" in message or "deadlock" in message
-
-
-def _ensure_direct_memberships_with_retry(room: Room, initiator, peer) -> None:
-    """Проверяет обязательные условия для direct memberships with retry.
-    
-    Args:
-        room: Комната, в контексте которой выполняется операция.
-        initiator: Параметр initiator, используемый в логике функции.
-        peer: Параметр peer, используемый в логике функции.
-    """
-    attempts = max(
-        1,
-        int(
-            getattr(
-                settings,
-                "CHAT_DIRECT_ROLE_SYNC_RETRIES",
-                getattr(settings, "CHAT_DIRECT_START_RETRIES", 3),
-            )
-        ),
-    )
-    for attempt in range(attempts):
-        try:
-            with transaction.atomic():
-                ensure_direct_memberships(room, initiator, peer)
-            return
-        except OperationalError as exc:
-            if attempt == attempts - 1 or not _is_transient_db_lock(exc):
-                raise
-            time.sleep(0.05 * (attempt + 1))
 
 
 def _resolve_room(room_id: int):
