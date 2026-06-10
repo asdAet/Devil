@@ -1,17 +1,23 @@
-"""Модели пользователей, идентичностей и профиля."""
+# pyright: reportIncompatibleVariableOverride=false, reportCallIssue=false
+"""Модели аккаунтов, профилей и публичной идентичности пользователей."""
 
 from __future__ import annotations
 
+import secrets
 import uuid
 import warnings
 from pathlib import Path
+from typing import ClassVar, TYPE_CHECKING
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.models import PermissionsMixin
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
 from django.core.files.storage import default_storage
+from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.html import strip_tags
 from PIL import Image
 
@@ -28,9 +34,142 @@ USER_PUBLIC_ID_VALIDATOR = RegexValidator(
 )
 
 
+def generate_user_public_id() -> str:
+    """Возвращает случайный публичный числовой идентификатор пользователя."""
+    value = secrets.randbelow(9_000_000_000) + 1_000_000_000
+    return str(value)
+
+
+def normalize_user_login(login: str | None) -> str:
+    """Нормализует login аккаунта к единому виду."""
+    return str(login or "").strip().lower()
+
+
+def normalize_user_email(email: str | None) -> str | None:
+    """Нормализует email аккаунта; пустое значение хранится как NULL."""
+    normalized = str(email or "").strip().lower()
+    return normalized or None
+
+
+class UserManager(BaseUserManager):
+    """Менеджер custom user model без поля username."""
+
+    use_in_migrations = True
+
+    def create_user(self, login: str, email: str | None = None, password: str | None = None, **extra_fields):
+        """Создает обычный аккаунт с уникальным login."""
+        normalized_login = normalize_user_login(login)
+        if not normalized_login:
+            raise ValueError("User login must be set.")
+
+        user = self.model(
+            login=normalized_login,
+            email=normalize_user_email(email),
+            **extra_fields,
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(
+        self,
+        login: str,
+        email: str | None = None,
+        password: str | None = None,
+        **extra_fields,
+    ):
+        """Создает администратора для Django Admin."""
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+
+        return self.create_user(login, email=email, password=password, **extra_fields)
+
+
+class User(AbstractBaseUser, PermissionsMixin):
+    """Аккаунт пользователя. Внутренний ключ аккаунта — только id."""
+
+    login = models.CharField(max_length=254, unique=True, db_index=True)
+    email = models.EmailField(null=True, blank=True, db_index=True)
+    email_verified = models.BooleanField(default=False)
+    public_id = models.CharField(
+        max_length=10,
+        unique=True,
+        db_index=True,
+        validators=[USER_PUBLIC_ID_VALIDATOR],
+        editable=False,
+    )
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=timezone.now)
+
+    objects: ClassVar[UserManager] = UserManager()  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    USERNAME_FIELD = "login"
+    REQUIRED_FIELDS: list[str] = []
+
+    if TYPE_CHECKING:
+        profile: Profile
+
+    class Meta:
+        db_table = "users_user"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=Q(email__isnull=False),
+                name="users_user_email_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["login"], name="users_user_login_idx"),
+            models.Index(fields=["public_id"], name="users_user_public_id_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.login
+
+    def clean(self):
+        super().clean()
+        self.login = normalize_user_login(self.login)
+        self.email = normalize_user_email(self.email)
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            old_public_id = type(self).objects.filter(pk=self.pk).values_list("public_id", flat=True).first()
+            if old_public_id and old_public_id != self.public_id:
+                raise ValidationError({"public_id": "public_id is immutable."})
+
+        self.login = normalize_user_login(self.login)
+        self.email = normalize_user_email(self.email)
+        if not self.public_id:
+            for _ in range(20):
+                candidate = generate_user_public_id()
+                if not type(self).objects.filter(public_id=candidate).exists():
+                    self.public_id = candidate
+                    break
+            if not self.public_id:
+                raise RuntimeError("Failed to allocate unique user public_id")
+
+        super().save(*args, **kwargs)
+
+    def get_full_name(self) -> str:
+        profile = getattr(self, "profile", None)
+        name = getattr(profile, "name", "") if profile is not None else ""
+        return str(name or "").strip()
+
+    def get_short_name(self) -> str:
+        return self.get_full_name() or self.login
+
+
 class Profile(models.Model):
-    """Модель Profile описывает структуру и поведение данных в приложении."""
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    """Профиль пользователя: отображаемые и медиа-данные, не auth-состояние."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=150, blank=True, default="")
     image = models.ImageField(blank=True, upload_to=profile_avatar_upload_to)
     avatar_url = models.URLField(max_length=2048, blank=True, default="")
@@ -42,32 +181,19 @@ class Profile(models.Model):
     bio = models.TextField(blank=True, max_length=1000)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    user_id: int
 
     def __init__(self, *args, **kwargs):
-        """Инициализирует экземпляр класса и подготавливает внутреннее состояние.
-        
-        Args:
-            *args: Дополнительные позиционные аргументы вызова.
-            **kwargs: Дополнительные именованные аргументы вызова.
-        """
         super().__init__(*args, **kwargs)
         self._old_image_name = self.image.name
 
     def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
-        return f"{self.user.username} profile"
+        user = getattr(self, "user", None)
+        login = getattr(user, "login", "") if user is not None else ""
+        label = self.name or login or self.user_id
+        return f"{label} profile"
 
     def save(self, *args, **kwargs):
-        """Сохраняет изменения объекта в хранилище.
-        
-        Args:
-            *args: Дополнительные позиционные аргументы вызова.
-            **kwargs: Дополнительные именованные аргументы вызова.
-        """
         if isinstance(self.bio, str):
             self.bio = strip_tags(self.bio).strip()
         if isinstance(self.name, str):
@@ -130,83 +256,13 @@ class Profile(models.Model):
         self._old_image_name = self.image.name
 
 
-class UserIdentityCore(models.Model):
-    """Модель UserIdentityCore описывает структуру и поведение данных в приложении."""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="identity_core")
-    public_id = models.CharField(
-        max_length=10,
-        unique=True,
-        db_index=True,
-        validators=[USER_PUBLIC_ID_VALIDATOR],
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
-        return f"user:{self.public_id}"
-
-    def save(self, *args, **kwargs):
-        """Сохраняет изменения объекта в хранилище.
-        
-        Args:
-            *args: Дополнительные позиционные аргументы вызова.
-            **kwargs: Дополнительные именованные аргументы вызова.
-        """
-        if self.pk is not None:
-            old_public_id = (
-                type(self).objects.filter(pk=self.pk).values_list("public_id", flat=True).first()
-            )
-            if old_public_id and old_public_id != self.public_id:
-                raise ValidationError({"public_id": "public_id is immutable."})
-        super().save(*args, **kwargs)
-
-
-class LoginIdentity(models.Model):
-    """Модель LoginIdentity описывает структуру и поведение данных в приложении."""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="login_identity")
-    login_normalized = models.CharField(max_length=64, unique=True, db_index=True)
-    password_hash = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
-        return f"login:{self.login_normalized}"
-
-
-class EmailIdentity(models.Model):
-    """Модель EmailIdentity описывает структуру и поведение данных в приложении."""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="email_identity")
-    email_normalized = models.EmailField(unique=True, db_index=True, null=True, blank=True)
-    email_verified = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
-        return f"email:{self.email_normalized or ''}"
-
-
 class OAuthIdentity(models.Model):
-    """Модель OAuthIdentity описывает структуру и поведение данных в приложении."""
+    """Внешняя OAuth-привязка к аккаунту."""
+
     class Provider(models.TextChoices):
-        """Класс Provider инкапсулирует связанную бизнес-логику модуля."""
         GOOGLE = "google", "Google"
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="oauth_identities")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="oauth_identities")
     provider = models.CharField(max_length=32, choices=Provider.choices)
     provider_user_id = models.CharField(max_length=191)
     email_from_provider = models.EmailField(blank=True, default="")
@@ -216,7 +272,6 @@ class OAuthIdentity(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        """Класс Meta инкапсулирует связанную бизнес-логику модуля."""
         constraints = [
             models.UniqueConstraint(
                 fields=["provider", "provider_user_id"],
@@ -228,27 +283,21 @@ class OAuthIdentity(models.Model):
         ]
 
     def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
         return f"{self.provider}:{self.provider_user_id}"
 
 
 class UserTwoFactor(models.Model):
     """TOTP two-factor state for a user account."""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="two_factor")
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="two_factor")
     secret_encrypted = models.TextField(blank=True, default="")
     enabled_at = models.DateTimeField(null=True, blank=True)
     last_accepted_timestep = models.BigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    user_id: int
 
     class Meta:
-        """Database metadata for two-factor credentials."""
-
         indexes = [
             models.Index(fields=["enabled_at"], name="users_2fa_enabled_idx"),
         ]
@@ -258,14 +307,15 @@ class UserTwoFactor(models.Model):
         return bool(self.secret_encrypted and self.enabled_at)
 
     def __str__(self):
-        return f"2fa:{self.user.pk}:{'enabled' if self.is_enabled else 'pending'}"
+        return f"2fa:{self.user_id}:{'enabled' if self.is_enabled else 'pending'}"
 
 
 class PublicHandle(models.Model):
-    """Модель PublicHandle описывает структуру и поведение данных в приложении."""
+    """Публичный @username пользователя или группы."""
+
     handle = models.CharField(max_length=30, unique=True, db_index=True)
     user = models.OneToOneField(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="public_handle",
         null=True,
@@ -282,7 +332,6 @@ class PublicHandle(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        """Класс Meta инкапсулирует связанную бизнес-логику модуля."""
         constraints = [
             models.CheckConstraint(
                 check=(
@@ -294,16 +343,11 @@ class PublicHandle(models.Model):
         ]
 
     def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
         return f"@{self.handle}"
 
 
 class SecurityRateLimitBucket(models.Model):
-    """Модель SecurityRateLimitBucket описывает структуру и поведение данных в приложении."""
+    """Счетчики rate limit для security/auth операций."""
 
     scope_key = models.CharField(max_length=191, unique=True, db_index=True)
     count = models.PositiveIntegerField(default=0)
@@ -311,15 +355,9 @@ class SecurityRateLimitBucket(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        """Класс Meta инкапсулирует связанную бизнес-логику модуля."""
         indexes = [
             models.Index(fields=["reset_at"], name="users_rl_reset_idx"),
         ]
 
     def __str__(self):
-        """Возвращает человекочитаемое строковое представление объекта.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
         return f"{self.scope_key}:{self.count}"

@@ -10,17 +10,16 @@ from pathlib import Path
 from django import forms
 from django.conf import settings
 from django.contrib.auth import password_validation
-from django.contrib.auth.models import User
 from django.utils.html import strip_tags
 from PIL import Image
 
-from .identity import normalize_email
+from .identity import normalize_email, validate_login
 from .models import (
-    EmailIdentity,
     MAX_PROFILE_IMAGE_PIXELS,
     MAX_PROFILE_IMAGE_SIDE,
     Profile,
     PublicHandle,
+    User,
 )
 
 
@@ -45,7 +44,7 @@ SVG_EVENT_HANDLER_RE = re.compile(r"\son[a-z0-9_-]+\s*=", flags=re.IGNORECASE)
 
 def _validate_username_symbols(username: str) -> None:
     """Проверяет значение поля username symbols и возвращает нормализованный результат.
-    
+
     Args:
         username: Публичное имя пользователя, используемое в событиях и ответах.
     """
@@ -55,10 +54,10 @@ def _validate_username_symbols(username: str) -> None:
 
 def _is_svg_upload(uploaded_file) -> bool:
     """Проверяет условие svg upload и возвращает логический результат.
-    
+
     Args:
         uploaded_file: Файл, загруженный пользователем через форму или API.
-    
+
     Returns:
         Логическое значение результата проверки.
     """
@@ -70,10 +69,10 @@ def _is_svg_upload(uploaded_file) -> bool:
 
 def _read_uploaded_bytes(uploaded_file) -> bytes:
     """Читает uploaded байты.
-    
+
     Args:
         uploaded_file: Файл, полученный из multipart-запроса.
-    
+
     Returns:
         Объект типа bytes, сформированный в ходе выполнения.
     """
@@ -91,7 +90,7 @@ def _read_uploaded_bytes(uploaded_file) -> bytes:
 
 def _validate_svg_avatar(uploaded_file) -> None:
     """Проверяет значение поля svg avatar и возвращает нормализованный результат.
-    
+
     Args:
         uploaded_file: Файл, загруженный пользователем через форму или API.
     """
@@ -132,24 +131,24 @@ class EmailRegisterForm(forms.Form):
 
     def clean_email(self):
         """Проверяет и нормализует значение поля email.
-        
+
         Returns:
             Функция не возвращает значение.
         """
         email = normalize_email(self.cleaned_data.get("email"))
         if not email:
             raise forms.ValidationError("Укажите email")
-        if EmailIdentity.objects.filter(email_normalized=email).exists():
+        if User.objects.filter(email=email).exists() or User.objects.filter(login=email).exists():
             raise forms.ValidationError("Email уже используется")
         return email
 
     def clean(self):
         """Проверяет согласованность и валидность данных формы.
-        
+
         Returns:
             Функция не возвращает значение.
         """
-        cleaned = super().clean()
+        cleaned = super().clean() or {}
         password1 = cleaned.get("password1")
         password2 = cleaned.get("password2")
         if not password1 or not password2:
@@ -158,7 +157,7 @@ class EmailRegisterForm(forms.Form):
             self.add_error("password2", "Пароли не совпадают")
             return cleaned
 
-        probe_user = User(email=cleaned.get("email", ""), username="temp")
+        probe_user = User(login=cleaned.get("email", ""), email=cleaned.get("email", ""))
         try:
             password_validation.validate_password(password1, user=probe_user)
         except forms.ValidationError as exc:
@@ -176,40 +175,43 @@ class UserUpdateForm(forms.ModelForm):
     class Meta:
         """Класс Meta инкапсулирует связанную бизнес-логику модуля."""
         model = User
-        fields = ["username", "email"]
+        fields = ["login", "email"]
 
-    def clean_username(self):
-        """Проверяет и нормализует значение поля username.
-        
+    def clean_login(self):
+        """Проверяет и нормализует значение поля login.
+
         Returns:
             Функция не возвращает значение.
         """
-        username = (self.cleaned_data.get("username") or "").strip()
-        if not username:
-            return ""
-        if len(username) > USERNAME_MAX_LENGTH:
-            raise forms.ValidationError(f"Максимум {USERNAME_MAX_LENGTH} символов.")
+        raw_login = (self.cleaned_data.get("login") or "").strip()
+        try:
+            login = validate_login(raw_login)
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc)) from exc
 
-        qs = User.objects.filter(username=username)
+        qs = User.objects.filter(login=login)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise forms.ValidationError("Имя пользователя уже занято")
-        return username
+            raise forms.ValidationError("Логин уже занят")
+        return login
 
     def clean_email(self):
         """Проверяет и нормализует значение поля email.
-        
+
         Returns:
             Функция не возвращает значение.
         """
         email = normalize_email(self.cleaned_data.get("email"))
         if not email:
-            return ""
-        qs = User.objects.filter(email__iexact=email)
+            return None
+        qs = User.objects.filter(email=email)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
+        login_qs = User.objects.filter(login=email)
+        if self.instance and self.instance.pk:
+            login_qs = login_qs.exclude(pk=self.instance.pk)
+        if qs.exists() or login_qs.exists():
             raise forms.ValidationError("Email уже используется")
         return email
 
@@ -221,7 +223,7 @@ class ProfileIdentityUpdateForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         """Инициализирует экземпляр класса и подготавливает внутреннее состояние.
-        
+
         Args:
             *args: Дополнительные позиционные аргументы вызова.
             user: Пользователь, для которого выполняется операция.
@@ -232,7 +234,7 @@ class ProfileIdentityUpdateForm(forms.Form):
 
     def clean_name(self):
         """Проверяет и нормализует значение поля name.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -240,7 +242,7 @@ class ProfileIdentityUpdateForm(forms.Form):
 
     def clean_username(self):
         """Проверяет и нормализует значение поля username.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -264,10 +266,10 @@ class ProfileIdentityUpdateForm(forms.Form):
 
     def save(self, profile: Profile) -> Profile:
         """Сохраняет изменения объекта в хранилище.
-        
+
         Args:
             profile: Параметр profile, используемый в логике функции.
-        
+
         Returns:
             Объект типа Profile, сформированный в ходе выполнения.
         """
@@ -292,7 +294,7 @@ class ProfileUpdateForm(forms.ModelForm):
 
     def clean_bio(self):
         """Проверяет и нормализует значение поля bio.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -301,7 +303,7 @@ class ProfileUpdateForm(forms.ModelForm):
 
     def clean(self):
         """Проверяет согласованность и валидность данных формы.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -360,7 +362,7 @@ class ProfileUpdateForm(forms.ModelForm):
 
     def clean_image(self):
         """Проверяет и нормализует значение поля image.
-        
+
         Returns:
             Функция не возвращает значение.
         """
@@ -398,10 +400,10 @@ class ProfileUpdateForm(forms.ModelForm):
 
     def save(self, commit=True):
         """Сохраняет изменения объекта в хранилище.
-        
+
         Args:
             commit: Параметр commit, используемый в логике функции.
-        
+
         Returns:
             Результат вычислений, сформированный в ходе выполнения функции.
         """

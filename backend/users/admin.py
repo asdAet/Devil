@@ -1,99 +1,92 @@
+"""Django Admin для custom user model и профилей."""
 
-"""Модуль admin реализует прикладную логику подсистемы users."""
-
+from __future__ import annotations
 
 from django import forms
 from django.contrib import admin
-from django.contrib.admin.sites import NotRegistered
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.contrib.auth.models import User
+from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django.contrib.auth.password_validation import validate_password
 from django.utils.html import format_html
 
-from .models import Profile
+from .models import Profile, User
+
+
+class UserCreationForm(forms.ModelForm):
+    """Форма создания пользователя в Django Admin."""
+
+    password1 = forms.CharField(label="Password", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Password confirmation", widget=forms.PasswordInput)
+
+    class Meta:
+        model = User
+        fields = ("login", "email")
+
+    def clean_password2(self):
+        password1 = self.cleaned_data.get("password1")
+        password2 = self.cleaned_data.get("password2")
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("Пароли не совпадают")
+        if not password2:
+            return password2
+        validate_password(password2, user=self.instance)
+        return password2
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+        return user
+
+
+class UserChangeForm(forms.ModelForm):
+    """Форма редактирования пользователя в Django Admin."""
+
+    password = ReadOnlyPasswordHashField(label="Password")
+
+    class Meta:
+        model = User
+        fields = (
+            "login",
+            "email",
+            "email_verified",
+            "password",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "user_permissions",
+        )
 
 
 class ProfileInlineForm(forms.ModelForm):
-    """Форма ProfileInlineForm валидирует и подготавливает входные данные."""
-    email = forms.EmailField(required=False, label="Email")
-    is_staff = forms.BooleanField(required=False, label="Модератор/админ")
-
+    """Форма профиля внутри карточки пользователя."""
 
     class Meta:
-        """Класс Meta инкапсулирует связанную бизнес-логику модуля."""
         model = Profile
-        fields = ("image", "bio")
-
-    def __init__(self, *args, **kwargs):
-        """Инициализирует экземпляр класса и подготавливает внутреннее состояние.
-        
-        Args:
-            *args: Дополнительные позиционные аргументы вызова.
-            **kwargs: Дополнительные именованные аргументы вызова.
-        """
-        super().__init__(*args, **kwargs)
-        user = getattr(self.instance, "user", None)
-        if user:
-            self.fields["is_staff"].initial = user.is_staff
-
-    def save(self, commit=True):
-        """Сохраняет изменения объекта в хранилище.
-        
-        Args:
-            commit: Параметр commit, используемый в логике функции.
-        
-        Returns:
-            Результат вычислений, сформированный в ходе выполнения функции.
-        """
-        profile = super().save(commit=False)
-        user = getattr(profile, "user", None)
-        if user:
-            user.is_staff = bool(self.cleaned_data.get("is_staff"))
-            if commit:
-                user.save()
-        if commit:
-            profile.save()
-        return profile
+        fields = ("name", "image", "bio")
 
 
 class ProfileInline(admin.StackedInline):
-    """Класс ProfileInline настраивает поведение сущности в Django Admin."""
+    """Inline профиля в карточке пользователя."""
+
     model = Profile
     form = ProfileInlineForm
     can_delete = False
     verbose_name_plural = "Profile"
     fields = (
-        "username_display",
-        "is_staff",
+        "name",
         "image",
         "bio",
         "last_seen",
         "avatar_preview",
     )
-    readonly_fields = ("username_display", "last_seen", "avatar_preview")
+    readonly_fields = ("last_seen", "avatar_preview")
     extra = 0
-
-    @admin.display(description="Логин")
-    def username_display(self, obj):
-        """Вспомогательная функция `username_display` реализует внутренний шаг бизнес-логики.
-        
-        Args:
-            obj: Параметр obj, используемый в логике функции.
-        
-        Returns:
-            Результат вычислений, сформированный в ходе выполнения функции.
-        """
-        return getattr(obj.user, "username", "—")
 
     @admin.display(description="Avatar")
     def avatar_preview(self, obj):
-        """Вспомогательная функция `avatar_preview` реализует внутренний шаг бизнес-логики.
-        
-        Args:
-            obj: Параметр obj, используемый в логике функции.
-        
-        Returns:
-            Результат вычислений, сформированный в ходе выполнения функции.
-        """
         if obj and getattr(obj, "image", None):
             try:
                 return format_html(
@@ -102,84 +95,82 @@ class ProfileInline(admin.StackedInline):
                 )
             except ValueError:
                 pass
-        return "—"
-
-
-# Заменяем стандартный UserAdmin, добавляя Profile inline
-try:
-    admin.site.unregister(User)
-except NotRegistered:
-    pass
+        return "-"
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    """Класс UserAdmin настраивает поведение сущности в Django Admin."""
+    """Admin для custom User без username."""
+
+    form = UserChangeForm
+    add_form = UserCreationForm
     inlines = [ProfileInline]
     list_display = (
-        "username",
+        "login",
+        "email",
+        "email_verified",
         "is_staff",
+        "is_active",
         "profile_last_seen",
+        "date_joined",
     )
     list_select_related = ("profile",)
-    search_fields = ("username", "email", "first_name", "last_name")
-    list_filter = ("is_staff", "is_active", "is_superuser", "date_joined")
+    search_fields = ("login", "email", "profile__name", "public_id")
+    list_filter = ("is_staff", "is_active", "is_superuser", "email_verified", "date_joined")
     ordering = ("-date_joined",)
+    filter_horizontal = ("groups", "user_permissions")
+
+    fieldsets = (
+        (None, {"fields": ("login", "password")}),
+        ("Identity", {"fields": ("email", "email_verified", "public_id")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Dates", {"fields": ("last_login", "date_joined")}),
+    )
+    readonly_fields = ("public_id", "last_login", "date_joined")
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("login", "email", "password1", "password2", "is_staff", "is_superuser"),
+            },
+        ),
+    )
 
     @admin.display(description="Last seen", ordering="profile__last_seen")
     def profile_last_seen(self, obj):
-        """Возвращает время последней активности пользователя для списка в Django Admin.
-
-        Args:
-            obj: Пользователь, для которого нужно показать значение `profile.last_seen`.
-
-        Returns:
-            Значение `last_seen` из связанного профиля или длинное тире, если профиль отсутствует.
-        """
         profile = getattr(obj, "profile", None)
-        return profile.last_seen if profile else "—"
+        return profile.last_seen if profile else "-"
 
 
 class ProfileAdminForm(ProfileInlineForm):
-    """Класс ProfileAdminForm инкапсулирует связанную бизнес-логику модуля."""
     class Meta(ProfileInlineForm.Meta):
-        """Класс Meta инкапсулирует связанную бизнес-логику модуля."""
         model = Profile
-        fields = ("user", "image", "bio")
+        fields = ("user", "name", "image", "bio")
 
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    """Класс ProfileAdmin настраивает поведение сущности в Django Admin."""
+    """Отдельная админка профилей."""
+
     form = ProfileAdminForm
-    list_display = ("user", "is_staff", "last_seen", "avatar_preview")
+    list_display = ("user", "user_login", "name", "is_staff", "last_seen", "avatar_preview")
     list_select_related = ("user",)
     list_filter = ("user__is_staff",)
+    search_fields = ("user__login", "user__email", "name")
     readonly_fields = ("last_seen", "avatar_preview")
-    fields = ("user", "is_staff", "image", "bio", "last_seen", "avatar_preview")
+    fields = ("user", "name", "is_staff", "image", "bio", "last_seen", "avatar_preview")
+
+    @admin.display(description="Login", ordering="user__login")
+    def user_login(self, obj):
+        return getattr(obj.user, "login", "-")
 
     @admin.display(boolean=True, description="Модератор/админ", ordering="user__is_staff")
     def is_staff(self, obj):
-        """Проверяет условие staff и возвращает логический результат.
-        
-        Args:
-            obj: Объект доменной модели или ORM-сущность.
-        
-        Returns:
-            Функция не возвращает значение.
-        """
         return getattr(obj.user, "is_staff", False)
 
     @admin.display(description="Avatar")
     def avatar_preview(self, obj):
-        """Формирует значение avatar preview для отображения в админ-панели.
-        
-        Args:
-            obj: Параметр obj, используемый в логике функции.
-        
-        Returns:
-            Результат вычислений, сформированный в ходе выполнения функции.
-        """
         if obj and getattr(obj, "image", None):
             try:
                 return format_html(
@@ -188,4 +179,4 @@ class ProfileAdmin(admin.ModelAdmin):
                 )
             except ValueError:
                 pass
-        return "—"
+        return "-"

@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 def _load_dotenv_file(path: Path, *, allowed_keys: set[str] | None = None) -> None:
     """Загружает dotenv file из базы данных или кэша.
-    
+
     Args:
         path: Путь ресурса в storage или URL-маршруте.
         allowed_keys: Параметр allowed keys, используемый в логике функции.
@@ -100,11 +100,11 @@ if not IS_PYTEST_RUN:
 
 def env_bool(name: str, default: bool) -> bool:
     """Вспомогательная функция `env_bool` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         name: Имя сущности или параметра.
         default: Значение по умолчанию при отсутствии пользовательского ввода.
-    
+
     Returns:
         Логическое значение результата проверки.
     """
@@ -116,11 +116,11 @@ def env_bool(name: str, default: bool) -> bool:
 
 def env_list(name: str, default: list[str]) -> list[str]:
     """Возвращает список переменная окружения.
-    
+
     Args:
         name: Имя сущности или параметра.
         default: Значение по умолчанию при отсутствии пользовательского ввода.
-    
+
     Returns:
         Список типа list[str] с данными результата.
     """
@@ -132,11 +132,11 @@ def env_list(name: str, default: list[str]) -> list[str]:
 
 def _extend_unique(items: list[str], extra: list[str]) -> list[str]:
     """Вспомогательная функция `_extend_unique` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         items: Параметр items, используемый в логике функции.
         extra: Параметр extra, используемый в логике функции.
-    
+
     Returns:
         Список типа list[str] с данными результата.
     """
@@ -234,10 +234,10 @@ INSTALLED_APPS = [
 
 def build_rest_renderer_classes(debug: bool) -> list[str]:
     """Формирует rest renderer classes для дальнейшего использования.
-    
+
     Args:
         debug: Параметр debug, используемый в логике функции.
-    
+
     Returns:
         Список типа list[str] с данными результата.
     """
@@ -331,10 +331,10 @@ else:
 
 def _database_from_url(url: str) -> dict:
     """Вспомогательная функция `_database_from_url` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         url: Параметр url, используемый в логике функции.
-    
+
     Returns:
         Словарь типа dict с данными результата.
     """
@@ -436,11 +436,11 @@ GROUP_DEFAULT_AVATAR = env_required("GROUP_DEFAULT_AVATAR")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
+AUTH_USER_MODEL = "users.User"
 LOGIN_REDIRECT_URL = "chat-home"
 LOGIN_URL = "login"
 AUTHENTICATION_BACKENDS = [
-    "users.auth_backends.EmailIdentityBackend",
-    # Keep Django ModelBackend for /admin login (createsuperuser uses username/password).
+    "users.auth_backends.LoginOrEmailBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 _DEV_ORIGINS = [
@@ -650,7 +650,7 @@ LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO").upper()
 # -- SQLite PRAGMAs via connection signal ------------------------------
 def _sqlite_pragmas(sender, connection, **kwargs):
     """Вспомогательная функция `_sqlite_pragmas` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         sender: Параметр sender, используемый в логике функции.
         connection: Параметр connection, используемый в логике функции.
@@ -724,5 +724,3 @@ LOGGING = {
         },
     },
 }
-
-

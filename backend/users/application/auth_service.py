@@ -1,25 +1,22 @@
-﻿"""Application services for auth and public identity management."""
+"""Application services for auth and public identity management."""
 
 from __future__ import annotations
 
 import re
 import time
-from urllib.parse import urlencode
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
 from django.contrib.auth import password_validation
-from django.contrib.auth.hashers import check_password, is_password_usable, make_password
-from django.contrib.auth.models import AbstractUser, User
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils.html import strip_tags
 
 from chat_app_django.metrics import observe_account_created
 from users.identity import (
     ensure_profile,
-    ensure_user_identity_core,
-    generate_technical_username,
     normalize_email,
     normalize_login,
     resolve_public_ref,
@@ -27,10 +24,10 @@ from users.identity import (
     user_public_ref,
     validate_login,
 )
-from users.models import EmailIdentity, LoginIdentity, OAuthIdentity
+from users.models import OAuthIdentity, User
 
-from .errors import IdentityConflictError, IdentityServiceError, IdentityUnauthorizedError
 from . import two_factor_service
+from .errors import IdentityConflictError, IdentityServiceError, IdentityUnauthorizedError
 
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -42,20 +39,10 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _invalid_credentials_error() -> IdentityUnauthorizedError:
-    """Выполняет вспомогательную обработку для invalid credentials error.
-    
-    Returns:
-        Объект типа IdentityUnauthorizedError, полученный при выполнении операции.
-    """
     return IdentityUnauthorizedError("Неверный логин, email или пароль")
 
 
 def _raise_handle_validation_or_conflict(exc: ValueError) -> None:
-    """Обрабатывает raise с учетом validation или конфликт.
-    
-    Args:
-        exc: Параметр exc, используемый в логике функции.
-    """
     message = str(exc)
     errors = {"username": [message]}
     if message == "Этот username уже занят":
@@ -64,145 +51,53 @@ def _raise_handle_validation_or_conflict(exc: ValueError) -> None:
 
 
 def _normalize_name(name: str | None) -> str:
-    """Нормализует name к внутреннему формату.
-    
-    Args:
-        name: Человекочитаемое имя объекта или параметра.
-    
-    Returns:
-        Строковое значение, сформированное функцией.
-    """
-    value = strip_tags(str(name or "")).strip()
-    return value
+    return strip_tags(str(name or "")).strip()
 
 
 def _normalize_optional_email(email: str | None) -> str | None:
-    """Нормализует optional email к внутреннему формату приложения.
-    
-    Args:
-        email: Email-адрес для проверки или обновления.
-    
-    Returns:
-        Объект типа str | None, сформированный в ходе выполнения.
-    """
     normalized = normalize_email(email)
     return normalized or None
 
 
-def _identity_password_hash(login_identity: object | None) -> str:
-    password_hash = getattr(login_identity, "password_hash", "")
-    return password_hash if isinstance(password_hash, str) else ""
-
-
-def _has_usable_identity_password(login_identity: object | None) -> bool:
-    password_hash = _identity_password_hash(login_identity)
-    return bool(password_hash and is_password_usable(password_hash))
-
-
 def _email_local_part(email: str) -> str:
-    """Вспомогательная функция `_email_local_part` реализует внутренний шаг бизнес-логики.
-    
-    Args:
-        email: Email-адрес для проверки или обновления.
-    
-    Returns:
-        Строковое значение, сформированное функцией.
-    """
     local = (email.split("@", 1)[0] if "@" in email else email).strip()
     return local or "user"
 
 
 def _looks_like_email(identifier: str) -> bool:
-    """Вспомогательная функция `_looks_like_email` реализует внутренний шаг бизнес-логики.
-    
-    Args:
-        identifier: Логин или email, использованный для входа.
-    
-    Returns:
-        Логическое значение результата проверки.
-    """
     return bool(_EMAIL_RE.fullmatch(identifier))
 
 
-def _authenticate_admin_without_identity(identifier: str, password: str) -> User | None:
-    """Аутентифицирует администратор без identity-данные.
-    
-    Args:
-        identifier: Логин или email, использованный для входа.
-        password: Пароль пользователя.
-    
-    Returns:
-        Объект типа User | None, сформированный в ходе выполнения.
-    """
-    if _looks_like_email(identifier):
-        user = User.objects.filter(email__iexact=identifier).first()
-    else:
-        user = User.objects.filter(username__iexact=identifier).first()
-
-    if user is None or not user.is_active:
+def _user_with_identifier(identifier: str) -> User | None:
+    normalized = normalize_email(identifier) if _looks_like_email(identifier) else normalize_login(identifier)
+    if not normalized:
         return None
-    if not (user.is_staff or user.is_superuser):
-        return None
-    if not user.check_password(password):
-        return None
-    return user
-
-
-def _ensure_login_identity(user: AbstractUser) -> LoginIdentity:
-    """Гарантирует корректность login identity перед выполнением операции.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-    
-    Returns:
-        Объект типа LoginIdentity, полученный при выполнении операции.
-    """
-    existing = getattr(user, "login_identity", None)
-    if existing is not None:
-        return existing
-
-    core = ensure_user_identity_core(user)
-    base_login = f"u{core.public_id}"
-    candidate = base_login
-    suffix = 0
-    while LoginIdentity.objects.filter(login_normalized=candidate).exists():
-        suffix += 1
-        candidate = f"{base_login}_{suffix}"
-
-    return LoginIdentity.objects.create(
-        user=user,
-        login_normalized=candidate,
-        password_hash=make_password(None),
+    return (
+        User.objects.filter(Q(login=normalized) | Q(email=normalized))
+        .select_related("profile")
+        .first()
     )
 
 
-def _set_email_identity(user: AbstractUser, email_value: str | None, *, verified: bool = False) -> None:
-    """Устанавливает email identity с учетом правил приложения.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-        email_value: Параметр email value, используемый в логике функции.
-        verified: Параметр verified, используемый в логике функции.
-    """
-    if email_value is None:
-        EmailIdentity.objects.filter(user=user).delete()
-        return
+def _raise_login_conflict(login: str) -> None:
+    if User.objects.filter(login=login).exists():
+        raise IdentityConflictError(
+            "Этот логин уже занят",
+            code="login_taken",
+            errors={"login": ["Этот логин уже занят"]},
+        )
 
-    existing = EmailIdentity.objects.filter(email_normalized=email_value).exclude(user=user).exists()
-    if existing:
+
+def _raise_email_conflict(email: str, *, exclude_user: User | None = None) -> None:
+    queryset = User.objects.filter(Q(email=email) | Q(login=email))
+    if exclude_user is not None:
+        queryset = queryset.exclude(pk=exclude_user.pk)
+    if queryset.exists():
         raise IdentityConflictError(
             "Эта почта уже используется",
             code="email_taken",
             errors={"email": ["Эта почта уже используется"]},
         )
-
-    EmailIdentity.objects.update_or_create(
-        user=user,
-        defaults={
-            "email_normalized": email_value,
-            "email_verified": bool(verified),
-        },
-    )
 
 
 def register_user(
@@ -213,80 +108,48 @@ def register_user(
     username: str | None = None,
     email: str | None = None,
 ) -> User:
-    """Регистрирует пользователь.
-    
-    Args:
-        login: Параметр login, используемый в логике функции.
-        password: Пароль пользователя.
-        password_confirm: Повтор пароля для проверки совпадения.
-        name: Имя сущности или параметра.
-        username: Публичное имя пользователя.
-        email: Email-адрес для проверки или обновления.
-    
-    Returns:
-        Объект типа User, сформированный в ходе выполнения.
-    """
+    """Регистрирует password-аккаунт."""
     try:
         normalized_login = validate_login(login)
     except ValueError as exc:
         raise IdentityServiceError(str(exc), errors={"login": [str(exc)]}) from exc
+
     normalized_name = _normalize_name(name)
     normalized_email = _normalize_optional_email(email)
 
     if not normalized_name:
         raise IdentityServiceError("Укажите name", errors={"name": ["Укажите name"]})
-
     if not password or not password_confirm:
         raise IdentityServiceError("Укажите пароль", errors={"password": ["Укажите пароль"]})
     if password != password_confirm:
         raise IdentityServiceError("Пароли не совпадают", errors={"passwordConfirm": ["Пароли не совпадают"]})
 
-    probe_user = User(username=normalized_login, first_name=normalized_name, email=normalized_email or "")
+    probe_user = User(login=normalized_login, email=normalized_email)
     try:
         password_validation.validate_password(password, user=probe_user)
     except Exception as exc:  # noqa: BLE001
         errors = list(getattr(exc, "messages", [])) or ["Пароль слишком слабый"]
-        raise IdentityServiceError("Пароль слишком слабый", errors={"password": [str(item) for item in errors]})
+        raise IdentityServiceError(
+            "Пароль слишком слабый",
+            errors={"password": [str(item) for item in errors]},
+        ) from exc
 
-    if LoginIdentity.objects.filter(login_normalized=normalized_login).exists():
-        raise IdentityConflictError(
-            "Этот логин уже занят",
-            code="login_taken",
-            errors={"login": ["Этот логин уже занят"]},
-        )
-
-    if normalized_email and EmailIdentity.objects.filter(email_normalized=normalized_email).exists():
-        raise IdentityConflictError(
-            "Эта почта уже используется",
-            code="email_taken",
-            errors={"email": ["Эта почта уже используется"]},
-        )
-
-    technical_username = generate_technical_username(normalized_login)
+    _raise_login_conflict(normalized_login)
+    if normalized_email:
+        _raise_email_conflict(normalized_email)
 
     try:
         with transaction.atomic():
-            user = User.objects.create(
-                username=technical_username,
-                first_name=normalized_name,
-                email=normalized_email or "",
+            user = User.objects.create_user(
+                login=normalized_login,
+                email=normalized_email,
+                password=password,
+                email_verified=False,
             )
-            user.set_unusable_password()
-            user.save(update_fields=["password"])
 
-            ensure_user_identity_core(user)
             profile = ensure_profile(user)
             profile.name = normalized_name
             profile.save(update_fields=["name"])
-
-            LoginIdentity.objects.create(
-                user=user,
-                login_normalized=normalized_login,
-                password_hash=make_password(password),
-            )
-
-            if normalized_email:
-                _set_email_identity(user, normalized_email, verified=False)
 
             if username is not None:
                 try:
@@ -301,55 +164,18 @@ def register_user(
 
 
 def login_user(identifier: str, password: str) -> User:
-    """Выполняет вход пользователь.
-    
-    Args:
-        identifier: Логин или email, использованный для входа.
-        password: Пароль пользователя.
-    
-    Returns:
-        Объект типа User, сформированный в ходе выполнения.
-    """
+    """Выполняет вход по login или email."""
     normalized_identifier = str(identifier or "").strip().lower()
     if not normalized_identifier or not password:
         raise _invalid_credentials_error()
 
-    identity: LoginIdentity | None = None
-
-    if _looks_like_email(normalized_identifier):
-        email_identity = (
-            EmailIdentity.objects.select_related("user", "user__login_identity", "user__profile")
-            .filter(email_normalized=normalized_identifier)
-            .first()
-        )
-        if email_identity is not None:
-            identity = getattr(email_identity.user, "login_identity", None)
-    else:
-        login_value = normalize_login(normalized_identifier)
-        identity = (
-            LoginIdentity.objects.select_related("user", "user__profile")
-            .filter(login_normalized=login_value)
-            .first()
-        )
-
-    if identity is None:
-        admin_without_identity = _authenticate_admin_without_identity(normalized_identifier, password)
-        if admin_without_identity is not None:
-            return admin_without_identity
+    user = _user_with_identifier(normalized_identifier)
+    if user is None or not user.is_active or not user.check_password(password):
         raise _invalid_credentials_error()
-
-    if not check_password(password, identity.password_hash):
-        raise _invalid_credentials_error()
-
-    return identity.user
+    return user
 
 
 def _get_expected_google_audience() -> str:
-    """Возвращает expected google audience из текущего контекста.
-    
-    Returns:
-        Строковое значение, сформированное функцией.
-    """
     expected_audience = str(getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "") or "").strip()
     if not expected_audience:
         raise IdentityServiceError(
@@ -361,7 +187,6 @@ def _get_expected_google_audience() -> str:
 
 
 def _get_google_oauth_client_secret() -> str:
-    """Возвращает OAuth client secret или поднимает ошибку конфигурации."""
     client_secret = str(getattr(settings, "GOOGLE_OAUTH_CLIENT_SECRET", "") or "").strip()
     if not client_secret:
         raise IdentityServiceError(
@@ -373,7 +198,6 @@ def _get_google_oauth_client_secret() -> str:
 
 
 def google_oauth_redirect_is_configured() -> bool:
-    """Проверяет, что сервер готов к redirect-сценарию Google OAuth."""
     return bool(
         str(getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "") or "").strip()
         and str(getattr(settings, "GOOGLE_OAUTH_CLIENT_SECRET", "") or "").strip()
@@ -381,7 +205,6 @@ def google_oauth_redirect_is_configured() -> bool:
 
 
 def build_google_authorization_url(*, state: str, redirect_uri: str) -> str:
-    """Формирует URL запуска server-side redirect flow для Google OAuth."""
     client_id = _get_expected_google_audience()
     _get_google_oauth_client_secret()
     query = urlencode(
@@ -399,7 +222,6 @@ def build_google_authorization_url(*, state: str, redirect_uri: str) -> str:
 
 
 def _exchange_google_authorization_code(code: str, redirect_uri: str) -> dict[str, Any]:
-    """Обменивает authorization code на токены Google OAuth."""
     normalized_code = str(code or "").strip()
     if not normalized_code:
         raise IdentityServiceError(
@@ -441,14 +263,6 @@ def _exchange_google_authorization_code(code: str, redirect_uri: str) -> dict[st
 
 
 def _verify_google_id_token(id_token: str) -> dict[str, Any]:
-    """Проверяет Google идентификатор токен.
-    
-    Args:
-        id_token: ID-токен OAuth-провайдера.
-    
-    Returns:
-        Словарь типа dict[str, Any] с данными результата.
-    """
     token = (id_token or "").strip()
     if not token:
         raise IdentityServiceError(
@@ -503,14 +317,6 @@ def _verify_google_id_token(id_token: str) -> dict[str, Any]:
 
 
 def _verify_google_access_token(access_token: str) -> dict[str, Any]:
-    """Проверяет Google доступ токен.
-    
-    Args:
-        access_token: Access-токен OAuth-провайдера.
-    
-    Returns:
-        Словарь типа dict[str, Any] с данными результата.
-    """
     token = (access_token or "").strip()
     if not token:
         raise IdentityServiceError(
@@ -586,16 +392,7 @@ def authenticate_or_signup_with_google(
     access_token: str | None = None,
     username: str | None = None,
 ) -> User:
-    """Аутентифицирует или signup с Google.
-    
-    Args:
-        id_token: ID-токен OAuth-провайдера.
-        access_token: Access-токен OAuth-провайдера.
-        username: Публичное имя пользователя.
-    
-    Returns:
-        Объект типа User, сформированный в ходе выполнения.
-    """
+    """Аутентифицирует или создает Google OAuth аккаунт по verified email."""
     normalized_id_token = str(id_token or "").strip()
     normalized_access_token = str(access_token or "").strip()
     if normalized_id_token:
@@ -607,8 +404,8 @@ def authenticate_or_signup_with_google(
             "Требуется idToken или accessToken",
             errors={"idToken": ["Требуется idToken или accessToken"]},
         )
-    provider_user_id = str(payload.get("sub") or "").strip()
 
+    provider_user_id = str(payload.get("sub") or "").strip()
     identity = (
         OAuthIdentity.objects.select_related("user", "user__profile")
         .filter(provider=OAuthIdentity.Provider.GOOGLE, provider_user_id=provider_user_id)
@@ -618,32 +415,46 @@ def authenticate_or_signup_with_google(
         return identity.user
 
     normalized_email = normalize_email(str(payload.get("email") or "").strip())
+    if not normalized_email:
+        raise IdentityUnauthorizedError("Google не вернул email")
+
     name_from_provider = _normalize_name(str(payload.get("name") or ""))
     avatar_url = str(payload.get("picture") or "").strip()
     display_name = name_from_provider or _email_local_part(normalized_email)
 
-    if normalized_email and EmailIdentity.objects.filter(email_normalized=normalized_email).exists():
-        raise IdentityConflictError(
-            "Эта почта уже используется",
-            code="email_taken",
-            errors={"email": ["Эта почта уже используется"]},
-        )
-
     with transaction.atomic():
-        technical_username = generate_technical_username(display_name)
-        user = User.objects.create(
-            username=technical_username,
-            first_name=display_name,
-            email=normalized_email,
-        )
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
+        user = User.objects.filter(Q(email=normalized_email) | Q(login=normalized_email)).first()
+        created_user = False
+        if user is None:
+            user = User.objects.create_user(
+                login=normalized_email,
+                email=normalized_email,
+                password=None,
+                email_verified=True,
+            )
+            created_user = True
+        else:
+            update_fields: list[str] = []
+            if user.email != normalized_email:
+                _raise_email_conflict(normalized_email, exclude_user=user)
+                user.email = normalized_email
+                update_fields.append("email")
+            if not user.email_verified:
+                user.email_verified = True
+                update_fields.append("email_verified")
+            if update_fields:
+                user.save(update_fields=update_fields)
 
-        ensure_user_identity_core(user)
         profile = ensure_profile(user)
-        profile.name = display_name
-        profile.avatar_url = avatar_url
-        profile.save(update_fields=["name", "avatar_url"])
+        profile_update_fields: list[str] = []
+        if display_name and not profile.name:
+            profile.name = display_name
+            profile_update_fields.append("name")
+        if avatar_url:
+            profile.avatar_url = avatar_url
+            profile_update_fields.append("avatar_url")
+        if profile_update_fields:
+            profile.save(update_fields=profile_update_fields)
 
         OAuthIdentity.objects.create(
             user=user,
@@ -654,15 +465,13 @@ def authenticate_or_signup_with_google(
             avatar_url_from_provider=avatar_url,
         )
 
-        if normalized_email:
-            _set_email_identity(user, normalized_email, verified=True)
-
         if username is not None:
             try:
                 set_user_public_handle(user, username)
             except ValueError as exc:
                 _raise_handle_validation_or_conflict(exc)
-        transaction.on_commit(lambda: observe_account_created("google"))
+        if created_user:
+            transaction.on_commit(lambda: observe_account_created("google"))
 
     return user
 
@@ -673,7 +482,6 @@ def authenticate_or_signup_with_google_authorization_code(
     redirect_uri: str,
     username: str | None = None,
 ) -> User:
-    """Завершает redirect-flow Google OAuth по authorization code."""
     payload = _exchange_google_authorization_code(code, redirect_uri)
     id_token = str(payload.get("id_token") or "").strip() or None
     access_token = str(payload.get("access_token") or "").strip() or None
@@ -684,49 +492,22 @@ def authenticate_or_signup_with_google_authorization_code(
     )
 
 
-def set_profile_name(user: AbstractUser, name: str | None) -> str:
-    """Устанавливает profile name с учетом правил приложения.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-        name: Человекочитаемое имя объекта или параметра.
-    
-    Returns:
-        Строковое значение, сформированное функцией.
-    """
+def set_profile_name(user: User, name: str | None) -> str:
     profile = ensure_profile(user)
     next_name = _normalize_name(name)
-    if getattr(user, "first_name", "") != next_name:
-        user.first_name = next_name
-        user.save(update_fields=["first_name"])
     profile.name = next_name
     profile.save(update_fields=["name"])
     return next_name
 
 
-def set_public_handle(user: AbstractUser, username: str | None) -> str | None:
-    """Устанавливает public handle с учетом правил приложения.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-        username: Публичное имя пользователя.
-    
-    Returns:
-        Объект типа str | None, сформированный в ходе выполнения.
-    """
+def set_public_handle(user: User, username: str | None) -> str | None:
     try:
         return set_user_public_handle(user, username)
     except ValueError as exc:
         _raise_handle_validation_or_conflict(exc)
 
 
-def _unlink_oauth_provider(user: AbstractUser, provider: str) -> None:
-    """Отвязывает OAuth provider.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-        provider: Имя OAuth-провайдера.
-    """
+def _unlink_oauth_provider(user: User, provider: str) -> None:
     normalized_provider = str(provider or "").strip().lower()
     if not normalized_provider:
         raise IdentityServiceError(
@@ -750,8 +531,7 @@ def _unlink_oauth_provider(user: AbstractUser, provider: str) -> None:
             errors={"unlinkOAuthProvider": ["OAuth provider не привязан"]},
         )
 
-    login_identity = getattr(user, "login_identity", None)
-    has_password = _has_usable_identity_password(login_identity)
+    has_password = user.has_usable_password()
     has_other_oauth = OAuthIdentity.objects.filter(user=user).exclude(pk=identity.pk).exists()
     if not has_password and not has_other_oauth:
         raise IdentityServiceError(
@@ -763,60 +543,47 @@ def _unlink_oauth_provider(user: AbstractUser, provider: str) -> None:
     identity.delete()
 
 
-def get_security_settings(user: AbstractUser) -> dict[str, Any]:
-    """Возвращает security settings из текущего контекста.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-    
-    Returns:
-        Словарь типа dict[str, Any] с результатами операции.
-    """
-    email_identity = getattr(user, "email_identity", None)
-    login_identity = getattr(user, "login_identity", None)
-
+def get_security_settings(user: User) -> dict[str, Any]:
     oauth_providers = list(
         OAuthIdentity.objects.filter(user=user).order_by("provider").values_list("provider", flat=True)
     )
 
     return {
-        "email": getattr(email_identity, "email_normalized", None) or None,
-        "emailVerified": bool(getattr(email_identity, "email_verified", False)),
-        "hasPassword": _has_usable_identity_password(login_identity),
+        "email": user.email or None,
+        "emailVerified": bool(user.email_verified),
+        "hasPassword": user.has_usable_password(),
         "oauthProviders": oauth_providers,
         **two_factor_service.get_two_factor_state(user),
     }
 
 
-def is_two_factor_enabled(user: AbstractUser) -> bool:
+def is_two_factor_enabled(user: User) -> bool:
     return two_factor_service.is_two_factor_enabled(user)
 
 
-def begin_two_factor_setup(user: AbstractUser) -> dict[str, str]:
+def begin_two_factor_setup(user: User) -> dict[str, str]:
     return two_factor_service.begin_totp_setup(user)
 
 
-def confirm_two_factor_setup(user: AbstractUser, code: str | None) -> dict[str, object]:
+def confirm_two_factor_setup(user: User, code: str | None) -> dict[str, object]:
     return two_factor_service.confirm_totp_setup(user, code)
 
 
-def disable_two_factor(user: AbstractUser, code: str | None) -> dict[str, object]:
+def disable_two_factor(user: User, code: str | None) -> dict[str, object]:
     return two_factor_service.disable_totp(user, code)
 
 
-def verify_two_factor_login(user: AbstractUser, code: str | None) -> None:
+def verify_two_factor_login(user: User, code: str | None) -> None:
     two_factor_service.verify_user_totp(user, code)
 
 
 def change_password(
-    user: AbstractUser,
+    user: User,
     *,
     old_password: str | None,
     new_password: str | None,
     new_password_confirm: str | None,
 ) -> None:
-    """Changes a password after validating the existing password."""
-
     current_password = str(old_password or "")
     next_password = str(new_password or "")
     confirm_password = str(new_password_confirm or "")
@@ -836,18 +603,7 @@ def change_password(
             "Пароли не совпадают",
             errors={"newPasswordConfirm": ["Пароли не совпадают"]},
         )
-
-    login_identity = getattr(user, "login_identity", None)
-    identity_password_hash = _identity_password_hash(login_identity)
-    has_identity_password = bool(
-        identity_password_hash and is_password_usable(identity_password_hash)
-    )
-    has_django_password = user.has_usable_password()
-    current_password_valid = (
-        bool(has_identity_password and check_password(current_password, identity_password_hash))
-        or bool(has_django_password and user.check_password(current_password))
-    )
-    if not current_password_valid:
+    if not user.has_usable_password() or not user.check_password(current_password):
         raise IdentityUnauthorizedError("Неверный текущий пароль")
 
     try:
@@ -859,49 +615,36 @@ def change_password(
             errors={"newPassword": [str(item) for item in messages]},
         ) from exc
 
-    login_identity = _ensure_login_identity(user)
-    login_identity.password_hash = make_password(next_password)
-    login_identity.save(update_fields=["password_hash", "updated_at"])
-
-    if has_django_password:
-        user.set_password(next_password)
-        user.save(update_fields=["password"])
+    user.set_password(next_password)
+    user.save(update_fields=["password"])
 
 
 def update_security_settings(
-    user: AbstractUser,
+    user: User,
     *,
     email: str | None = None,
     verify_email: bool | None = None,
     new_password: str | None = None,
     unlink_oauth_provider: str | None = None,
 ) -> None:
-    """Обновляет security settings и сохраняет изменения.
-    
-    Args:
-        user: Пользователь, для которого выполняется операция.
-        email: Email-адрес для проверки или обновления.
-        verify_email: Параметр verify email, используемый в логике функции.
-        new_password: Параметр new password, используемый в логике функции.
-        unlink_oauth_provider: Параметр unlink oauth provider, используемый в логике функции.
-    """
     if email is not None:
         normalized_email = _normalize_optional_email(email)
-        _set_email_identity(user, normalized_email, verified=False)
-        user.email = normalized_email or ""
-        user.save(update_fields=["email"])
+        if normalized_email:
+            _raise_email_conflict(normalized_email, exclude_user=user)
+        user.email = normalized_email
+        user.email_verified = False
+        user.save(update_fields=["email", "email_verified"])
 
     if verify_email:
-        email_identity = getattr(user, "email_identity", None)
-        if email_identity is None or not getattr(email_identity, "email_normalized", None):
+        if not user.email:
             raise IdentityServiceError(
                 "Сначала добавьте email",
                 code="email_missing",
                 errors={"email": ["Сначала добавьте email"]},
             )
-        if not email_identity.email_verified:
-            email_identity.email_verified = True
-            email_identity.save(update_fields=["email_verified", "updated_at"])
+        if not user.email_verified:
+            user.email_verified = True
+            user.save(update_fields=["email_verified"])
 
     if unlink_oauth_provider is not None:
         _unlink_oauth_provider(user, unlink_oauth_provider)
@@ -919,33 +662,11 @@ def update_security_settings(
                 errors={"newPassword": [str(item) for item in messages]},
             ) from exc
 
-        login_identity = getattr(user, "login_identity", None)
-        has_usable_password = _has_usable_identity_password(login_identity)
-        has_oauth = OAuthIdentity.objects.filter(user=user).exists()
-        has_email = bool(
-            getattr(getattr(user, "email_identity", None), "email_normalized", None)
-        )
-        if has_oauth and not has_usable_password and not has_email:
-            raise IdentityServiceError(
-                "Сначала добавьте email",
-                code="email_missing",
-                errors={"email": ["Сначала добавьте email"]},
-            )
-
-        login_identity = _ensure_login_identity(user)
-        login_identity.password_hash = make_password(str(new_password))
-        login_identity.save(update_fields=["password_hash", "updated_at"])
+        user.set_password(str(new_password))
+        user.save(update_fields=["password"])
 
 
 def get_user_by_ref(ref: str):
-    """Возвращает user by ref из текущего контекста или хранилища.
-    
-    Args:
-        ref: Параметр ref, используемый в логике функции.
-    
-    Returns:
-        Результат вычислений, сформированный в ходе выполнения функции.
-    """
     owner_type, owner = resolve_public_ref(ref)
     if owner_type == "user":
         return owner

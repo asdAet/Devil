@@ -5,6 +5,7 @@ class UserSerializer(serializers.Serializer):
     """Сериализатор UserSerializer преобразует данные между API и внутренними объектами."""
     id = serializers.IntegerField()
     name = serializers.CharField(required=False, allow_blank=True)
+    login = serializers.CharField(required=False, allow_blank=True)
     handle = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     publicId = serializers.CharField(required=False, allow_blank=True)
     publicRef = serializers.CharField(required=False, allow_blank=True)
@@ -49,10 +50,10 @@ class OAuthGoogleSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """Проверяет входные данные и возвращает нормализованный результат.
-        
+
         Args:
             attrs: Атрибуты после первичной валидации.
-        
+
         Returns:
             Результат вычислений, сформированный в ходе выполнения функции.
         """

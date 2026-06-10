@@ -7,11 +7,11 @@ from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
 import secrets
+from typing import cast
 from urllib.parse import quote, urlsplit
 
 from django.conf import settings
-from django.contrib.auth import login, logout, password_validation
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model, login, logout, password_validation
 from django.core.files.storage import default_storage
 from django.db import OperationalError, ProgrammingError
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
@@ -64,7 +64,6 @@ from users.avatar_service import (
 from users.forms import ProfileUpdateForm
 from users.identity import (
     ensure_profile,
-    ensure_user_identity_core,
     resolve_public_ref,
     room_public_handle,
     room_public_id,
@@ -73,9 +72,10 @@ from users.identity import (
     user_public_id,
     user_public_ref,
 )
+from users.models import User
 
 
-AUTH_BACKEND_PATH = "users.auth_backends.EmailIdentityBackend"
+AUTH_BACKEND_PATH = "users.auth_backends.LoginOrEmailBackend"
 GOOGLE_OAUTH_STATE_SESSION_KEY = "auth.google_oauth_state"
 GOOGLE_OAUTH_RETURN_TO_SESSION_KEY = "auth.google_oauth_return_to"
 GOOGLE_OAUTH_ERROR_RETURN_TO_SESSION_KEY = "auth.google_oauth_error_return_to"
@@ -202,7 +202,7 @@ def _start_two_factor_challenge(request, user) -> None:
     request.session.modified = True
 
 
-def _resolve_two_factor_challenge_user(request):
+def _resolve_two_factor_challenge_user(request) -> User:
     user_id = request.session.get(TWO_FACTOR_PENDING_USER_SESSION_KEY)
     started_at = int(request.session.get(TWO_FACTOR_PENDING_STARTED_SESSION_KEY) or 0)
     if not user_id or not started_at or int(time.time()) - started_at > TWO_FACTOR_CHALLENGE_TTL_SECONDS:
@@ -214,7 +214,8 @@ def _resolve_two_factor_challenge_user(request):
             errors={"code": ["Сессия подтверждения 2FA истекла"]},
         )
 
-    user = User.objects.filter(pk=user_id, is_active=True).first()
+    UserModel = get_user_model()
+    user = cast(User | None, UserModel.objects.filter(pk=user_id, is_active=True).first())
     if user is None:
         _clear_two_factor_challenge(request)
         raise IdentityServiceError(
@@ -244,13 +245,13 @@ def _protected_media_response(
     file_path_override: Path | None = None,
 ) -> FileResponse | HttpResponse:
     """Вспомогательная функция `_protected_media_response` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         normalized_path: Параметр normalized path, используемый в логике функции.
         cache_control: Параметр cache control, используемый в логике функции.
         preferred_content_type: Параметр preferred content type, используемый в логике функции.
         file_path_override: Физический файл для fallback-выдачи без зависимости от storage backend.
-    
+
     Returns:
         HTTP-ответ с результатом обработки.
     """
@@ -303,10 +304,10 @@ def _protected_media_response(
 
 def _extract_payload(request) -> Mapping[str, object]:
     """Выполняет вспомогательную обработку для extract payload.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и параметрами вызова.
-    
+
     Returns:
         Объект типа Mapping[str, object], полученный при выполнении операции.
     """
@@ -322,26 +323,23 @@ def _extract_payload(request) -> Mapping[str, object]:
 
 def _resolve_email(user) -> str:
     """Определяет email на основе доступного контекста.
-    
+
     Args:
         user: Пользователь, для которого выполняется операция.
-    
+
     Returns:
         Строковое значение, сформированное функцией.
     """
-    identity = getattr(user, "email_identity", None)
-    if identity and getattr(identity, "email_normalized", None):
-        return identity.email_normalized
-    return ""
+    return str(getattr(user, "email", "") or "")
 
 
 def _serialize_user(request, user):
     """Сериализует user для передачи клиенту.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и параметрами вызова.
         user: Пользователь, для которого выполняется операция.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -355,6 +353,7 @@ def _serialize_user(request, user):
     return {
         "id": user.pk,
         "name": (getattr(profile, "name", "") or "").strip(),
+        "login": getattr(user, "login", "") or "",
         "handle": handle,
         "publicId": public_id,
         "publicRef": user_public_ref(user),
@@ -370,11 +369,11 @@ def _serialize_user(request, user):
 
 def _serialize_public_user(request, user):
     """Сериализует public user для передачи клиенту.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и параметрами вызова.
         user: Пользователь, для которого выполняется операция.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -385,10 +384,10 @@ def _serialize_public_user(request, user):
 
 def _get_client_ip(request) -> str:
     """Возвращает client ip из текущего контекста.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и параметрами вызова.
-    
+
     Returns:
         Строковое значение, сформированное функцией.
     """
@@ -397,11 +396,11 @@ def _get_client_ip(request) -> str:
 
 def _rate_limited(request, action: str) -> bool:
     """Вспомогательная функция `_rate_limited` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
         action: Код или имя действия, которое фиксируется в аудите.
-    
+
     Returns:
         Логическое значение результата проверки.
     """
@@ -416,10 +415,10 @@ def _rate_limited(request, action: str) -> bool:
 
 def _identity_error_response(exc: IdentityServiceError) -> Response:
     """Вспомогательная функция `_identity_error_response` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         exc: Параметр exc, используемый в логике функции.
-    
+
     Returns:
         HTTP-ответ с результатом обработки.
     """
@@ -436,10 +435,10 @@ def _identity_error_response(exc: IdentityServiceError) -> Response:
 @api_view(["GET"])
 def csrf_token(request):
     """Вспомогательная функция `csrf_token` реализует внутренний шаг бизнес-логики.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -450,10 +449,10 @@ def csrf_token(request):
 @api_view(["GET"])
 def session_view(request):
     """Обрабатывает API-представление для session.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -467,10 +466,10 @@ def session_view(request):
 @api_view(["GET"])
 def presence_session_view(request):
     """Обрабатывает API-представление для presence session.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -482,10 +481,10 @@ def presence_session_view(request):
 @api_view(["GET"])
 def password_rules_view(request):
     """Обрабатывает API-представление для password rules.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -497,10 +496,10 @@ def password_rules_view(request):
 @api_view(["POST"])
 def login_view(request):
     """Обрабатывает API-представление для login.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -566,10 +565,10 @@ def login_two_factor_view(request):
 @api_view(["POST"])
 def logout_view(request):
     """Обрабатывает API-представление для logout.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -592,10 +591,10 @@ def logout_view(request):
 @api_view(["POST"])
 def register_view(request):
     """Обрабатывает API-представление для register.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -637,10 +636,10 @@ def register_view(request):
 @api_view(["POST"])
 def oauth_google_view(request):
     """Обрабатывает API-представление для oauth google.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -747,11 +746,11 @@ def oauth_google_callback_view(request):
 @api_view(["GET"])
 def media_view(request, file_path: str):
     """Обрабатывает API-представление для media.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
         file_path: Параметр file path, используемый в логике функции.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -784,7 +783,7 @@ def media_view(request, file_path: str):
     exp_raw = request.GET.get("exp")
     signature = request.GET.get("sig")
     try:
-        expires_at = int(exp_raw)  
+        expires_at = int(exp_raw)
     except (TypeError, ValueError):
         audit_http_event("media.signature.invalid", request, path=file_path, reason="invalid_exp")
         return Response({"error": "Доступ запрещен"}, status=403)
@@ -816,10 +815,10 @@ def media_view(request, file_path: str):
 @api_view(["GET", "PATCH"])
 def profile_view(request):
     """Обрабатывает API-представление для profile.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -863,10 +862,10 @@ def profile_view(request):
 @api_view(["PATCH"])
 def profile_handle_view(request):
     """Обрабатывает API-представление для profile handle.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -890,10 +889,10 @@ def profile_handle_view(request):
 @api_view(["GET", "PATCH"])
 def security_settings_view(request):
     """Обрабатывает API-представление для security settings.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -1003,11 +1002,11 @@ def security_two_factor_disable_view(request):
 @api_view(["GET"])
 def public_resolve_view(request, ref: str):
     """Обрабатывает API-представление для public resolve.
-    
+
     Args:
         request: HTTP-запрос с контекстом пользователя и входными данными.
         ref: Параметр ref, используемый в логике функции.
-    
+
     Returns:
         Результат вычислений, сформированный в ходе выполнения функции.
     """
@@ -1024,7 +1023,7 @@ def public_resolve_view(request, ref: str):
                 "ownerId": owner.pk,
                 "publicRef": user_public_ref(owner),
                 "handle": user_public_handle(owner),
-                "publicId": ensure_user_identity_core(owner).public_id,
+                "publicId": user_public_id(owner),
                 "user": _serialize_public_user(request, owner),
             }
         )

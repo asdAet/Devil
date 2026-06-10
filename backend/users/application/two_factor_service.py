@@ -7,14 +7,13 @@ import hashlib
 import io
 import secrets
 import time
-from typing import Iterable
+from typing import Any, Iterable
 
 import pyotp
 import qrcode
 import qrcode.image.svg
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.db import transaction
 from django.utils import timezone
 
@@ -78,12 +77,12 @@ def _qr_svg_data_uri(otpauth_uri: str) -> str:
     return f"data:image/svg+xml;base64,{encoded}"
 
 
-def _credential_for_update(user: AbstractUser) -> UserTwoFactor:
+def _credential_for_update(user: Any) -> UserTwoFactor:
     credential, _ = UserTwoFactor.objects.select_for_update().get_or_create(user=user)
     return credential
 
 
-def get_two_factor_state(user: AbstractUser) -> dict[str, object]:
+def get_two_factor_state(user: Any) -> dict[str, object]:
     credential = UserTwoFactor.objects.filter(user=user).first()
     enabled = bool(credential and credential.is_enabled)
     enabled_at = getattr(credential, "enabled_at", None)
@@ -93,14 +92,14 @@ def get_two_factor_state(user: AbstractUser) -> dict[str, object]:
     }
 
 
-def is_two_factor_enabled(user: AbstractUser) -> bool:
+def is_two_factor_enabled(user: Any) -> bool:
     credential = getattr(user, "two_factor", None)
     if credential is None:
         credential = UserTwoFactor.objects.filter(user=user).first()
     return bool(credential and credential.is_enabled)
 
 
-def begin_totp_setup(user: AbstractUser) -> dict[str, str]:
+def begin_totp_setup(user: Any) -> dict[str, str]:
     with transaction.atomic():
         credential = _credential_for_update(user)
         if credential.is_enabled:
@@ -116,7 +115,7 @@ def begin_totp_setup(user: AbstractUser) -> dict[str, str]:
         credential.last_accepted_timestep = None
         credential.save(update_fields=["secret_encrypted", "enabled_at", "last_accepted_timestep", "updated_at"])
 
-    account_name = user_public_ref(user) or str(getattr(user, "username", "") or user.pk)
+    account_name = user_public_ref(user) or str(getattr(user, "login", "") or user.pk)
     otpauth_uri = pyotp.TOTP(secret, interval=TOTP_INTERVAL_SECONDS).provisioning_uri(
         name=account_name,
         issuer_name=TWO_FACTOR_ISSUER,
@@ -152,7 +151,7 @@ def _verify_code_against_secret(
     return accepted_timestep
 
 
-def confirm_totp_setup(user: AbstractUser, code: str | None) -> dict[str, object]:
+def confirm_totp_setup(user: Any, code: str | None) -> dict[str, object]:
     with transaction.atomic():
         credential = _credential_for_update(user)
         if not credential.secret_encrypted:
@@ -184,7 +183,7 @@ def confirm_totp_setup(user: AbstractUser, code: str | None) -> dict[str, object
         return get_two_factor_state(user)
 
 
-def verify_user_totp(user: AbstractUser, code: str | None, *, consume: bool = True) -> None:
+def verify_user_totp(user: Any, code: str | None, *, consume: bool = True) -> None:
     with transaction.atomic():
         credential = _credential_for_update(user)
         if not credential.is_enabled:
@@ -209,7 +208,7 @@ def verify_user_totp(user: AbstractUser, code: str | None, *, consume: bool = Tr
             credential.save(update_fields=["last_accepted_timestep", "updated_at"])
 
 
-def disable_totp(user: AbstractUser, code: str | None) -> dict[str, object]:
+def disable_totp(user: Any, code: str | None) -> dict[str, object]:
     with transaction.atomic():
         credential = _credential_for_update(user)
         if not credential.is_enabled:
