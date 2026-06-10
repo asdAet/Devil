@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from asgiref.sync import async_to_sync
+from asgiref.typing import (
+    ASGIReceiveCallable,
+    ASGIReceiveEvent,
+    ASGISendEvent,
+    WebSocketDisconnectEvent,
+    WebSocketScope,
+)
 import json
 import tempfile
-from django.contrib.auth import get_user_model
+from typing import Any, cast
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache.backends.filebased import FileBasedCache
 from django.test import Client, TestCase
@@ -18,36 +25,65 @@ from chat_app_django.ws_auth import (
 )
 from chat_app_django.ws_auth_middleware import WebSocketTokenAuthMiddleware
 from users.application import auth_service
+from users.models import User
 
-User = get_user_model()
+
+class ChannelWebSocketScope(WebSocketScope, total=False):
+    channel: str
+    url_route: Any
+    path_remaining: str
+    cookies: dict[str, str]
+    session: Any
+    user: Any
 
 
 class WebSocketTokenAuthMiddlewareTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="ws_auth_user",
+            login="ws_auth_user",
             password="pass12345",
         )
 
     def _run_middleware(self, *, query_string: str, user=None):
         captured_scope: dict[str, object] = {}
 
-        async def app(scope, receive, send):
+        async def app(scope: ChannelWebSocketScope, receive: ASGIReceiveCallable, send) -> None:
             captured_scope.update(scope)
 
-        async def receive():
-            return {"type": "websocket.disconnect"}
+        async def receive() -> ASGIReceiveEvent:
+            event: WebSocketDisconnectEvent = {
+                "type": "websocket.disconnect",
+                "code": 1000,
+                "reason": "",
+            }
+            return event
 
-        async def send(_message):
+        async def send(_message: ASGISendEvent) -> None:
             return None
 
         middleware = WebSocketTokenAuthMiddleware(app)
-        scope = {
+        scope: ChannelWebSocketScope = {
             "type": "websocket",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "scheme": "ws",
+            "path": "/ws/",
+            "raw_path": b"/ws/",
             "query_string": query_string.encode("utf-8"),
+            "root_path": "",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+            "server": ("testserver", 80),
+            "subprotocols": [],
+            "extensions": {},
+            "channel": "test.websocket",
+            "url_route": {"args": (), "kwargs": {}},
+            "path_remaining": "",
+            "cookies": {},
+            "session": {},
             "user": user if user is not None else AnonymousUser(),
         }
-        async_to_sync(middleware)(scope, receive, send)
+        async_to_sync(middleware)(cast(Any, scope), receive, send)
         return captured_scope
 
     def test_authenticated_token_restores_scope_user(self):

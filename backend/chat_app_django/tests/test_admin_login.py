@@ -1,16 +1,15 @@
 """Admin auth regression tests."""
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 
-User = get_user_model()
 
 
 class AdminLoginTests(TestCase):
     def test_createsuperuser_credentials_work_in_admin_login(self):
         user = User.objects.create_superuser(
-            username="admin",
+            login="admin",
             email="admin@example.com",
             password="adminpass123",
         )

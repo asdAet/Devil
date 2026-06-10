@@ -1,16 +1,15 @@
 """Tests for Browsable API HTML forms used in manual testing."""
 
-from django.contrib.auth import get_user_model
+from users.models import User
 from django.test import TestCase
 
 
-User = get_user_model()
 
 
 class BrowsableApiFormsTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="browsable_user", password="pass12345")
-        self.peer = User.objects.create_user(username="browsable_peer", password="pass12345")
+        self.user = User.objects.create_user(login="browsable_user", password="pass12345")
+        self.peer = User.objects.create_user(login="browsable_peer", password="pass12345")
 
     def _get_html(self, path: str, expected_status: int = 200) -> str:
         response = self.client.get(path, HTTP_ACCEPT="text/html")

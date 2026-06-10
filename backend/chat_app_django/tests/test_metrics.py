@@ -256,7 +256,7 @@ class BusinessMetricsTests(TestCase):
         self.assertEqual(google_after, google_before + 1)
 
     def test_message_and_attachment_metrics_increment_after_commit(self):
-        user = User.objects.create_user(username="metrics_sender", password="pass12345")
+        user = User.objects.create_user(login="metrics_sender", password="pass12345")
         room = Room.objects.create(name="metrics-room", kind=Room.Kind.PUBLIC, created_by=user)
 
         message_count_before = _sample_value(
@@ -282,7 +282,7 @@ class BusinessMetricsTests(TestCase):
 
         with _capture_on_commit_callbacks(self, execute=True):
             message = Message.objects.create(
-                username=user.username,
+                username=user.login,
                 user=user,
                 room=room,
                 message_content="metrics hello",
