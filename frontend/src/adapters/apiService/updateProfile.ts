@@ -45,7 +45,7 @@ export async function updateProfile(
   }
 
   if (hasProfileFields) {
-    const profileResponse = await apiClient.patch<unknown>(
+    const profileResponse = await apiClient.patchForm<unknown>(
       "/profile/",
       profileForm,
     );

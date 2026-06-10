@@ -16,11 +16,10 @@ const optionalPublicUsernameSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .optional()
-  .transform((value) => value ?? "")
   .refine((value) => value.length === 0 || /^[a-z][a-z0-9_]{2,29}$/.test(value), {
     message: "Username: a-z, 0-9, _, длина 3-30, начинается с буквы.",
-  });
+  })
+  .optional();
 
 const avatarCropSchema = z
   .object({

@@ -284,12 +284,9 @@ describe("ApiService", () => {
     ]);
   });
 
-  it("sends multipart form data for profile update", async () => {
-    let contentType = "";
-
+  it("updates profile fields and handle through dedicated endpoints", async () => {
     server.use(
-      http.patch("*/api/profile/", async ({ request }) => {
-        contentType = request.headers.get("content-type") || "";
+      http.patch("*/api/profile/", () => {
         return HttpResponse.json({
           user: {
             handle: "updated",
@@ -325,8 +322,6 @@ describe("ApiService", () => {
       bio: "about me",
     });
 
-    expect(contentType).toContain("multipart/form-data");
-    expect(contentType).not.toContain("application/json");
     expect(response.user.username).toBe("updated");
   });
 

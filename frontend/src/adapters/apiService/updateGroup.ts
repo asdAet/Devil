@@ -74,6 +74,6 @@ export async function updateGroup(
     formData.append("avatarAction", avatarAction);
   }
 
-  const response = await apiClient.patch<unknown>(endpoint, formData);
+  const response = await apiClient.patchForm<unknown>(endpoint, formData);
   return decodeGroupResponse(response.data);
 }
