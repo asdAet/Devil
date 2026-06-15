@@ -4,4 +4,4 @@ set -e
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
-exec daphne -b 0.0.0.0 -p 8000 chat_app_django.asgi:application
+exec daphne -b 0.0.0.0 -p 8000 --access-logfile - chat_app_django.asgi:application
