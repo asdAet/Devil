@@ -40,6 +40,7 @@ class RoleAdmin(admin.ModelAdmin):
     ordering = ("room", "-position")
     list_select_related = ("room",)
     readonly_fields = ("created_at", "permission_flags")
+    list_per_page = 50
     fields = (
         "room",
         "name",
@@ -73,6 +74,7 @@ class MembershipAdmin(admin.ModelAdmin):
     raw_id_fields = ("room", "user", "banned_by")
     filter_horizontal = ("roles",)
     list_select_related = ("room", "user", "banned_by")
+    list_per_page = 50
 
     @admin.display(description="Roles")
     def role_names(self, obj: Membership) -> str:
@@ -104,6 +106,7 @@ class PermissionOverrideAdmin(admin.ModelAdmin):
     list_filter = ("room__kind",)
     raw_id_fields = ("room", "target_role", "target_user")
     list_select_related = ("room", "target_role", "target_user")
+    list_per_page = 50
 
     @admin.display(description="Allow flags")
     def allow_flags(self, obj: PermissionOverride) -> str:
