@@ -179,6 +179,7 @@ frontend/dist/
 backend/media/profile_pics/
 backend/media/chat_upload_sessions/
 backend/.venv_fresh/
+backend/staticfiles/
 
 trash/
 .claude/
@@ -218,3 +219,4 @@ test_e2e.txt
 test_unit.txt
 CLAUDE.md
 backend/coverage.txt
+AGENTS.md
