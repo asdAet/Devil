@@ -10,6 +10,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from chat_app_django.security.audit import audit_http_event
 from groups.application import (
     group_service,
     invite_service,
@@ -148,6 +149,7 @@ def create_group(request):
         username=data.get("username"),
     )
     info = group_service.get_group_info(room.pk, request.user, request=request)
+    audit_http_event("group.created", request, room_id=room.pk, name=data["name"])
     return Response(GroupOutputSerializer(info).data, status=http_status.HTTP_201_CREATED)
 
 
@@ -264,11 +266,13 @@ def group_detail(request, room_id):
             kwargs["avatar"] = avatar_file
         room = group_service.update_group(request.user, room_id, **kwargs)
         info = group_service.get_group_info(room.pk, request.user, request=request)
+        audit_http_event("group.updated", request, room_id=room.pk, fields=list(kwargs.keys()))
         return Response(GroupOutputSerializer(info).data)
 
     # DELETE
     if not getattr(request.user, "is_authenticated", False):
         return _error("Требуется аутентификация", 401)
+    audit_http_event("group.deleted", request, room_id=room_id)
     group_service.delete_group(request.user, room_id)
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
@@ -289,6 +293,7 @@ def join_group(request, room_id):
         Функция не возвращает значение.
     """
     member_service.join_group(request.user, room_id)
+    audit_http_event("group.member.joined", request, room_id=int(room_id))
     return Response({"roomId": int(room_id), "status": "joined"})
 
 
@@ -306,6 +311,7 @@ def leave_group(request, room_id):
         Функция не возвращает значение.
     """
     member_service.leave_group(request.user, room_id)
+    audit_http_event("group.member.left", request, room_id=int(room_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -351,6 +357,7 @@ def kick_member(request, room_id, user_id):
         Функция не возвращает значение.
     """
     member_service.kick_member(request.user, room_id, int(user_id))
+    audit_http_event("group.member.kicked", request, room_id=int(room_id), target_user_id=int(user_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -374,6 +381,7 @@ def ban_member(request, room_id, user_id):
     member_service.ban_member(
         request.user, room_id, int(user_id), reason=data.get("reason", "")
     )
+    audit_http_event("group.member.banned", request, room_id=int(room_id), target_user_id=int(user_id), reason=data.get("reason", ""))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -392,6 +400,7 @@ def unban_member(request, room_id, user_id):
         Функция не возвращает значение.
     """
     member_service.unban_member(request.user, room_id, int(user_id))
+    audit_http_event("group.member.unbanned", request, room_id=int(room_id), target_user_id=int(user_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -416,6 +425,7 @@ def mute_member(request, room_id, user_id):
         request.user, room_id, int(user_id),
         duration_seconds=data["durationSeconds"],
     )
+    audit_http_event("group.member.muted", request, room_id=int(room_id), target_user_id=int(user_id), duration_seconds=data["durationSeconds"])
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -434,6 +444,7 @@ def unmute_member(request, room_id, user_id):
         Функция не возвращает значение.
     """
     member_service.unmute_member(request.user, room_id, int(user_id))
+    audit_http_event("group.member.unmuted", request, room_id=int(room_id), target_user_id=int(user_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -489,6 +500,7 @@ def group_invites(request, room_id):
             expires_in_seconds=data.get("expiresInSeconds"),
             max_uses=data.get("maxUses", 0),
         )
+        audit_http_event("group.invite.created", request, room_id=int(room_id), invite_code=invite.code)
         return Response(InviteOutputSerializer(invite).data, status=http_status.HTTP_201_CREATED)
 
     # GET
@@ -511,6 +523,7 @@ def revoke_invite(request, room_id, code):
         Функция не возвращает значение.
     """
     invite_service.revoke_invite(request.user, room_id, code)
+    audit_http_event("group.invite.revoked", request, room_id=int(room_id), invite_code=code)
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -545,6 +558,7 @@ def join_via_invite(request, code):
         Функция не возвращает значение.
     """
     result = invite_service.join_via_invite(request.user, code)
+    audit_http_event("group.member.joined_via_invite", request, invite_code=code)
     return Response(result)
 
 
@@ -582,6 +596,7 @@ def approve_join_request(request, room_id, request_id):
         Функция не возвращает значение.
     """
     member_service.approve_join_request(request.user, room_id, int(request_id))
+    audit_http_event("group.join_request.approved", request, room_id=int(room_id), request_id=int(request_id))
     return Response({"status": "approved"})
 
 
@@ -600,6 +615,7 @@ def reject_join_request(request, room_id, request_id):
         Функция не возвращает значение.
     """
     member_service.reject_join_request(request.user, room_id, int(request_id))
+    audit_http_event("group.join_request.rejected", request, room_id=int(room_id), request_id=int(request_id))
     return Response({"status": "rejected"})
 
 
@@ -627,6 +643,7 @@ def group_pins(request, room_id):
         pin = pin_service.pin_message(
             request.user, room_id, data["messageId"]
         )
+        audit_http_event("group.message.pinned", request, room_id=int(room_id), message_id=data["messageId"])
         return Response(
             {"messageId": pin.message_id, "pinnedAt": pin.pinned_at.isoformat()},
             status=http_status.HTTP_201_CREATED,
@@ -654,6 +671,7 @@ def unpin_message(request, room_id, message_id):
         Функция не возвращает значение.
     """
     pin_service.unpin_message(request.user, room_id, int(message_id))
+    audit_http_event("group.message.unpinned", request, room_id=int(room_id), message_id=int(message_id))
     return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -678,6 +696,7 @@ def transfer_ownership(request, room_id):
     ownership_service.transfer_ownership(
         request.user, room_id, data["userId"]
     )
+    audit_http_event("group.ownership.transferred", request, room_id=int(room_id), new_owner_id=data["userId"])
     return Response({"status": "transferred"})
 
 
