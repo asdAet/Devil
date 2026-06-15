@@ -31,7 +31,7 @@ class RoomAdmin(admin.ModelAdmin):
     list_per_page = 50
 
     fieldsets = (
-        ("Room Info", {"fields": ("name", "kind", "public_id", "public_handle")}),
+        ("Room Info", {"fields": ("name", "kind", "public_id")}),
         ("Access", {"fields": ("direct_pair_key", "created_by")}),
     )
 
