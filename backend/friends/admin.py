@@ -24,6 +24,7 @@ class FriendshipAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     fields = ("from_user", "to_user", "status", "created_at", "updated_at")
     actions = ("mark_pending", "mark_accepted", "mark_declined", "mark_blocked", "make_mutual_accepted")
+    list_per_page = 50
 
     @admin.display(description="ID отправителя")
     def from_user_id_value(self, obj: Friendship) -> int | None:

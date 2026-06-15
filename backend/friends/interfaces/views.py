@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chat_app_django.security.audit import audit_http_event
 from friends.application import friend_service
 from friends.application.errors import FriendServiceError
 from friends.interfaces.serializers import (
@@ -133,6 +134,7 @@ class SendRequestApiView(GenericAPIView):
         except FriendServiceError as exc:
             return _service_error_response(exc)
         output = OutgoingRequestOutputSerializer(friendship, context={"request": request})
+        audit_http_event("friend.request.sent", request, target_ref=target_ref, friendship_id=friendship.pk)
         return Response({"item": output.data}, status=http_status.HTTP_201_CREATED)
 
 
@@ -155,6 +157,7 @@ class AcceptRequestApiView(APIView):
         except FriendServiceError as exc:
             return _service_error_response(exc)
         output = IncomingRequestOutputSerializer(friendship, context={"request": request})
+        audit_http_event("friend.request.accepted", request, friendship_id=friendship.pk)
         return Response({"item": output.data})
 
 
@@ -177,6 +180,7 @@ class DeclineRequestApiView(APIView):
         except FriendServiceError as exc:
             return _service_error_response(exc)
         output = IncomingRequestOutputSerializer(friendship, context={"request": request})
+        audit_http_event("friend.request.declined", request, friendship_id=friendship.pk)
         return Response({"item": output.data})
 
 
@@ -199,6 +203,7 @@ class CancelOutgoingRequestApiView(APIView):
         except FriendServiceError as exc:
             return _service_error_response(exc)
         output = OutgoingRequestOutputSerializer(friendship, context={"request": request})
+        audit_http_event("friend.request.cancelled", request, friendship_id=friendship.pk)
         return Response({"item": output.data})
 
 
@@ -220,6 +225,7 @@ class RemoveFriendApiView(APIView):
             friend_service.remove_friend(request.user, int(user_id))
         except FriendServiceError as exc:
             return _service_error_response(exc)
+        audit_http_event("friend.removed", request, target_user_id=int(user_id))
         return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -279,6 +285,7 @@ class BlockUserApiView(GenericAPIView):
             )
         except FriendServiceError as exc:
             return _service_error_response(exc)
+        audit_http_event("friend.blocked", request, target_ref=target_ref)
         return Response(
             {"item": {"id": friendship.pk, "status": friendship.status}},
             status=http_status.HTTP_201_CREATED,
@@ -303,4 +310,5 @@ class UnblockUserApiView(APIView):
             friend_service.unblock_user(request.user, int(user_id))
         except FriendServiceError as exc:
             return _service_error_response(exc)
+        audit_http_event("friend.unblocked", request, target_user_id=int(user_id))
         return Response(status=http_status.HTTP_204_NO_CONTENT)
