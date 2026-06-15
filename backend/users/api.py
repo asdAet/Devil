@@ -1,4 +1,4 @@
-﻿"""Users API: session, auth, profile and public resolver endpoints."""
+"""Users API: session, auth, profile and public resolver endpoints."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from urllib.parse import quote, urlsplit
 
 from django.conf import settings
 from django.contrib.auth import get_user_model, login, logout, password_validation
+from django.contrib.sessions.models import Session
 from django.core.files.storage import default_storage
 from django.db import OperationalError, ProgrammingError
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
@@ -411,6 +412,18 @@ def _rate_limited(request, action: str) -> bool:
     scope_key = f"rl:auth:{action}:{ip}"
     policy = auth_rate_limit_policy()
     return DbRateLimiter.is_limited(scope_key=scope_key, policy=policy)
+
+
+def _invalidate_all_user_sessions(user) -> None:
+    """Terminates all active sessions for the given user except the current one."""
+    try:
+        sessions = Session.objects.filter(expire_date__gt=timezone.now())
+        for session in sessions:
+            data = session.get_decoded()
+            if data.get("_auth_user_id") == str(user.pk):
+                session.delete()
+    except Exception:
+        pass
 
 
 def _identity_error_response(exc: IdentityServiceError) -> Response:
@@ -880,8 +893,10 @@ def profile_handle_view(request):
     try:
         auth_service.set_public_handle(user, username_value)
     except IdentityServiceError as exc:
+        audit_http_event("auth.profile.handle.failed", request, reason=exc.code)
         return _identity_error_response(exc)
 
+    audit_http_event("auth.profile.handle.success", request, public_ref=user_public_ref(user), new_handle=username_value)
     return Response({"user": _serialize_user(request, user)})
 
 
@@ -923,7 +938,10 @@ def security_settings_view(request):
             unlink_oauth_provider=unlink_provider_value if "unlinkOAuthProvider" in payload else None,
         )
     except IdentityServiceError as exc:
+        audit_http_event("auth.security_settings.failed", request, reason=exc.code)
         return _identity_error_response(exc)
+
+    audit_http_event("auth.security_settings.success", request, public_ref=user_public_ref(user))
 
     return Response(
         {
@@ -937,6 +955,10 @@ def security_settings_view(request):
 @csrf_protect
 @api_view(["POST"])
 def security_change_password_view(request):
+    if _rate_limited(request, "security_change_password"):
+        audit_http_event("auth.password_change.rate_limited", request)
+        return error_response(status=429, error="Слишком много попыток. Попробуйте позже.")
+
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return error_response(status=401, error="Требуется авторизация")
@@ -950,7 +972,11 @@ def security_change_password_view(request):
             new_password_confirm=str(payload.get("newPasswordConfirm") or ""),
         )
     except IdentityServiceError as exc:
+        audit_http_event("auth.password_change.failed", request, reason=exc.code)
         return _identity_error_response(exc)
+
+    _invalidate_all_user_sessions(user)
+    audit_http_event("auth.password_change.success", request, public_ref=user_public_ref(user))
 
     return Response({"ok": True, "security": auth_service.get_security_settings(user)})
 
@@ -972,6 +998,10 @@ def security_two_factor_setup_view(request):
 @csrf_protect
 @api_view(["POST"])
 def security_two_factor_confirm_view(request):
+    if _rate_limited(request, "security_two_factor"):
+        audit_http_event("auth.2fa.enable.rate_limited", request)
+        return error_response(status=429, error="Слишком много попыток. Попробуйте позже.")
+
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return error_response(status=401, error="Требуется авторизация")
@@ -980,13 +1010,20 @@ def security_two_factor_confirm_view(request):
     try:
         auth_service.confirm_two_factor_setup(user, str(payload.get("code") or ""))
     except IdentityServiceError as exc:
+        audit_http_event("auth.2fa.enable.failed", request, reason=exc.code)
         return _identity_error_response(exc)
+
+    audit_http_event("auth.2fa.enable.success", request, public_ref=user_public_ref(user))
     return Response({"ok": True, "security": auth_service.get_security_settings(user)})
 
 
 @csrf_protect
 @api_view(["POST"])
 def security_two_factor_disable_view(request):
+    if _rate_limited(request, "security_two_factor"):
+        audit_http_event("auth.2fa.disable.rate_limited", request)
+        return error_response(status=429, error="Слишком много попыток. Попробуйте позже.")
+
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return error_response(status=401, error="Требуется авторизация")
@@ -995,7 +1032,12 @@ def security_two_factor_disable_view(request):
     try:
         auth_service.disable_two_factor(user, str(payload.get("code") or ""))
     except IdentityServiceError as exc:
+        audit_http_event("auth.2fa.disable.failed", request, reason=exc.code)
         return _identity_error_response(exc)
+
+    _invalidate_all_user_sessions(user)
+    audit_http_event("auth.2fa.disable.success", request, public_ref=user_public_ref(user))
+
     return Response({"ok": True, "security": auth_service.get_security_settings(user)})
 
 

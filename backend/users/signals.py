@@ -31,7 +31,10 @@ def sync_chat_handle_snapshot_on_save(sender, instance, **kwargs):
     """Обновляет username snapshot сообщений при изменении публичного handle."""
     if kwargs.get("raw", False):
         return
-    user = getattr(instance, "user", None)
+    try:
+        user = instance.user
+    except Exception:  # noqa: BLE001
+        return
     if user is None:
         return
 
@@ -50,16 +53,23 @@ def sync_chat_handle_snapshot_on_save(sender, instance, **kwargs):
 @receiver(post_delete, sender=PublicHandle)
 def sync_chat_handle_snapshot_on_delete(sender, instance, **kwargs):
     """Обновляет username snapshot сообщений при удалении публичного handle."""
-    user = getattr(instance, "user", None)
-    if user is None:
+    user_id = instance.user_id
+    if not user_id:
         return
 
-    new_username = user_public_id(user)
-    Message.objects.filter(user=user).exclude(username=new_username).update(username=new_username)
-    audit_security_event(
-        "public_handle.user.deleted",
-        actor_user=user,
-        actor_user_id=user.id,
-        actor_username=new_username,
-        is_authenticated=True,
-    )
+    try:
+        user = instance.user
+    except Exception:  # noqa: BLE001
+        user = None
+
+    new_username = user_public_id(user) if user else str(user_id)
+    Message.objects.filter(user_id=user_id).exclude(username=new_username).update(username=new_username)
+
+    if user:
+        audit_security_event(
+            "public_handle.user.deleted",
+            actor_user=user,
+            actor_user_id=user.id,
+            actor_username=new_username,
+            is_authenticated=True,
+        )
