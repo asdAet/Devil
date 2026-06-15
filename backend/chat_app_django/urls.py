@@ -250,3 +250,13 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,
     )
+
+# In local dev, serve static files (daphne doesn't do this automatically)
+_is_local_dev = getattr(settings, "_is_local_dev", False)
+if _is_local_dev and not settings.DEBUG:
+    from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+    urlpatterns += staticfiles_urlpatterns()
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT,
+    )

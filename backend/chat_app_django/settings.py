@@ -1,4 +1,4 @@
-﻿
+
 """Модуль settings реализует прикладную логику подсистемы chat_app_django."""
 
 
@@ -52,49 +52,15 @@ def _load_dotenv_file(path: Path, *, allowed_keys: set[str] | None = None) -> No
 
 
 # Load env files for local app run.
-# Root `.env` may contain production-only infrastructure values (e.g. DB host
-# `postgres` valid only inside docker network), so by default we import a safe
-# subset required for local server behavior. Full import can be explicitly
-# enabled via DJANGO_LOAD_ROOT_ENV_ALL=1.
+# Root `.env` is loaded completely. Local `backend/.env` takes priority
+# (loaded after root, overwrites same keys).
 IS_PYTEST_RUN = (
-    "pytest" in Path(sys.argv[0]).name.lower()
+    "pytest" in str(Path(sys.argv[0])).lower()
+    or any("pytest" in str(arg).lower() for arg in sys.argv[1:])
     or "PYTEST_CURRENT_TEST" in os.environ
 )
-LOAD_ROOT_ENV_ALL = os.getenv("DJANGO_LOAD_ROOT_ENV_ALL", "").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
 if not IS_PYTEST_RUN:
-    if LOAD_ROOT_ENV_ALL:
-        _load_dotenv_file(BASE_DIR.parent / ".env")
-    else:
-        _load_dotenv_file(
-            BASE_DIR.parent / ".env",
-            allowed_keys={
-                "GOOGLE_OAUTH_CLIENT_ID",
-                "GOOGLE_OAUTH_CLIENT_SECRET",
-                "DJANGO_SECRET_KEY",
-                "CHAT_ATTACHMENT_MAX_PER_MESSAGE",
-                "CHAT_ATTACHMENT_MAX_SIZE_MB",
-                "CHAT_ATTACHMENT_ALLOW_ANY_TYPE",
-                "CHAT_ATTACHMENT_ALLOWED_TYPES",
-                "CHAT_ATTACHMENT_DELETE_FILES_ON_MESSAGE_DELETE",
-                "CHAT_ATTACHMENT_UPLOAD_TTL_SECONDS",
-                "CHAT_ATTACHMENT_CHUNK_MIN_SIZE_KB",
-                "CHAT_ATTACHMENT_CHUNK_MAX_SIZE_MB",
-                "CHAT_ATTACHMENT_TARGET_CHUNKS",
-                "CHAT_THUMBNAIL_MAX_SIDE",
-                "CHAT_THUMBNAIL_MAX_SOURCE_SIZE_MB",
-                "CHAT_THUMBNAIL_MAX_SOURCE_PIXELS",
-                "USER_PASSWORD_DEFAULT_AVATAR",
-                "USER_OAUTH_DEFAULT_AVATAR",
-                "GROUP_DEFAULT_AVATAR",
-                "USER_AVATAR_UPLOAD_DIR",
-                "GROUP_AVATAR_UPLOAD_DIR",
-            },
-        )
+    _load_dotenv_file(BASE_DIR.parent / ".env")
     _load_dotenv_file(BASE_DIR / ".env")
 
 
@@ -182,27 +148,44 @@ def resolve_upload_memory_limits(max_upload_mb: int) -> tuple[int | None, int]:
     return data_upload_limit, DEFAULT_FILE_UPLOAD_MAX_MEMORY_SIZE
 
 
-DEBUG = env_bool("DJANGO_DEBUG", True)
+DEBUG = env_bool("DJANGO_DEBUG", False)
 TESTING = "test" in sys.argv
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY должен быть задан в .env.")
+if not IS_PYTEST_RUN and len(SECRET_KEY) < 50:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY должен быть >= 50 символов.")
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
     ["localhost", "127.0.0.1"] if DEBUG else [],
 )
 ALLOW_LOCALHOST_DEV_ORIGINS = env_bool("DJANGO_ALLOW_LOCALHOST_DEV_ORIGINS", DEBUG)
-if ALLOW_LOCALHOST_DEV_ORIGINS:
+
+# Detect local dev: DB host is a Docker-internal hostname not resolvable outside Docker
+_docker_hosts = {"postgres", "mysql", "mariadb"}
+_is_local_dev = (
+    DEBUG
+    or ALLOW_LOCALHOST_DEV_ORIGINS
+    or os.getenv("DJANGO_DB_HOST", "") in _docker_hosts
+)
+
+# When running locally with Docker DB host, force DEBUG for dev conveniences
+# (static files, browsable API, no SSL redirect, localhost in CSRF, etc.)
+if _is_local_dev and not DEBUG:
+    DEBUG = True
+
+if ALLOW_LOCALHOST_DEV_ORIGINS or _is_local_dev:
     ALLOWED_HOSTS = _extend_unique(
         ALLOWED_HOSTS,
         ["localhost", "127.0.0.1", "[::1]", "host.docker.internal"],
     )
-ALLOWED_HOSTS = _extend_unique(
-    ALLOWED_HOSTS,
-    ["backend", "nginx"],
-)
+if DEBUG or IS_PYTEST_RUN:
+    ALLOWED_HOSTS = _extend_unique(
+        ALLOWED_HOSTS,
+        ["backend", "nginx"],
+    )
 if not DEBUG and not ALLOWED_HOSTS:
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS должен быть задан в production.")
 
@@ -247,7 +230,7 @@ def build_rest_renderer_classes(debug: bool) -> list[str]:
     return classes
 
 
-REST_RENDERER_CLASSES = build_rest_renderer_classes(DEBUG)
+REST_RENDERER_CLASSES = build_rest_renderer_classes(DEBUG or IS_PYTEST_RUN)
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
@@ -307,10 +290,16 @@ ASGI_APPLICATION = "chat_app_django.asgi.application"
 REDIS_URL = os.getenv("REDIS_URL")
 REQUIRE_REDIS = env_bool("DJANGO_REQUIRE_REDIS", not DEBUG)
 ALLOW_INMEMORY_CHANNEL_LAYER = env_bool("DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER", DEBUG)
+
+# In local dev (Docker host fallback), force in-memory channel layer
+if _is_local_dev:
+    ALLOW_INMEMORY_CHANNEL_LAYER = True
+    REQUIRE_REDIS = False
+
 if REQUIRE_REDIS and not REDIS_URL:
     raise ImproperlyConfigured("REDIS_URL должен быть задан в production.")
 
-if REDIS_URL:
+if REDIS_URL and not _is_local_dev:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -351,18 +340,24 @@ def _database_from_url(url: str) -> dict:
     raise ImproperlyConfigured("Неподдерживаемая схема DATABASE_URL.")
 
 
+_docker_host_fallback = False
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
     db_config = _database_from_url(DATABASE_URL)
-    # Add connection pooling for production performance
     db_config["CONN_MAX_AGE"] = env_int("DJANGO_DB_CONN_MAX_AGE", 600, minimum=0)
     db_config["OPTIONS"] = {
         "connect_timeout": 10,
-        "options": "-c statement_timeout=30000",  # 30s query timeout
+        "options": "-c statement_timeout=30000",
     }
     DATABASES = {"default": db_config}
 else:
     db_engine = os.getenv("DJANGO_DB_ENGINE", "")
+    db_host = os.getenv("DJANGO_DB_HOST", "")
+
+    # If DB host is a Docker-internal hostname not resolvable locally, use SQLite
+    if db_engine == "django.db.backends.postgresql" and db_host in _docker_hosts:
+        db_engine = ""
+
     if db_engine:
         DATABASES = {
             "default": {
@@ -370,7 +365,7 @@ else:
                 "NAME": os.getenv("DJANGO_DB_NAME", ""),
                 "USER": os.getenv("DJANGO_DB_USER", ""),
                 "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", ""),
-                "HOST": os.getenv("DJANGO_DB_HOST", ""),
+                "HOST": db_host,
                 "PORT": os.getenv("DJANGO_DB_PORT", ""),
                 "CONN_MAX_AGE": env_int("DJANGO_DB_CONN_MAX_AGE", 600, minimum=0),
                 "OPTIONS": {
@@ -386,7 +381,7 @@ else:
                 "ENGINE": "django.db.backends.sqlite3",
                 "NAME": sqlite_path or (BASE_DIR / "db.sqlite3"),
                 "OPTIONS": {
-                    "timeout": 30,
+                    "timeout": 5,
                 },
             }
         }
@@ -396,6 +391,7 @@ if (
     not DEBUG
     and DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3"
     and not ALLOW_SQLITE_IN_PROD
+    and not _is_local_dev
 ):
     raise ImproperlyConfigured("SQLite не разрешен в production.")
 
@@ -452,14 +448,14 @@ CSRF_TRUSTED_ORIGINS = env_list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     _DEV_ORIGINS if DEBUG else [],
 )
-if ALLOW_LOCALHOST_DEV_ORIGINS:
+if ALLOW_LOCALHOST_DEV_ORIGINS or _is_local_dev:
     CSRF_TRUSTED_ORIGINS = _extend_unique(CSRF_TRUSTED_ORIGINS, _DEV_ORIGINS)
 
 CORS_ALLOWED_ORIGINS = env_list(
     "DJANGO_CORS_ALLOWED_ORIGINS",
     _DEV_ORIGINS if DEBUG else [],
 )
-if ALLOW_LOCALHOST_DEV_ORIGINS:
+if ALLOW_LOCALHOST_DEV_ORIGINS or _is_local_dev:
     CORS_ALLOWED_ORIGINS = _extend_unique(CORS_ALLOWED_ORIGINS, _DEV_ORIGINS)
 CORS_ALLOW_CREDENTIALS = env_bool("DJANGO_CORS_ALLOW_CREDENTIALS", True)
 CORS_URLS_REGEX = r"^/api/.*$"
@@ -480,9 +476,26 @@ TRUSTED_PROXY_RANGES = env_list(
 )
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", not DEBUG)
-CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", not DEBUG)
-SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
+
+# In local dev (Docker host fallback or DEBUG), disable HTTPS-only settings
+# that are forced by the production .env
+if _is_local_dev:
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+else:
+    SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", True)
+    CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", True)
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_HSTS_SECONDS = env_int("DJANGO_HSTS_SECONDS", 31536000 if not DEBUG else 0, minimum=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG and not _is_local_dev
+SECURE_HSTS_PRELOAD = not DEBUG and not _is_local_dev
+X_FRAME_OPTIONS = "DENY"
 SECURE_REDIRECT_EXEMPT = env_list(
     "DJANGO_SECURE_REDIRECT_EXEMPT",
     [
@@ -545,10 +558,10 @@ if USERNAME_MAX_LENGTH > 150:
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
 CHAT_MESSAGE_EDIT_WINDOW_SECONDS = env_int("CHAT_MESSAGE_EDIT_WINDOW_SECONDS", 900, minimum=0)
-CHAT_MESSAGE_MAX_LENGTH = int(os.getenv("CHAT_MESSAGE_MAX_LENGTH", "1000"))
-CHAT_MESSAGES_PAGE_SIZE = int(os.getenv("CHAT_MESSAGES_PAGE_SIZE", "50"))
-CHAT_MESSAGES_MAX_PAGE_SIZE = int(os.getenv("CHAT_MESSAGES_MAX_PAGE_SIZE", "200"))
-CHAT_WS_IDLE_TIMEOUT = int(os.getenv("CHAT_WS_IDLE_TIMEOUT", "600"))
+CHAT_MESSAGE_MAX_LENGTH = env_int("CHAT_MESSAGE_MAX_LENGTH", 1000, minimum=1)
+CHAT_MESSAGES_PAGE_SIZE = env_int("CHAT_MESSAGES_PAGE_SIZE", 50, minimum=1)
+CHAT_MESSAGES_MAX_PAGE_SIZE = env_int("CHAT_MESSAGES_MAX_PAGE_SIZE", 200, minimum=1)
+CHAT_WS_IDLE_TIMEOUT = env_int("CHAT_WS_IDLE_TIMEOUT", 600, minimum=10)
 CHAT_TARGET_REGEX = os.getenv("CHAT_TARGET_REGEX", r"^[A-Za-z0-9_@-]{1,60}$")
 
 # -- Attachments --------------------------------------------------------
@@ -594,16 +607,16 @@ CHAT_THUMBNAIL_MAX_SOURCE_PIXELS = env_int(
     50_000_000,
     minimum=1,
 )
-PRESENCE_TTL = int(os.getenv("PRESENCE_TTL", "40"))
-PRESENCE_GRACE = int(os.getenv("PRESENCE_GRACE", "5"))
-PRESENCE_HEARTBEAT = int(os.getenv("PRESENCE_HEARTBEAT", "20"))
-PRESENCE_IDLE_TIMEOUT = int(os.getenv("PRESENCE_IDLE_TIMEOUT", "90"))
-PRESENCE_TOUCH_INTERVAL = int(os.getenv("PRESENCE_TOUCH_INTERVAL", "30"))
+PRESENCE_TTL = env_int("PRESENCE_TTL", 40, minimum=5)
+PRESENCE_GRACE = env_int("PRESENCE_GRACE", 5, minimum=0)
+PRESENCE_HEARTBEAT = env_int("PRESENCE_HEARTBEAT", 20, minimum=5)
+PRESENCE_IDLE_TIMEOUT = env_int("PRESENCE_IDLE_TIMEOUT", 90, minimum=10)
+PRESENCE_TOUCH_INTERVAL = env_int("PRESENCE_TOUCH_INTERVAL", 30, minimum=5)
 
-DIRECT_INBOX_UNREAD_TTL = int(os.getenv("DIRECT_INBOX_UNREAD_TTL", str(30 * 24 * 60 * 60)))
-DIRECT_INBOX_ACTIVE_TTL = int(os.getenv("DIRECT_INBOX_ACTIVE_TTL", "90"))
-DIRECT_INBOX_HEARTBEAT = int(os.getenv("DIRECT_INBOX_HEARTBEAT", "20"))
-DIRECT_INBOX_IDLE_TIMEOUT = int(os.getenv("DIRECT_INBOX_IDLE_TIMEOUT", "90"))
+DIRECT_INBOX_UNREAD_TTL = env_int("DIRECT_INBOX_UNREAD_TTL", 30 * 24 * 60 * 60, minimum=60)
+DIRECT_INBOX_ACTIVE_TTL = env_int("DIRECT_INBOX_ACTIVE_TTL", 90, minimum=10)
+DIRECT_INBOX_HEARTBEAT = env_int("DIRECT_INBOX_HEARTBEAT", 20, minimum=5)
+DIRECT_INBOX_IDLE_TIMEOUT = env_int("DIRECT_INBOX_IDLE_TIMEOUT", 90, minimum=10)
 
 # -- Groups -------------------------------------------------------------
 GROUP_INVITE_CODE_LENGTH = env_int("GROUP_INVITE_CODE_LENGTH", 12, minimum=8)
@@ -615,7 +628,7 @@ AUDIT_RETENTION_DAYS = env_int("AUDIT_RETENTION_DAYS", 180, minimum=1)
 AUDIT_API_DEFAULT_LIMIT = env_int("AUDIT_API_DEFAULT_LIMIT", 50, minimum=1)
 AUDIT_API_MAX_LIMIT = env_int("AUDIT_API_MAX_LIMIT", 200, minimum=1)
 
-if REDIS_URL:
+if REDIS_URL and not _is_local_dev:
     redis_cache_config = {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": REDIS_URL,
@@ -659,7 +672,7 @@ def _sqlite_pragmas(sender, connection, **kwargs):
     if connection.vendor == "sqlite":
         cursor = connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("PRAGMA busy_timeout=30000;")
+        cursor.execute("PRAGMA busy_timeout=5000;")
 
 
 from django.db.backends.signals import connection_created  # noqa: E402
