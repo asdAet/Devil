@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 
 from roles.models import PermissionOverride, Role
 
@@ -27,4 +27,12 @@ class RoomAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "kind", "direct_pair_key", "created_by")
     search_fields = ("id", "name", "direct_pair_key", "public_id")
     list_filter = ("kind",)
+    readonly_fields = ("created_by", "direct_pair_key")
+    list_per_page = 50
+
+    fieldsets = (
+        ("Room Info", {"fields": ("name", "kind", "public_id", "public_handle")}),
+        ("Access", {"fields": ("direct_pair_key", "created_by")}),
+    )
+
     inlines = (RoleInline, PermissionOverrideInline)
