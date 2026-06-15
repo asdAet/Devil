@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="module">
+  <h2>{{ title }}</h2>
+  <p>Пользователь: <strong>{{ user.login }}</strong></p>
+
+  <div class="two-factor-qr-container">
+    <h3>1. Отсканируйте QR-код</h3>
+    <div class="two-factor-qr">
+      <img src="{{ setup.qrSvg }}" alt="QR Code" class="two-factor-qr-image">
+    </div>
+
+    <h3>2. Или введите ключ вручную</h3>
+    <code class="two-factor-manual-key">{{ setup.manualKey }}</code>
+
+    <h3>3. Введите код из приложения</h3>
+    <p>Откройте приложение-аутентификатор (Google Authenticator, Authy и т.д.), введите 6-значный код ниже.</p>
+  </div>
+
+  <form method="post" style="margin-top: 16px;">
+    {% csrf_token %}
+    <input type="hidden" name="form" value="1">
+
+    <div style="margin-bottom: 16px;">
+      <label for="id_code" style="display: block; margin-bottom: 4px; font-weight: bold;">
+        TOTP код:
+      </label>
+      <input type="text" name="code" id="id_code" maxlength="6" required
+             placeholder="6-значный код"
+             style="width: 200px; padding: 8px; font-family: monospace; letter-spacing: 2px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <input type="submit" name="_confirm_2fa" value="Подтвердить и включить 2FA" class="default">
+    <a href="{% url 'admin:users_user_changelist' %}" class="button" style="margin-left: 10px;">Отмена</a>
+  </form>
+</div>
+{% endblock %}

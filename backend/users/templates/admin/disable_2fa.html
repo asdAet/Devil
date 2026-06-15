@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="module">
+  <h2>{{ title }}</h2>
+  <p>Пользователь: <strong>{{ user.login }}</strong></p>
+
+  <div style="padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 16px;">
+    <p style="color: #856404; font-weight: bold; margin: 0;">
+      ⚠️ Внимание! Отключение 2FA снижает безопасность аккаунта.
+    </p>
+    <p style="color: #856404; margin: 8px 0 0 0;">
+      Пользователь сможет входить только с помощью пароля.
+    </p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="form" value="1">
+
+    <input type="submit" name="_confirm_disable" value="Отключить 2FA" class="default"
+           style="background: #dc3545; color: white; border-color: #dc3545;"
+           onclick="return confirm('Вы уверены? Отключение 2FA снижает безопасность.');">
+    <a href="{% url 'admin:users_user_changelist' %}" class="button" style="margin-left: 10px;">Отмена</a>
+  </form>
+</div>
+{% endblock %}
