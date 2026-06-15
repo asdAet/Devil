@@ -286,7 +286,7 @@ def create_attachment_upload(
         )
 
     max_size = int(getattr(settings, "CHAT_ATTACHMENT_MAX_SIZE_MB", 10)) * 1024 * 1024
-    if (not getattr(user, "is_superuser", False)) and file_size > max_size:
+    if file_size > max_size:
         raise AttachmentUploadError(
             f"Файл '{normalized_filename}' превышает максимальный размер",
             code="file_too_large",
@@ -504,7 +504,7 @@ def finalize_attachment_uploads(
         )
 
     max_per_msg = int(getattr(settings, "CHAT_ATTACHMENT_MAX_PER_MESSAGE", 10))
-    if (not getattr(user, "is_superuser", False)) and len(upload_ids) > max_per_msg:
+    if len(upload_ids) > max_per_msg:
         raise AttachmentUploadError(
             f"Максимум {max_per_msg} файлов на сообщение",
             code="too_many_files",

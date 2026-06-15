@@ -16,6 +16,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from chat_app_django.security.audit import audit_http_event
 from messages.models import Message, MessageAttachment, MessageAttachmentUpload
 from messages.serializers import MessageSerializer
 from roles.access import ensure_can_read_or_404, has_permission
@@ -793,6 +794,8 @@ def message_detail(request, room_id: int, message_id):
             content = request.data.get("content", "")
             if not isinstance(content, str):
                 return Response({"error": "Требуется поле content"}, status=http_status.HTTP_400_BAD_REQUEST)
+            old_msg = Message.objects.filter(pk=message_id, room=room).first()
+            old_content = old_msg.message_content if old_msg else ""
             msg = edit_message(request.user, room, message_id, content)
             edited_at = msg.edited_at or msg.date_added
             _broadcast_to_room(room, {
@@ -804,12 +807,19 @@ def message_detail(request, room_id: int, message_id):
                 "editedByRef": user_public_ref(request.user),
                 "editedBy": user_public_username(request.user),
             })
+            audit_http_event(
+                "chat.message.edited", request,
+                room_id=room.pk, message_id=message_id,
+                old_content=old_content, new_content=msg.message_content,
+            )
             return Response({
                 "id": msg.pk,
                 "content": msg.message_content,
                 "editedAt": edited_at.isoformat(),
             })
         else:
+            old_msg = Message.objects.filter(pk=message_id, room=room).first()
+            old_content = old_msg.message_content if old_msg else ""
             deleted = delete_message(request.user, room, message_id)
             _broadcast_to_room(room, {
                 "type": "chat_message_delete",
@@ -818,6 +828,11 @@ def message_detail(request, room_id: int, message_id):
                 "deletedByRef": user_public_ref(request.user),
                 "deletedBy": user_public_username(request.user),
             })
+            audit_http_event(
+                "chat.message.deleted", request,
+                room_id=room.pk, message_id=message_id,
+                old_content=old_content,
+            )
             return Response(status=http_status.HTTP_204_NO_CONTENT)
 
     except MessageNotFoundError:
