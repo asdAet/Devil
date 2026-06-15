@@ -7,30 +7,30 @@ import { resolveIdentityLabel } from "../../shared/lib/userIdentity";
 import { Skeleton } from "../../shared/ui";
 import styles from "../../styles/chat/ChatSearch.module.css";
 
-/**
- * Описывает входные props компонента `Props`.
- */
 type Props = {
   roomId: string;
   onResultClick?: (messageId: number) => void;
 };
 
-/**
- * Обрабатывает highlight text.
- * @param text Текст, который используется в вычислении.
- * @param query Поисковый запрос.
-
- */
-function highlightText(text: string, query: string): string {
-  if (!query.trim()) return text;
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.replace(new RegExp(`(${escaped})`, "gi"), "<mark>$1</mark>");
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
 }
 
-/**
- * Skeleton результатов поиска сообщений. Поле ввода остается доступным, а
- * изменяемая зона результатов показывает прогресс без скачка layout.
- */
+function highlightText(text: string, query: string): string {
+  if (!query.trim()) return escapeHtml(text);
+  const escaped = escapeHtml(text);
+  const queryPattern = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return escaped.replace(
+    new RegExp(`(${queryPattern})`, "gi"),
+    "<mark>$1</mark>",
+  );
+}
+
 function ChatSearchResultsSkeleton() {
   return (
     <div className={styles.searchSkeleton} aria-busy="true">
@@ -47,9 +47,16 @@ function ChatSearchResultsSkeleton() {
   );
 }
 
-/**
- * React-компонент ChatSearch отвечает за отрисовку и обработку UI-сценария.
- */
+function sanitizeHighlight(html: string): string {
+  const allowed = html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+    .replace(/on\w+="[^"]*"/gi, "")
+    .replace(/on\w+='[^']*'/gi, "")
+    .replace(/javascript:/gi, "");
+  return allowed;
+}
+
 export function ChatSearch({ roomId, onResultClick }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResultItem[]>([]);
@@ -124,7 +131,9 @@ export function ChatSearch({ roomId, onResultClick }: Props) {
                 <div
                   className={styles.resultContent}
                   dangerouslySetInnerHTML={{
-                    __html: r.highlight || highlightText(r.content, query),
+                    __html: r.highlight
+                      ? sanitizeHighlight(r.highlight)
+                      : highlightText(r.content, query),
                   }}
                 />
               </div>
