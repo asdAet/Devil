@@ -258,15 +258,12 @@ class UserAdmin(BaseUserAdmin):
             self.message_user(request, f"Пароль для {obj.login} изменён.")
         super().save_model(request, obj, form, change)
 
-    @admin.display(description="Статус 2FA")
     def twofa_status(self, obj):
         return format_html('<div id="twofa_status">{}</div>', _twofa_html(obj)["status"])
 
-    @admin.display(description="QR-код и ключ")
     def twofa_qr(self, obj):
         return format_html('<div id="twofa_qr">{}</div>', _twofa_html(obj)["qr"])
 
-    @admin.display(description="Действия")
     def twofa_actions(self, obj):
         return format_html('<div id="twofa_actions">{}</div>', _twofa_html(obj)["actions"])
 
