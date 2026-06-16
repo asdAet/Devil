@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.urls import reverse
 from django.utils.html import format_html
 
 from groups.infrastructure.models import InviteLink, JoinRequest, PinnedMessage
@@ -87,7 +88,7 @@ class RoomAdmin(admin.ModelAdmin):
     )
     search_fields = ("id", "name", "public_id", "created_by__login", "description")
     list_filter = ("kind", "is_public", "join_approval_required")
-    readonly_fields = ("member_count", "created_by")
+    readonly_fields = ("member_count", "created_by", "messages_link")
     list_per_page = 50
     date_hierarchy = None
 
@@ -103,7 +104,7 @@ class RoomAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
         }),
         ("Статистика", {
-            "fields": ("member_count", "created_by"),
+            "fields": ("member_count", "created_by", "messages_link"),
             "classes": ("collapse",),
         }),
     )
@@ -122,6 +123,17 @@ class RoomAdmin(admin.ModelAdmin):
     @admin.display(description="Участники")
     def member_count_display(self, obj):
         return obj.member_count
+
+    @admin.display(description="Сообщения")
+    def messages_link(self, obj):
+        if obj.pk:
+            url = reverse("admin:messages_message_changelist") + "?room__id__exact=%d" % obj.pk
+            count = obj.messages.count()
+            return format_html(
+                '<a href="{}">Посмотреть сообщения ({})</a>',
+                url, count,
+            )
+        return "-"
 
     @admin.action(description="Пересчитать количество участников")
     def recalc_member_count(self, request, queryset):
