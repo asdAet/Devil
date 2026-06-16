@@ -4,7 +4,7 @@ from django.utils.html import format_html
 
 from groups.infrastructure.models import InviteLink, JoinRequest, PinnedMessage
 from roles.models import Membership, PermissionOverride, Role
-from rooms.models import Room
+from rooms.models import Group, Room
 
 
 class RoleInline(admin.TabularInline):
@@ -81,21 +81,34 @@ def _permission_flags(mask: int) -> str:
     return ", ".join(names) if names else "-"
 
 
-@admin.register(Room)
-class RoomAdmin(admin.ModelAdmin):
+def _messages_link(obj):
+    if obj.pk:
+        url = reverse("admin:chat_messages_message_changelist") + "?room__id__exact=%d" % obj.pk
+        count = obj.messages.count()
+        return format_html(
+            '<a href="{}">Посмотреть сообщения ({})</a>',
+            url, count,
+        )
+    return "-"
+
+
+_messages_link.short_description = "Сообщения"
+
+
+@admin.register(Group)
+class GroupAdmin(admin.ModelAdmin):
     list_display = (
-        "id", "name", "kind", "member_count", "is_public",
+        "id", "name", "member_count", "is_public",
         "slow_mode_seconds", "join_approval_required", "created_by",
     )
     search_fields = ("id", "name", "public_id", "created_by__login", "description")
-    list_filter = ("kind", "is_public", "join_approval_required")
+    list_filter = ("is_public", "join_approval_required")
     readonly_fields = ("member_count", "created_by", "messages_link")
     list_per_page = 50
-    date_hierarchy = None
 
     fieldsets = (
         ("Основная информация", {
-            "fields": ("name", "kind", "description", "public_id", "is_public"),
+            "fields": ("name", "description", "public_id", "is_public"),
         }),
         ("Настройки", {
             "fields": ("slow_mode_seconds", "join_approval_required", "max_members"),
@@ -121,20 +134,27 @@ class RoomAdmin(admin.ModelAdmin):
 
     actions = ("recalc_member_count",)
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(kind=Room.Kind.GROUP).select_related("created_by")
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj is None:
+            readonly.append("kind")
+        return readonly
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.kind = Room.Kind.GROUP
+        super().save_model(request, obj, form, change)
+
     @admin.display(description="Участники")
     def member_count_display(self, obj):
         return obj.member_count
 
     @admin.display(description="Сообщения")
     def messages_link(self, obj):
-        if obj.pk:
-            url = reverse("admin:chat_messages_message_changelist") + "?room__id__exact=%d" % obj.pk
-            count = obj.messages.count()
-            return format_html(
-                '<a href="{}">Посмотреть сообщения ({})</a>',
-                url, count,
-            )
-        return "-"
+        return _messages_link(obj)
 
     @admin.action(description="Пересчитать количество участников")
     def recalc_member_count(self, request, queryset):
@@ -146,5 +166,26 @@ class RoomAdmin(admin.ModelAdmin):
             updated += 1
         self.message_user(request, f"Пересчитано для {updated} групп.")
 
+
+class DirectAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "direct_pair_key", "created_by")
+    search_fields = ("id", "name", "direct_pair_key", "created_by__login")
+    list_filter = ("kind",)
+    readonly_fields = ("direct_pair_key", "created_by", "messages_link")
+    list_per_page = 50
+
+    fieldsets = (
+        (None, {"fields": ("name", "kind", "direct_pair_key")}),
+        ("Пользователи", {"fields": ("created_by",)}),
+        ("Сообщения", {"fields": ("messages_link",)}),
+    )
+
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("created_by")
+        return super().get_queryset(request).exclude(kind=Room.Kind.GROUP).select_related("created_by")
+
+    @admin.display(description="Сообщения")
+    def messages_link(self, obj):
+        return _messages_link(obj)
+
+
+admin.site.register(Room, DirectAdmin)

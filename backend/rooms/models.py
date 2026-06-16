@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 # pyright: reportIncompatibleVariableOverride=false, reportCallIssue=false
 from typing import Optional
@@ -124,3 +124,10 @@ class Room(models.Model):
                 if old_public_id and old_public_id != self.public_id:
                     raise ValidationError({"public_id": "public_id is immutable."})
         super().save(*args, **kwargs)
+
+
+class Group(Room):
+    class Meta:
+        proxy = True
+        verbose_name = "Группа"
+        verbose_name_plural = "Группы"
