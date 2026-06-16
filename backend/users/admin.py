@@ -9,7 +9,7 @@ from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.contrib.auth.password_validation import validate_password
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from django.views.decorators.http import require_POST
 
 from .models import Profile, User, UserTwoFactor
@@ -259,13 +259,13 @@ class UserAdmin(BaseUserAdmin):
         super().save_model(request, obj, form, change)
 
     def twofa_status(self, obj):
-        return format_html('<div id="twofa_status">{}</div>', _twofa_html(obj)["status"])
+        return mark_safe('<div id="twofa_status">{}</div>'.format(_twofa_html(obj)["status"]))
 
     def twofa_qr(self, obj):
-        return format_html('<div id="twofa_qr">{}</div>', _twofa_html(obj)["qr"])
+        return mark_safe('<div id="twofa_qr">{}</div>'.format(_twofa_html(obj)["qr"]))
 
     def twofa_actions(self, obj):
-        return format_html('<div id="twofa_actions">{}</div>', _twofa_html(obj)["actions"])
+        return mark_safe('<div id="twofa_actions">{}</div>'.format(_twofa_html(obj)["actions"]))
 
     @admin.display(description="2FA")
     def two_factor_status(self, obj):
