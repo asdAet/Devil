@@ -277,3 +277,17 @@ class PermissionOverride(models.Model):
         """
         target = self.target_role or self.target_user
         return f"{self.room_id}:override:{target}"
+
+
+class GroupRole(Role):
+    class Meta:
+        proxy = True
+        verbose_name = "Роль группы"
+        verbose_name_plural = "Роли групп"
+
+
+class GroupMembership(Membership):
+    class Meta:
+        proxy = True
+        verbose_name = "Участник группы"
+        verbose_name_plural = "Участники групп"
