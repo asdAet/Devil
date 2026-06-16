@@ -4,6 +4,7 @@ from django.utils.html import format_html
 
 from groups.infrastructure.models import InviteLink, JoinRequest, PinnedMessage
 from roles.models import Membership, PermissionOverride, Role
+from rooms.models import Room
 
 
 class RoleInline(admin.TabularInline):
@@ -80,7 +81,7 @@ def _permission_flags(mask: int) -> str:
     return ", ".join(names) if names else "-"
 
 
-@admin.register(__import__("rooms.models", fromlist=["Room"]).Room)
+@admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
     list_display = (
         "id", "name", "kind", "member_count", "is_public",
@@ -127,7 +128,7 @@ class RoomAdmin(admin.ModelAdmin):
     @admin.display(description="Сообщения")
     def messages_link(self, obj):
         if obj.pk:
-            url = reverse("admin:messages_message_changelist") + "?room__id__exact=%d" % obj.pk
+            url = reverse("admin:chat_messages_message_changelist") + "?room__id__exact=%d" % obj.pk
             count = obj.messages.count()
             return format_html(
                 '<a href="{}">Посмотреть сообщения ({})</a>',
