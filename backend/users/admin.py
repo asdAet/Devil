@@ -9,7 +9,8 @@ from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.contrib.auth.password_validation import validate_password
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
-from django.utils.html import format_html, mark_safe
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
 from .models import Profile, User, UserTwoFactor

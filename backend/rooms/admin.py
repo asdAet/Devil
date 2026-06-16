@@ -75,7 +75,7 @@ def _permission_flags(mask: int) -> str:
     names = [
         perm.name
         for perm in Perm
-        if perm and (int(mask) & int(perm))
+        if perm and perm.name and (int(mask) & int(perm))
     ]
     return ", ".join(names) if names else "-"
 
