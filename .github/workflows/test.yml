@@ -23,6 +23,7 @@ jobs:
       DJANGO_REQUIRE_REDIS: "false"
       DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER: "true"
       DJANGO_ALLOW_SQLITE: "true"
+      DJANGO_DEBUG: "1"
     defaults:
       run:
         working-directory: backend
@@ -99,6 +100,7 @@ jobs:
       DJANGO_REQUIRE_REDIS: "false"
       DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER: "true"
       DJANGO_ALLOW_SQLITE: "true"
+      DJANGO_DEBUG: "1"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
     steps:
       - name: Checkout repository
