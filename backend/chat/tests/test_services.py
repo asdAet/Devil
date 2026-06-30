@@ -7,8 +7,9 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import OperationalError
+from django.db import OperationalError, connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from chat import services
@@ -473,3 +474,44 @@ class ChatServicesTests(TestCase):
         )
         services.mark_read(self.owner, self.room, own_message.pk)
         self.assertEqual(services.get_unread_counts(self.owner), [])
+
+    def test_get_unread_counts_query_count_does_not_grow_with_rooms(self):
+        def make_member_with_unread_rooms(login, room_count):
+            member = User.objects.create_user(login=login, password="pass12345")
+            for index in range(room_count):
+                room = Room.objects.create(
+                    name=f"{login}-room-{index}",
+                    kind=Room.Kind.PRIVATE,
+                    created_by=self.owner,
+                )
+                ensure_membership(room, member, role_name="Member")
+                ensure_membership(room, self.peer, role_name="Owner")
+                Message.objects.create(
+                    username=self.peer.login,
+                    user=self.peer,
+                    room=room,
+                    message_content=f"unread {index}",
+                )
+            return member
+
+        few = make_member_with_unread_rooms("unread_few", 2)
+        many = make_member_with_unread_rooms("unread_many", 6)
+
+        services.get_unread_counts(few)
+
+        with CaptureQueriesContext(connection) as few_queries:
+            few_result = services.get_unread_counts(few)
+        with CaptureQueriesContext(connection) as many_queries:
+            many_result = services.get_unread_counts(many)
+
+        self.assertEqual(len(few_result), 2)
+        self.assertEqual(len(many_result), 6)
+        self.assertTrue(
+            all(item["unreadCount"] == 1 for item in few_result + many_result)
+        )
+        self.assertEqual(
+            len(few_queries),
+            len(many_queries),
+            f"N+1 detected: {len(few_queries)} queries for 2 rooms "
+            f"but {len(many_queries)} for 6 rooms",
+        )
