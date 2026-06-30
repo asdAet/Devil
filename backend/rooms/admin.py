@@ -81,6 +81,7 @@ def _permission_flags(mask: int) -> str:
     return ", ".join(names) if names else "-"
 
 
+@admin.display(description="Сообщения")
 def _messages_link(obj):
     if obj.pk:
         url = reverse("admin:chat_messages_message_changelist") + "?room__id__exact=%d" % obj.pk
@@ -90,9 +91,6 @@ def _messages_link(obj):
             url, count,
         )
     return "-"
-
-
-_messages_link.short_description = "Сообщения"
 
 
 @admin.register(Group)

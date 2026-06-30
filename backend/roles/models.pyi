@@ -67,3 +67,9 @@ class PermissionOverride(models.Model):
     target_user_id: Optional[int]
 
     def __str__(self) -> str: ...
+
+
+class GroupRole(Role): ...
+
+
+class GroupMembership(Membership): ...
