@@ -51,17 +51,18 @@ def _load_dotenv_file(path: Path, *, allowed_keys: set[str] | None = None) -> No
             os.environ[key] = value
 
 
-# Load env files for local app run.
+# Load env files.
 # Root `.env` is loaded completely. Local `backend/.env` takes priority
 # (loaded after root, overwrites same keys).
+# _load_dotenv_file does not overwrite existing env vars,
+# so CI env vars (set via workflow env:) always take precedence.
 IS_PYTEST_RUN = (
     "pytest" in str(Path(sys.argv[0])).lower()
     or any("pytest" in str(arg).lower() for arg in sys.argv[1:])
     or "PYTEST_CURRENT_TEST" in os.environ
 )
-if not IS_PYTEST_RUN:
-    _load_dotenv_file(BASE_DIR.parent / ".env")
-    _load_dotenv_file(BASE_DIR / ".env")
+_load_dotenv_file(BASE_DIR.parent / ".env")
+_load_dotenv_file(BASE_DIR / ".env")
 
 
 def env_bool(name: str, default: bool) -> bool:

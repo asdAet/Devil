@@ -169,7 +169,7 @@ class BuildProfileUrlTests(_SignedUrlAssertionsMixin, SimpleTestCase):
             "scheme": scheme,
         }
 
-    @override_settings(MEDIA_URL="/media/", MEDIA_SIGNING_KEY="test-key", MEDIA_URL_TTL_SECONDS=300)
+    @override_settings(MEDIA_URL="/media/", MEDIA_SIGNING_KEY="test-key", MEDIA_URL_TTL_SECONDS=300, PUBLIC_BASE_URL=None)
     def test_prefers_host_over_origin_for_local_dev(self):
         """Проверяет сценарий `test_prefers_host_over_origin_for_local_dev`."""
         scope = self._scope(
@@ -197,7 +197,7 @@ class BuildProfileUrlTests(_SignedUrlAssertionsMixin, SimpleTestCase):
         url = build_profile_url(scope, "profile_pics/a.jpg")
         self.assert_signed_media_url(url, "https://slowed.sbs")
 
-    @override_settings(MEDIA_URL="/media/", MEDIA_SIGNING_KEY="test-key", MEDIA_URL_TTL_SECONDS=300)
+    @override_settings(MEDIA_URL="/media/", MEDIA_SIGNING_KEY="test-key", MEDIA_URL_TTL_SECONDS=300, PUBLIC_BASE_URL=None)
     def test_uses_forwarded_host_and_proto(self):
         """Проверяет сценарий `test_uses_forwarded_host_and_proto`."""
         scope = self._scope(
@@ -211,7 +211,7 @@ class BuildProfileUrlTests(_SignedUrlAssertionsMixin, SimpleTestCase):
         url = build_profile_url(scope, "profile_pics/a.jpg")
         self.assert_signed_media_url(url, "https://chat.example.com")
 
-    @override_settings(MEDIA_URL="/media/", MEDIA_SIGNING_KEY="test-key", MEDIA_URL_TTL_SECONDS=300)
+    @override_settings(MEDIA_URL="/media/", MEDIA_SIGNING_KEY="test-key", MEDIA_URL_TTL_SECONDS=300, PUBLIC_BASE_URL=None)
     def test_falls_back_to_server(self):
         """Проверяет сценарий `test_falls_back_to_server`."""
         scope = self._scope(headers=[], server=("172.18.0.4", 8000), scheme="ws")
@@ -246,7 +246,7 @@ class BuildProfileUrlFromRequestTests(_SignedUrlAssertionsMixin, SimpleTestCase)
         """Проверяет сценарий `setUp`."""
         self.factory = RequestFactory()
 
-    @override_settings(MEDIA_URL="/media/", ALLOWED_HOSTS=["*"], MEDIA_SIGNING_KEY="test-key")
+    @override_settings(MEDIA_URL="/media/", ALLOWED_HOSTS=["*"], MEDIA_SIGNING_KEY="test-key", PUBLIC_BASE_URL=None)
     def test_request_prefers_host_over_origin_for_local_dev(self):
         """Проверяет сценарий `test_request_prefers_host_over_origin_for_local_dev`."""
         request = self.factory.get(
@@ -275,7 +275,7 @@ class BuildProfileUrlFromRequestTests(_SignedUrlAssertionsMixin, SimpleTestCase)
         url = build_profile_url_from_request(request, "profile_pics/a.jpg")
         self.assert_signed_media_url(url, "https://cdn.slowed.sbs")
 
-    @override_settings(MEDIA_URL="/media/", ALLOWED_HOSTS=["*"], MEDIA_SIGNING_KEY="test-key")
+    @override_settings(MEDIA_URL="/media/", ALLOWED_HOSTS=["*"], MEDIA_SIGNING_KEY="test-key", PUBLIC_BASE_URL=None)
     def test_request_uses_forwarded_host_and_proto(self):
         """Проверяет сценарий `test_request_uses_forwarded_host_and_proto`."""
         request = self.factory.get(
@@ -318,7 +318,7 @@ class BuildProfileUrlFromRequestTests(_SignedUrlAssertionsMixin, SimpleTestCase)
         )
         self.assert_signed_media_url(url, "https://slowed.sbs")
 
-    @override_settings(MEDIA_URL="/media/", ALLOWED_HOSTS=["*"], MEDIA_SIGNING_KEY="test-key")
+    @override_settings(MEDIA_URL="/media/", ALLOWED_HOSTS=["*"], MEDIA_SIGNING_KEY="test-key", PUBLIC_BASE_URL=None)
     def test_request_returns_relative_path_when_host_is_unavailable(self):
         """Проверяет сценарий `test_request_returns_relative_path_when_host_is_unavailable`."""
         request = self.factory.get("/api/auth/session/")
