@@ -74,6 +74,7 @@ class Message(models.Model):
         indexes = [
             models.Index(fields=["room", "date_added"], name="msg_room_date_idx"),
             models.Index(fields=["username", "date_added"], name="msg_user_date_idx"),
+            models.Index(fields=["room", "is_deleted", "id"], name="msg_room_deleted_id_idx"),
         ]
 
     def __str__(self):

@@ -6,10 +6,13 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from functools import reduce
+from operator import or_
 
 from django.conf import settings
 from django.core.files.storage import Storage
 from django.db import OperationalError, ProgrammingError, transaction
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from messages.domain import ReactionEmoji, ReactionEmojiError
@@ -593,26 +596,44 @@ def get_unread_counts(user) -> list[dict]:
         .select_related("room")
     )
 
-    result = []
     rooms = [membership.room for membership in memberships]
     public_room = Room.objects.filter(kind=Room.Kind.PUBLIC).first()
     if public_room is not None and all(public_room.pk != room.pk for room in rooms):
         rooms.append(public_room)
 
-    for room in rooms:
-        read_state = MessageReadState.objects.filter(user=user, room=room).first()
-        if room.kind == Room.Kind.PUBLIC and read_state is None:
-            continue
+    last_read_by_room = {
+        state.room_id: (state.last_read_message_id or 0)
+        for state in MessageReadState.objects.filter(user=user, room__in=rooms)
+    }
 
-        last_read_id = read_state.last_read_message_id if read_state else 0
-        unread = (
-            Message.objects
-            .filter(room=room, is_deleted=False, id__gt=(last_read_id or 0))
+    counted_rooms = [
+        room
+        for room in rooms
+        if not (room.kind == Room.Kind.PUBLIC and room.pk not in last_read_by_room)
+    ]
+    if not counted_rooms:
+        return []
+
+    room_filter = reduce(
+        or_,
+        (
+            Q(room_id=room.pk, id__gt=last_read_by_room.get(room.pk, 0))
+            for room in counted_rooms
+        ),
+    )
+    unread_by_room = {
+        row["room"]: row["unread"]
+        for row in (
+            Message.objects.filter(room_filter, is_deleted=False)
             .exclude(user=user)
-            .count()
+            .values("room")
+            .annotate(unread=Count("id"))
         )
-        if unread > 0:
-            result.append({"roomId": room.pk, "unreadCount": unread})
+    }
 
-    return result
+    return [
+        {"roomId": room.pk, "unreadCount": unread_by_room[room.pk]}
+        for room in counted_rooms
+        if unread_by_room.get(room.pk, 0) > 0
+    ]
 
