@@ -99,12 +99,37 @@ def ensure_group_public_id(room: Room) -> str:
 
 
 def ensure_profile(user) -> Profile:
-    """Гарантирует наличие профиля у пользователя."""
+    """Гарантирует наличие профиля у пользователя.
+
+    При первичном создании профиля устанавливает полный crop (0, 0, 1, 1),
+    чтобы фронтенд сразу рендерил аватарку через frame с clip-path,
+    а не через object-fit: cover, который даёт смещение для дефолтного SVG.
+    """
     profile = getattr(user, "profile", None)
     if profile is not None:
+        _ensure_default_crop(profile)
         return profile
     profile, _ = Profile.objects.get_or_create(user=user)
+    _ensure_default_crop(profile)
     return profile
+
+
+def _ensure_default_crop(profile: Profile) -> None:
+    """Устанавливает full crop если все crop-поля NULL."""
+    if (
+        profile.avatar_crop_x is not None
+        or profile.avatar_crop_y is not None
+        or profile.avatar_crop_width is not None
+        or profile.avatar_crop_height is not None
+    ):
+        return
+    Profile.objects.filter(pk=profile.pk).update(
+        avatar_crop_x=0.0,
+        avatar_crop_y=0.0,
+        avatar_crop_width=1.0,
+        avatar_crop_height=1.0,
+    )
+    profile.refresh_from_db()
 
 
 def _with_sqlite_lock_retry(operation, *, attempts: int = 5):
