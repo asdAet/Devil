@@ -13,6 +13,10 @@ services:
     depends_on:
       postgres-bootstrap:
         condition: service_completed_successfully
+    networks:
+      - default
+      - data-net
+      - frontend-net
     restart: unless-stopped
 
   alertmanager:
@@ -118,6 +122,9 @@ services:
       - "--nginx.scrape-uri=http://nginx:8080/nginx_status"
     depends_on:
       - nginx
+    networks:
+      - default
+      - frontend-net
     restart: unless-stopped
 
   redis_exporter:
@@ -126,6 +133,9 @@ services:
       - "--redis.addr=redis://redis:6379"
     depends_on:
       - redis
+    networks:
+      - default
+      - data-net
     restart: unless-stopped
 
   postgres-bootstrap:
@@ -144,6 +154,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - data-net
     restart: "no"
 
   postgres_exporter:
@@ -160,6 +173,9 @@ services:
     depends_on:
       postgres-bootstrap:
         condition: service_completed_successfully
+    networks:
+      - default
+      - data-net
     restart: unless-stopped
 
 volumes:
