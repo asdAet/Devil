@@ -220,3 +220,4 @@ test_unit.txt
 CLAUDE.md
 backend/coverage.txt
 AGENTS.md
+.env copy
