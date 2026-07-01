@@ -136,6 +136,7 @@ request_certificate() {
 if [ ! -f "${live_cert_path}" ] || [ ! -f "${live_key_path}" ]; then
   # shellcheck disable=SC2086
   request_certificate ${domain_args}
+  docker restart devil-nginx-1 2>/dev/null || true
 fi
 
 while true; do
@@ -143,6 +144,7 @@ while true; do
     --webroot \
     -w /var/www/certbot \
     --quiet \
+    --deploy-hook "docker restart devil-nginx-1" \
     ${staging_arg} || true
   sleep "${CERTBOT_RENEW_INTERVAL_SECONDS}"
 done
