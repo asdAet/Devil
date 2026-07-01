@@ -50,6 +50,9 @@ services:
       - prometheus
       - loki
       - alertmanager
+    networks:
+      - default
+      - frontend-net
     restart: unless-stopped
 
   loki:
