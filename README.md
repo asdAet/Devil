@@ -1,8 +1,8 @@
 <div align="center">
   <img src="frontend/public/MINI-direct-logo-avatar.png" alt="Devil logo" width="180">
-  <div>
-    <a href="https://deepwiki.com/asdAet/Devil"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
-  </div>
+    <div align="center">
+      [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/auth0/java-jwt)
+    </div>
   <p><strong>Realtime-мессенджер для личного и командного общения</strong></p>
   <p>Devil — веб-приложение для закрытых диалогов, групповых комнат и быстрого обмена сообщениями в реальном времени. Проект объединяет чат, presence, роли, вложения и production-инфраструктуру в одной системе.</p>
 </div>
